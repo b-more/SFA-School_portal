@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Portal Training Manual - St. Francis of Assisi School</title>
+    <style>
+        @page { size: A4; margin: 18mm 16mm; }
+        @media print {
+            .page-break { page-break-before: always; }
+            .no-break { page-break-inside: avoid; }
+            body { font-size: 10.5pt; }
+            .print-btn, .answer-toggle { display: none !important; }
+            .answer { display: block !important; }
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 13px;
+            color: #1a1a2e;
+            line-height: 1.7;
+            background: #f0f2f5;
+        }
+
+        .container {
+            max-width: 880px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px 50px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+        }
+
+        /* Cover */
+        .cover {
+            text-align: center;
+            padding: 50px 0 35px;
+            border-bottom: 4px solid #1e3a5f;
+            margin-bottom: 35px;
+        }
+        .cover-school { font-size: 26px; font-weight: 700; color: #1e3a5f; letter-spacing: 2px; text-transform: uppercase; }
+        .cover-title { font-size: 22px; font-weight: 600; color: #2d5a8e; margin-top: 20px; }
+        .cover-subtitle { font-size: 14px; color: #666; margin-top: 5px; }
+        .cover-meta { margin-top: 25px; font-size: 12px; color: #888; }
+        .cover-meta span { display: inline-block; margin: 0 12px; }
+        .cover-badge { display: inline-block; margin-top: 20px; background: #1e3a5f; color: white; padding: 8px 20px; border-radius: 20px; font-size: 12px; font-weight: 600; letter-spacing: 1px; }
+
+        /* Module header */
+        .module-header {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8e 100%);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 8px;
+            margin: 35px 0 20px;
+        }
+        .module-header .module-num { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.8; }
+        .module-header h1 { font-size: 20px; margin-top: 4px; }
+        .module-header .module-desc { font-size: 12px; opacity: 0.85; margin-top: 6px; }
+        .module-header .module-lessons { font-size: 11px; margin-top: 8px; opacity: 0.7; }
+
+        /* Lesson header */
+        .lesson-header {
+            background: #f0f7ff;
+            border-left: 5px solid #1e3a5f;
+            padding: 14px 18px;
+            margin: 25px 0 15px;
+            border-radius: 0 6px 6px 0;
+        }
+        .lesson-header .lesson-num { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #2d5a8e; font-weight: 600; }
+        .lesson-header h2 { font-size: 16px; color: #1e3a5f; margin-top: 2px; }
+        .lesson-header .lesson-obj { font-size: 11px; color: #666; margin-top: 4px; font-style: italic; }
+
+        /* Sub-sections */
+        h3 { font-size: 14px; color: #1e3a5f; margin: 18px 0 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+
+        p { margin-bottom: 10px; text-align: justify; }
+
+        ul, ol { padding-left: 22px; margin-bottom: 12px; }
+        li { margin-bottom: 4px; }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 12px; }
+        thead th { background: #1e3a5f; color: white; padding: 9px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+        tbody td { padding: 7px 10px; border: 1px solid #e5e7eb; vertical-align: top; }
+        tbody tr:nth-child(even) { background: #f9fafb; }
+
+        /* Steps */
+        .steps { list-style: none; padding-left: 0; counter-reset: step; margin: 10px 0 16px; }
+        .steps li { counter-increment: step; padding: 8px 10px 8px 50px; margin-bottom: 5px; position: relative; background: #fafafa; border-radius: 4px; border: 1px solid #f0f0f0; }
+        .steps li::before { content: "Step " counter(step); position: absolute; left: 5px; top: 8px; font-size: 8px; font-weight: 700; color: white; background: #1e3a5f; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; }
+
+        /* Callouts */
+        .note { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; margin: 10px 0 16px; border-radius: 0 5px 5px 0; font-size: 12px; }
+        .note strong { color: #1e40af; }
+        .tip { background: #ecfdf5; border-left: 4px solid #10b981; padding: 10px 14px; margin: 10px 0 16px; border-radius: 0 5px 5px 0; font-size: 12px; }
+        .tip strong { color: #065f46; }
+        .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 10px 14px; margin: 10px 0 16px; border-radius: 0 5px 5px 0; font-size: 12px; }
+        .warning strong { color: #92400e; }
+
+        /* Quiz Section */
+        .quiz-box {
+            background: #fefce8;
+            border: 2px solid #facc15;
+            border-radius: 8px;
+            padding: 18px 20px;
+            margin: 20px 0;
+        }
+        .quiz-box h4 {
+            color: #854d0e;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 1px dashed #e5c100;
+        }
+        .quiz-q {
+            margin-bottom: 14px;
+            padding-left: 0;
+        }
+        .quiz-q .q-text {
+            font-weight: 600;
+            color: #422006;
+            margin-bottom: 5px;
+            font-size: 12.5px;
+        }
+        .quiz-q .q-options {
+            padding-left: 18px;
+            font-size: 12px;
+            color: #4b5563;
+        }
+        .quiz-q .q-options div { margin-bottom: 2px; }
+        .answer {
+            display: none;
+            background: #d1fae5;
+            color: #065f46;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 4px;
+            display: inline-block;
+        }
+        .answer.hidden { display: none; }
+
+        /* Module Test */
+        .test-box {
+            background: #fdf2f8;
+            border: 2px solid #ec4899;
+            border-radius: 8px;
+            padding: 20px 22px;
+            margin: 25px 0;
+        }
+        .test-box h3 {
+            color: #9d174d;
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            border-bottom: 2px solid #f9a8d4;
+            padding-bottom: 6px;
+        }
+        .test-box .test-info {
+            font-size: 11px;
+            color: #9d174d;
+            margin-bottom: 14px;
+            font-style: italic;
+        }
+        .test-q {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px dotted #f9a8d4;
+        }
+        .test-q:last-child { border-bottom: none; }
+        .test-q .q-num { font-weight: 700; color: #9d174d; font-size: 12px; }
+        .test-q .q-text { font-weight: 600; color: #1a1a2e; margin-bottom: 5px; font-size: 12.5px; }
+        .test-q .q-options { padding-left: 18px; font-size: 12px; color: #4b5563; }
+        .test-q .q-options div { margin-bottom: 2px; }
+        .test-answer {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 4px;
+            display: inline-block;
+        }
+        .test-answer.hidden { display: none; }
+
+        /* Toggle button */
+        .answer-toggle {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        .answer-toggle:hover { background: #047857; }
+
+        /* Badges */
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+        .badge-green { background: #d1fae5; color: #065f46; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-blue { background: #dbeafe; color: #1e40af; }
+        .badge-yellow { background: #fef3c7; color: #92400e; }
+        .badge-gray { background: #f3f4f6; color: #374151; }
+        .badge-pink { background: #fce7f3; color: #9d174d; }
+
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 11px; color: #7c3aed; }
+
+        hr { border: none; border-top: 2px solid #e5e7eb; margin: 25px 0; }
+
+        /* TOC */
+        .toc { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px 28px; margin-bottom: 30px; }
+        .toc h2 { color: #1e3a5f; font-size: 17px; margin-bottom: 12px; border-bottom: 2px solid #1e3a5f; padding-bottom: 6px; }
+        .toc-module { margin-bottom: 10px; }
+        .toc-module-title { font-weight: 700; color: #1e3a5f; font-size: 13px; }
+        .toc-lessons { padding-left: 20px; font-size: 12px; color: #4b5563; margin-top: 3px; }
+        .toc-lessons div { margin-bottom: 1px; }
+
+        .nav-map { background: #1e293b; color: #e2e8f0; padding: 18px 22px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 11.5px; line-height: 1.6; margin: 10px 0; white-space: pre-line; }
+
+        .print-btn { position: fixed; top: 20px; right: 20px; background: #1e3a5f; color: white; border: none; padding: 12px 22px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000; }
+        .print-btn:hover { background: #2d5a8e; }
+    </style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+
+<div class="container">
+
+    <!-- COVER -->
+    <div class="cover">
+        <div class="cover-school">St. Francis of Assisi School</div>
+        <div class="cover-title">Teacher Portal Training Manual</div>
+        <div class="cover-subtitle">School Management Information System (MIS)</div>
+        <div class="cover-badge">Modular Training Programme</div>
+        <div class="cover-meta">
+            <span>Portal: <code>portal.stfrancisofassisi.tech</code></span>
+            <span>Version 2.0</span>
+            <span>March 2026</span>
+        </div>
+        <div class="cover-meta"><span>Audience: All Teaching Staff (Primary & Secondary)</span></div>
+        <div class="cover-meta" style="margin-top: 15px;">
+            <span><strong>5 Modules</strong></span>
+            <span><strong>14 Lessons</strong></span>
+            <span><strong>42 Quiz Questions</strong></span>
+            <span><strong>5 Module Tests (50 Questions)</strong></span>
+        </div>
+    </div>
+
+    <!-- TABLE OF CONTENTS -->
+    <div class="toc">
+        <h2>Programme Structure</h2>
+
+        <div class="toc-module">
+            <div class="toc-module-title">Module 1: Getting Started & System Navigation</div>
+            <div class="toc-lessons">
+                <div>Lesson 1.1 &mdash; Logging In & First-Time Setup</div>
+                <div>Lesson 1.2 &mdash; Understanding Your Role (Class Teacher vs Subject Teacher)</div>
+                <div>Lesson 1.3 &mdash; Navigating the Dashboard & Sidebar</div>
+                <div>Module 1 Test (10 Questions)</div>
+            </div>
+        </div>
+
+        <div class="toc-module">
+            <div class="toc-module-title">Module 2: Daily Attendance Management</div>
+            <div class="toc-lessons">
+                <div>Lesson 2.1 &mdash; Marking Daily Attendance</div>
+                <div>Lesson 2.2 &mdash; Attendance Reports & Exports</div>
+                <div>Module 2 Test (10 Questions)</div>
+            </div>
+        </div>
+
+        <div class="toc-module">
+            <div class="toc-module-title">Module 3: Academic Results & Grading</div>
+            <div class="toc-lessons">
+                <div>Lesson 3.1 &mdash; Entering Student Results</div>
+                <div>Lesson 3.2 &mdash; Understanding Exam Types & Grading</div>
+                <div>Lesson 3.3 &mdash; Report Cards: Generating, Commenting & Distributing</div>
+                <div>Module 3 Test (10 Questions)</div>
+            </div>
+        </div>
+
+        <div class="toc-module">
+            <div class="toc-module-title">Module 4: Teaching Tools</div>
+            <div class="toc-lessons">
+                <div>Lesson 4.1 &mdash; Creating & Managing Homework</div>
+                <div>Lesson 4.2 &mdash; Viewing & Managing Students</div>
+                <div>Lesson 4.3 &mdash; Homework Submissions & Grading</div>
+                <div>Module 4 Test (10 Questions)</div>
+            </div>
+        </div>
+
+        <div class="toc-module">
+            <div class="toc-module-title">Module 5: Staff Self-Service & Best Practices</div>
+            <div class="toc-lessons">
+                <div>Lesson 5.1 &mdash; My Profile & Password Management</div>
+                <div>Lesson 5.2 &mdash; My Payslips & Staff Documents</div>
+                <div>Lesson 5.3 &mdash; Best Practices, Security & Troubleshooting</div>
+                <div>Module 5 Test (10 Questions)</div>
+            </div>
+        </div>
+    </div>
+
+    <button class="answer-toggle" onclick="document.querySelectorAll('.answer,.test-answer').forEach(el => el.classList.toggle('hidden')); this.textContent = this.textContent.includes('Show') ? 'Hide All Answers' : 'Show All Answers';">Show All Answers</button>
+
+    <!-- ============================================================ -->
+    <!-- MODULE 1 -->
+    <!-- ============================================================ -->
+    <div class="page-break">
+        <div class="module-header">
+            <div class="module-num">Module 1</div>
+            <h1>Getting Started & System Navigation</h1>
+            <div class="module-desc">Learn how to access the portal, understand your role, and navigate the system efficiently.</div>
+            <div class="module-lessons">3 Lessons | 9 Quiz Questions | 10 Test Questions</div>
+        </div>
+
+        <!-- Lesson 1.1 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 1.1</div>
+            <h2>Logging In & First-Time Setup</h2>
+            <div class="lesson-obj">Objective: Successfully log into the portal and change your default password.</div>
+        </div>
+
+        <h3>Accessing the Portal</h3>
+        <ol class="steps">
+            <li>Open your web browser (<strong>Chrome</strong>, <strong>Firefox</strong>, or <strong>Edge</strong> recommended)</li>
+            <li>Type the portal address: <code>https://portal.stfrancisofassisi.tech/admin</code></li>
+            <li>Enter your <strong>Email Address</strong> provided by the school administrator</li>
+            <li>Enter your <strong>Password</strong> (default password is given by admin)</li>
+            <li>Click <strong>"Sign In"</strong></li>
+        </ol>
+
+        <h3>First-Time Password Change</h3>
+        <p>When you log in for the first time, the system will force you to change your password. This is a security measure to ensure only you can access your account.</p>
+        <ul>
+            <li>Your new password must be at least <strong>8 characters</strong> long</li>
+            <li>Use a mix of letters, numbers, and special characters for a strong password</li>
+            <li>Do not reuse passwords from other websites</li>
+            <li>Remember your password &mdash; write it down in a secure place if needed</li>
+        </ul>
+
+        <div class="warning">
+            <strong>Security:</strong> Never share your login credentials with anyone. Each teacher has their own unique account. If you suspect someone has your password, change it immediately.
+        </div>
+
+        <h3>Supported Browsers</h3>
+        <table>
+            <thead><tr><th>Browser</th><th>Supported</th><th>Notes</th></tr></thead>
+            <tbody>
+                <tr><td>Google Chrome</td><td><span class="badge badge-green">Recommended</span></td><td>Best performance and compatibility</td></tr>
+                <tr><td>Mozilla Firefox</td><td><span class="badge badge-green">Recommended</span></td><td>Excellent alternative</td></tr>
+                <tr><td>Microsoft Edge</td><td><span class="badge badge-green">Supported</span></td><td>Works well on Windows</td></tr>
+                <tr><td>Safari</td><td><span class="badge badge-yellow">Partial</span></td><td>Some features may not display correctly</td></tr>
+                <tr><td>Internet Explorer</td><td><span class="badge badge-red">Not Supported</span></td><td>Do not use</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Quiz 1.1 -->
+        <div class="quiz-box">
+            <h4>Lesson 1.1 &mdash; Quick Quiz</h4>
+            <div class="quiz-q">
+                <div class="q-text">Q1: What is the correct URL for the school portal?</div>
+                <div class="q-options">
+                    <div>a) www.stfrancisofassisi.tech</div>
+                    <div>b) portal.stfrancisofassisi.tech/admin</div>
+                    <div>c) stfrancis.school.com</div>
+                    <div>d) admin.stfrancis.tech</div>
+                </div>
+                <div class="answer hidden">Answer: b) portal.stfrancisofassisi.tech/admin</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q2: What is the minimum number of characters required for your password?</div>
+                <div class="q-options">
+                    <div>a) 4 characters</div>
+                    <div>b) 6 characters</div>
+                    <div>c) 8 characters</div>
+                    <div>d) 12 characters</div>
+                </div>
+                <div class="answer hidden">Answer: c) 8 characters</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q3: Which browser is NOT recommended for use with the portal?</div>
+                <div class="q-options">
+                    <div>a) Chrome</div>
+                    <div>b) Firefox</div>
+                    <div>c) Internet Explorer</div>
+                    <div>d) Edge</div>
+                </div>
+                <div class="answer hidden">Answer: c) Internet Explorer</div>
+            </div>
+        </div>
+
+        <!-- Lesson 1.2 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 1.2</div>
+            <h2>Understanding Your Role</h2>
+            <div class="lesson-obj">Objective: Understand the difference between Class Teacher and Subject Teacher roles and their permissions.</div>
+        </div>
+
+        <h3>Two Types of Teacher Roles</h3>
+        <table>
+            <thead><tr><th>Role</th><th>Description</th><th>Key Permissions</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong>Class Teacher</strong></td>
+                    <td>Assigned as the main teacher responsible for a specific class section (e.g., Grade 3A)</td>
+                    <td>
+                        &bull; Mark attendance for the class<br>
+                        &bull; Enter results for ALL subjects<br>
+                        &bull; Write class teacher comments on report cards<br>
+                        &bull; View all students in the class
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Subject Teacher</strong></td>
+                    <td>Teaches specific subjects in one or more classes (e.g., Mathematics in Grade 7A & 7B)</td>
+                    <td>
+                        &bull; Enter results for assigned subjects ONLY<br>
+                        &bull; Create homework for assigned subjects<br>
+                        &bull; View students in classes they teach<br>
+                        &bull; Cannot write class teacher comments
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="note">
+            <strong>Note:</strong> A teacher can be BOTH a class teacher for one class AND a subject teacher in other classes. For example, you may be the Class Teacher for Grade 5A while also teaching Science in Grade 5B and 6A.
+        </div>
+
+        <h3>What Teachers Cannot Do</h3>
+        <ul>
+            <li>Access financial or accounting modules (fees, payments)</li>
+            <li>Manage the school timetable (admin function)</li>
+            <li>Edit student personal details (admin function)</li>
+            <li>Access other teachers' records or payslips</li>
+            <li>Change school settings or configurations</li>
+            <li>Delete other teachers' homework or results</li>
+        </ul>
+
+        <!-- Quiz 1.2 -->
+        <div class="quiz-box">
+            <h4>Lesson 1.2 &mdash; Quick Quiz</h4>
+            <div class="quiz-q">
+                <div class="q-text">Q1: Who can write class teacher comments on report cards?</div>
+                <div class="q-options">
+                    <div>a) Any teacher</div>
+                    <div>b) Only the class teacher for that class</div>
+                    <div>c) Only subject teachers</div>
+                    <div>d) Only the head teacher</div>
+                </div>
+                <div class="answer hidden">Answer: b) Only the class teacher for that class</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q2: A Subject Teacher can enter results for which subjects?</div>
+                <div class="q-options">
+                    <div>a) All subjects in the school</div>
+                    <div>b) Any subject in their grade level</div>
+                    <div>c) Only subjects they are assigned to teach</div>
+                    <div>d) Only one subject per class</div>
+                </div>
+                <div class="answer hidden">Answer: c) Only subjects they are assigned to teach</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q3: Can a teacher be both a Class Teacher and a Subject Teacher at the same time?</div>
+                <div class="q-options">
+                    <div>a) No, you must choose one role</div>
+                    <div>b) Yes, you can be Class Teacher for one class and Subject Teacher in other classes</div>
+                    <div>c) Only if the admin approves it</div>
+                    <div>d) Only in primary school</div>
+                </div>
+                <div class="answer hidden">Answer: b) Yes, you can be Class Teacher for one class and Subject Teacher in other classes</div>
+            </div>
+        </div>
+
+        <!-- Lesson 1.3 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 1.3</div>
+            <h2>Navigating the Dashboard & Sidebar</h2>
+            <div class="lesson-obj">Objective: Navigate the portal confidently using the sidebar menu and dashboard shortcuts.</div>
+        </div>
+
+        <h3>The Sidebar Menu</h3>
+        <p>The left sidebar is your main navigation. It contains grouped menu items based on your role:</p>
+        <table>
+            <thead><tr><th>Menu Group</th><th>Items Available</th><th>URL</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Dashboard</strong></td><td>Teacher Dashboard (your home page)</td><td><code>/admin/dashboard</code></td></tr>
+                <tr><td><strong>Academic</strong></td><td>Daily Attendance</td><td><code>/admin/mark-attendance</code></td></tr>
+                <tr><td></td><td>Enter Results</td><td><code>/admin/enter-results</code></td></tr>
+                <tr><td></td><td>Generate Report Cards</td><td><code>/admin/generate-report-cards</code></td></tr>
+                <tr><td><strong>Academic Mgmt</strong></td><td>Report Cards (View/Download)</td><td><code>/admin/report-cards</code></td></tr>
+                <tr><td></td><td>Results</td><td><code>/admin/results</code></td></tr>
+                <tr><td><strong>Teaching</strong></td><td>Homework</td><td><code>/admin/homework</code></td></tr>
+                <tr><td><strong>Student Mgmt</strong></td><td>Students</td><td><code>/admin/students</code></td></tr>
+                <tr><td><strong>Reports</strong></td><td>Attendance Reports</td><td><code>/admin/attendance-reports</code></td></tr>
+                <tr><td><strong>Staff Mgmt</strong></td><td>My Payslips</td><td><code>/admin/my-payslips</code></td></tr>
+            </tbody>
+        </table>
+
+        <h3>Dashboard Quick Action Buttons</h3>
+        <p>The dashboard has shortcut buttons at the top for your most common tasks:</p>
+        <table>
+            <thead><tr><th>Button</th><th>Action</th></tr></thead>
+            <tbody>
+                <tr><td><span class="badge badge-blue">Create Homework</span></td><td>Opens the homework creation form</td></tr>
+                <tr><td><span class="badge badge-yellow">Grade Submissions</span></td><td>View homework submissions awaiting grading</td></tr>
+                <tr><td><span class="badge badge-green">View My Classes</span></td><td>See your assigned student lists</td></tr>
+                <tr><td><span class="badge badge-gray">Record Results</span></td><td>Go to Enter Results page</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Dashboard Information Cards</h3>
+        <table>
+            <thead><tr><th>Card</th><th>What It Shows</th></tr></thead>
+            <tbody>
+                <tr><td><strong>My Classes</strong></td><td>All classes you are assigned to (class teacher + subject teacher)</td></tr>
+                <tr><td><strong>Student Count</strong></td><td>Total students across your classes</td></tr>
+                <tr><td><strong>Recent Homework</strong></td><td>Latest homework assignments and submission counts</td></tr>
+                <tr><td><strong>Recent Attendance</strong></td><td>Attendance records from the last 7 days</td></tr>
+                <tr><td><strong>Grading Summary</strong></td><td>Submissions: graded, ungraded, late</td></tr>
+                <tr><td><strong>Upcoming Events</strong></td><td>School events for your grade level</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Quiz 1.3 -->
+        <div class="quiz-box">
+            <h4>Lesson 1.3 &mdash; Quick Quiz</h4>
+            <div class="quiz-q">
+                <div class="q-text">Q1: Where do you find the "Daily Attendance" option?</div>
+                <div class="q-options">
+                    <div>a) Sidebar > Teaching</div>
+                    <div>b) Sidebar > Academic</div>
+                    <div>c) Sidebar > Reports</div>
+                    <div>d) Sidebar > Staff Management</div>
+                </div>
+                <div class="answer hidden">Answer: b) Sidebar > Academic</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q2: Which dashboard card shows how many homework submissions are still ungraded?</div>
+                <div class="q-options">
+                    <div>a) My Classes</div>
+                    <div>b) Recent Homework</div>
+                    <div>c) Grading Summary</div>
+                    <div>d) Student Count</div>
+                </div>
+                <div class="answer hidden">Answer: c) Grading Summary</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q3: What is the URL for the Enter Results page?</div>
+                <div class="q-options">
+                    <div>a) /admin/results</div>
+                    <div>b) /admin/marks</div>
+                    <div>c) /admin/enter-results</div>
+                    <div>d) /admin/grades</div>
+                </div>
+                <div class="answer hidden">Answer: c) /admin/enter-results</div>
+            </div>
+        </div>
+
+        <!-- MODULE 1 TEST -->
+        <div class="test-box">
+            <h3>Module 1 Test</h3>
+            <div class="test-info">10 Multiple Choice Questions &mdash; Covers Lessons 1.1, 1.2, and 1.3</div>
+
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">1.</span> What should you do the FIRST time you log into the portal?</div>
+                <div class="q-options">
+                    <div>a) Mark attendance</div>
+                    <div>b) Change your default password</div>
+                    <div>c) Create homework</div>
+                    <div>d) View your payslip</div>
+                </div>
+                <div class="test-answer hidden">Answer: b) Change your default password</div>
+            </div>
+
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">2.</span> Which of the following is the correct portal URL?</div>
+                <div class="q-options">
+                    <div>a) https://stfrancisofassisi.tech/portal</div>
+                    <div>b) https://portal.stfrancisofassisi.tech/admin</div>
+                    <div>c) https://admin.stfrancisofassisi.tech</div>
+                    <div>d) https://school.stfrancisofassisi.tech</div>
+                </div>
+                <div class="test-answer hidden">Answer: b) https://portal.stfrancisofassisi.tech/admin</div>
+            </div>
+
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">3.</span> A Class Teacher can enter results for:</div>
+                <div class="q-options">
+                    <div>a) Only Mathematics and English</div>
+                    <div>b) Only the subjects they specialise in</div>
+                    <div>c) ALL subjects in their assigned class</div>
+                    <div>d) No subjects (only the admin can)</div>
+                </div>
+                <div class="test-answer hidden">Answer: c) ALL subjects in their assigned class</div>
+            </div>
+
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">4.</span> Where can you find the "Homework" menu?</div>
+                <div class="q-options">
+                    <div>a) Sidebar > Academic</div>
+                    <div>b) Sidebar > Reports</div>
+                    <div>c) Sidebar > Teaching</div>
+                    <div>d) Sidebar > Staff Management</div>
+                </div>
+                <div class="test-answer hidden">Answer: c) Sidebar > Teaching</div>
+            </div>
+
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">5.</span> Can a teacher access the school's financial or fee management system?</div>
+                <div class="q-options">
+                    <div>a) Yes, all teachers have access</div>
+                    <div>b) Only class teachers have access</div>
+                    <div>c) No, financial modules are restricted to administrators</div>
+                    <div>d) Only head teachers have access</div>
+                </div>
+                <div class="test-answer hidden">Answer: c) No, financial modules are restricted to administrators</div>
+            </div>
+
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">6.</span> What does the "Student Count" card on the dashboard show?</div>
+                <div class="q-options">
+                    <div>a) Total students in the entire school</div>
+                    <div>b) Total students across your assigned classes</div>
+                    <div>c) Number of students absent today</div>
+                    <div>d) Number of students who submitted homework</div>
+                </div>
+                <div class="test-answer hidden">Answer: b) Total students across your assigned classes</div>
+            </div>
+
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">7.</span> What is the minimum password length required by the system?</div>
+                <div class="q-options">
+                    <div>a) 4 characters</div>
+                    <div>b) 6 characters</div>
+                    <div>c) 8 characters</div>
+                    <div>d) 10 characters</div>
+                </div>
+                <div class="test-answer hidden">Answer: c) 8 characters</div>
+            </div>
+
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">8.</span> Which quick action button takes you directly to the results entry page?</div>
+                <div class="q-options">
+                    <div>a) Create Homework</div>
+                    <div>b) Grade Submissions</div>
+                    <div>c) View My Classes</div>
+                    <div>d) Record Results</div>
+                </div>
+                <div class="test-answer hidden">Answer: d) Record Results</div>
+            </div>
+
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">9.</span> What should you do if you suspect someone else knows your password?</div>
+                <div class="q-options">
+                    <div>a) Do nothing, passwords are not important</div>
+                    <div>b) Change your password immediately</div>
+                    <div>c) Ask the other person to forget it</div>
+                    <div>d) Create a new account</div>
+                </div>
+                <div class="test-answer hidden">Answer: b) Change your password immediately</div>
+            </div>
+
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">10.</span> A Subject Teacher teaching Mathematics in Grade 7A and 7B can view students in:</div>
+                <div class="q-options">
+                    <div>a) All classes in the school</div>
+                    <div>b) Only Grade 7A</div>
+                    <div>c) Grade 7A and Grade 7B (classes where they teach)</div>
+                    <div>d) No classes (only admins can view students)</div>
+                </div>
+                <div class="test-answer hidden">Answer: c) Grade 7A and Grade 7B (classes where they teach)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODULE 2 -->
+    <!-- ============================================================ -->
+    <div class="page-break">
+        <div class="module-header">
+            <div class="module-num">Module 2</div>
+            <h1>Daily Attendance Management</h1>
+            <div class="module-desc">Learn how to mark daily attendance and generate attendance reports for your classes.</div>
+            <div class="module-lessons">2 Lessons | 6 Quiz Questions | 10 Test Questions</div>
+        </div>
+
+        <!-- Lesson 2.1 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 2.1</div>
+            <h2>Marking Daily Attendance</h2>
+            <div class="lesson-obj">Objective: Mark attendance for your class accurately and efficiently.</div>
+        </div>
+
+        <h3>Step-by-Step: How to Mark Attendance</h3>
+        <ol class="steps">
+            <li><strong>Select Class</strong> &mdash; If you are a class teacher, your class is auto-selected. Subject teachers select from a dropdown of their assigned classes.</li>
+            <li><strong>Select Date</strong> &mdash; Defaults to today. You can select a past date for missed days. Future dates are blocked.</li>
+            <li><strong>Click "Mark All Present"</strong> &mdash; This marks all students as Present in one click (saves time).</li>
+            <li><strong>Adjust Individual Students</strong> &mdash; Click the status button next to students who are absent, sick, late, or excused. Each click cycles to the next status.</li>
+            <li><strong>Click "Submit Attendance"</strong> &mdash; A green notification shows the summary: Present: X | Absent: X | Sick: X | Late: X | Excused: X</li>
+        </ol>
+
+        <h3>Attendance Status Options</h3>
+        <table>
+            <thead><tr><th>Status</th><th>Symbol</th><th>When to Use</th><th>Colour on Button</th></tr></thead>
+            <tbody>
+                <tr><td><span class="badge badge-green">Present</span></td><td><strong>P</strong></td><td>Student is in school</td><td>Green</td></tr>
+                <tr><td><span class="badge badge-red">Absent</span></td><td><strong>X</strong></td><td>Student is not in school, no reason given</td><td>Red</td></tr>
+                <tr><td><span class="badge badge-blue">Sick</span></td><td><strong>S</strong></td><td>Student is sick (medical or reported by parent)</td><td>Blue</td></tr>
+                <tr><td><span class="badge badge-yellow">Late</span></td><td><strong>Y</strong></td><td>Student arrived after official start time</td><td>Yellow</td></tr>
+                <tr><td><span class="badge badge-gray">Excused</span></td><td><strong>L</strong></td><td>Pre-approved absence (family event, appointment)</td><td>Grey</td></tr>
+            </tbody>
+        </table>
+
+        <div class="tip">
+            <strong>Time-Saving Tip:</strong> Always start by clicking <strong>"Mark All Present"</strong> first, then adjust only the few students who are absent, sick, or late. This is much faster than marking each student individually.
+        </div>
+
+        <h3>Important Rules</h3>
+        <ul>
+            <li>Attendance should be marked <strong>every school day</strong> by the class teacher</li>
+            <li>Mark attendance <strong>before the first period</strong> (ideally before 08:00)</li>
+            <li>You can <strong>edit attendance</strong> for the same day by going back and resubmitting</li>
+            <li>You <strong>cannot mark future dates</strong></li>
+            <li>The system records the <strong>exact time</strong> attendance was submitted</li>
+        </ul>
+
+        <!-- Quiz 2.1 -->
+        <div class="quiz-box">
+            <h4>Lesson 2.1 &mdash; Quick Quiz</h4>
+            <div class="quiz-q">
+                <div class="q-text">Q1: What is the fastest way to mark attendance for a class where most students are present?</div>
+                <div class="q-options">
+                    <div>a) Click Present next to each student one by one</div>
+                    <div>b) Click "Mark All Present" then adjust the absent ones</div>
+                    <div>c) Ask the admin to mark it for you</div>
+                    <div>d) Leave it blank and submit</div>
+                </div>
+                <div class="answer hidden">Answer: b) Click "Mark All Present" then adjust the absent ones</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q2: What symbol is used for a student who arrived late?</div>
+                <div class="q-options">
+                    <div>a) L</div>
+                    <div>b) X</div>
+                    <div>c) Y</div>
+                    <div>d) T</div>
+                </div>
+                <div class="answer hidden">Answer: c) Y</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q3: Can you mark attendance for a future date?</div>
+                <div class="q-options">
+                    <div>a) Yes, for up to one week ahead</div>
+                    <div>b) Yes, but only for the next day</div>
+                    <div>c) No, only today or past dates</div>
+                    <div>d) Yes, if you are a class teacher</div>
+                </div>
+                <div class="answer hidden">Answer: c) No, only today or past dates</div>
+            </div>
+        </div>
+
+        <!-- Lesson 2.2 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 2.2</div>
+            <h2>Attendance Reports & Exports</h2>
+            <div class="lesson-obj">Objective: Generate and export attendance reports for analysis and record-keeping.</div>
+        </div>
+
+        <h3>Report Types Available</h3>
+        <table>
+            <thead><tr><th>Report Type</th><th>What It Shows</th><th>Best For</th></tr></thead>
+            <tbody>
+                <tr><td>All Attendance</td><td>Complete records across all dates</td><td>General overview</td></tr>
+                <tr><td>By Class Section</td><td>Attendance for a specific class</td><td>Class teacher monthly review</td></tr>
+                <tr><td>By Grade</td><td>Attendance for an entire grade</td><td>Grade-level analysis</td></tr>
+                <tr><td>By Student</td><td>One student's complete history</td><td>Individual follow-up</td></tr>
+                <tr><td>By Status</td><td>All records with a specific status</td><td>Finding all absences</td></tr>
+                <tr><td>Attendance Summary</td><td>Statistical overview with percentages</td><td>Admin reports & meetings</td></tr>
+            </tbody>
+        </table>
+
+        <h3>How to Export</h3>
+        <table>
+            <thead><tr><th>Export Option</th><th>Format</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Monthly Register (PDF)</strong></td><td>Landscape A4</td><td>Matrix with days 1-31, students as rows, status symbols. Ideal for printing and filing.</td></tr>
+                <tr><td><strong>Monthly Register (CSV)</strong></td><td>Excel/CSV</td><td>Same data in spreadsheet format for analysis.</td></tr>
+                <tr><td><strong>Summary PDF</strong></td><td>PDF</td><td>Statistical summary with counts and percentages per student.</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Attendance Symbols on Reports</h3>
+        <p>When you view exported registers, these are the symbols used:</p>
+        <p><strong>P</strong> = Present &nbsp;&nbsp; <strong>X</strong> = Absent &nbsp;&nbsp; <strong>S</strong> = Sick &nbsp;&nbsp; <strong>Y</strong> = Late &nbsp;&nbsp; <strong>L</strong> = Excused</p>
+
+        <!-- Quiz 2.2 -->
+        <div class="quiz-box">
+            <h4>Lesson 2.2 &mdash; Quick Quiz</h4>
+            <div class="quiz-q">
+                <div class="q-text">Q1: Which report type would you use to find all students who were absent in March?</div>
+                <div class="q-options">
+                    <div>a) By Student</div>
+                    <div>b) By Status (filter: Absent)</div>
+                    <div>c) Attendance Summary</div>
+                    <div>d) By Grade</div>
+                </div>
+                <div class="answer hidden">Answer: b) By Status (filter: Absent)</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q2: What format is best for printing a class attendance register to file in a physical folder?</div>
+                <div class="q-options">
+                    <div>a) CSV</div>
+                    <div>b) Monthly Register (PDF)</div>
+                    <div>c) Summary PDF</div>
+                    <div>d) Excel</div>
+                </div>
+                <div class="answer hidden">Answer: b) Monthly Register (PDF)</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q3: What does the symbol "L" represent on an attendance register?</div>
+                <div class="q-options">
+                    <div>a) Late</div>
+                    <div>b) Left early</div>
+                    <div>c) Excused</div>
+                    <div>d) Lunch break</div>
+                </div>
+                <div class="answer hidden">Answer: c) Excused</div>
+            </div>
+        </div>
+
+        <!-- MODULE 2 TEST -->
+        <div class="test-box">
+            <h3>Module 2 Test</h3>
+            <div class="test-info">10 Multiple Choice Questions &mdash; Covers Lessons 2.1 and 2.2</div>
+
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">1.</span> Attendance should ideally be marked:</div>
+                <div class="q-options"><div>a) At the end of the day</div><div>b) Before the first period</div><div>c) During lunch break</div><div>d) Once a week</div></div>
+                <div class="test-answer hidden">Answer: b) Before the first period</div>
+            </div>
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">2.</span> What happens when you click "Submit Attendance"?</div>
+                <div class="q-options"><div>a) Nothing visible</div><div>b) A green notification shows the attendance summary</div><div>c) An email is sent to parents</div><div>d) The page refreshes with no feedback</div></div>
+                <div class="test-answer hidden">Answer: b) A green notification shows the attendance summary</div>
+            </div>
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">3.</span> The symbol "X" on an attendance register means:</div>
+                <div class="q-options"><div>a) Excused</div><div>b) Present</div><div>c) Absent</div><div>d) Sick</div></div>
+                <div class="test-answer hidden">Answer: c) Absent</div>
+            </div>
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">4.</span> A class teacher's class is _____ in the attendance dropdown.</div>
+                <div class="q-options"><div>a) Hidden</div><div>b) Listed last</div><div>c) Automatically selected</div><div>d) Greyed out</div></div>
+                <div class="test-answer hidden">Answer: c) Automatically selected</div>
+            </div>
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">5.</span> Which export format allows you to do further analysis in a spreadsheet?</div>
+                <div class="q-options"><div>a) PDF Summary</div><div>b) Monthly Register (PDF)</div><div>c) Monthly Register (CSV)</div><div>d) Printed register</div></div>
+                <div class="test-answer hidden">Answer: c) Monthly Register (CSV)</div>
+            </div>
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">6.</span> Can you edit attendance after it has been submitted?</div>
+                <div class="q-options"><div>a) No, it is locked forever</div><div>b) Yes, by resubmitting for the same date</div><div>c) Only the admin can edit it</div><div>d) Only within 10 minutes</div></div>
+                <div class="test-answer hidden">Answer: b) Yes, by resubmitting for the same date</div>
+            </div>
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">7.</span> A student who is sick should be marked as:</div>
+                <div class="q-options"><div>a) Absent (X)</div><div>b) Sick (S)</div><div>c) Excused (L)</div><div>d) Late (Y)</div></div>
+                <div class="test-answer hidden">Answer: b) Sick (S)</div>
+            </div>
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">8.</span> Which report type shows a statistical overview with percentages?</div>
+                <div class="q-options"><div>a) By Class Section</div><div>b) By Student</div><div>c) Attendance Summary</div><div>d) All Attendance</div></div>
+                <div class="test-answer hidden">Answer: c) Attendance Summary</div>
+            </div>
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">9.</span> Teachers can generate attendance reports for:</div>
+                <div class="q-options"><div>a) All classes in the school</div><div>b) Only their assigned classes</div><div>c) Only primary classes</div><div>d) No classes (admin only)</div></div>
+                <div class="test-answer hidden">Answer: b) Only their assigned classes</div>
+            </div>
+            <div class="test-q">
+                <div class="q-text"><span class="q-num">10.</span> What does clicking a student's status button do?</div>
+                <div class="q-options"><div>a) Opens a dropdown menu</div><div>b) Cycles through: Present > Absent > Sick > Late > Excused</div><div>c) Marks them as absent</div><div>d) Opens a new page</div></div>
+                <div class="test-answer hidden">Answer: b) Cycles through: Present > Absent > Sick > Late > Excused</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODULE 3 -->
+    <!-- ============================================================ -->
+    <div class="page-break">
+        <div class="module-header">
+            <div class="module-num">Module 3</div>
+            <h1>Academic Results & Grading</h1>
+            <div class="module-desc">Master the process of entering student results, understanding the grading system, and generating report cards.</div>
+            <div class="module-lessons">3 Lessons | 9 Quiz Questions | 10 Test Questions</div>
+        </div>
+
+        <!-- Lesson 3.1 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 3.1</div>
+            <h2>Entering Student Results</h2>
+            <div class="lesson-obj">Objective: Enter student marks correctly for any exam type.</div>
+        </div>
+
+        <h3>Step-by-Step: Entering Results</h3>
+        <ol class="steps">
+            <li><strong>Go to Enter Results</strong> &mdash; Sidebar > Academic > Enter Results</li>
+            <li><strong>Select Class</strong> &mdash; Choose the class section from the dropdown</li>
+            <li><strong>Select Subject</strong> &mdash; Only shows subjects assigned to the selected grade (and your teaching assignment)</li>
+            <li><strong>Select Term, Exam Type & Year</strong> &mdash; Choose the correct combination</li>
+            <li><strong>Enter Marks</strong> &mdash; Type marks (0-100) for each student. Use Tab to move between fields.</li>
+            <li><strong>Review Grades</strong> &mdash; System auto-calculates grades. Override manually if needed.</li>
+            <li><strong>Add Comments</strong> &mdash; Optional feedback per student (e.g., "Well done", "Needs more practice")</li>
+            <li><strong>Submit</strong> &mdash; Click "Submit Results". System shows saved count.</li>
+        </ol>
+
+        <div class="warning">
+            <strong>Important:</strong> If a student was <strong>absent</strong> for the exam, leave their marks <strong>blank</strong>. Do NOT enter 0, as 0 means the student sat the exam and scored zero.
+        </div>
+
+        <!-- Quiz 3.1 -->
+        <div class="quiz-box">
+            <h4>Lesson 3.1 &mdash; Quick Quiz</h4>
+            <div class="quiz-q">
+                <div class="q-text">Q1: What should you enter for a student who was absent during an exam?</div>
+                <div class="q-options"><div>a) 0</div><div>b) "ABS"</div><div>c) Leave the field blank</div><div>d) -1</div></div>
+                <div class="answer hidden">Answer: c) Leave the field blank</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q2: What is the valid range for entering marks?</div>
+                <div class="q-options"><div>a) 1 to 100</div><div>b) 0 to 100</div><div>c) 0 to 50</div><div>d) 1 to 50</div></div>
+                <div class="answer hidden">Answer: b) 0 to 100</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q3: Can you edit results after submitting them?</div>
+                <div class="q-options"><div>a) No, results are permanent</div><div>b) Yes, by selecting the same class, subject, term, and exam type again</div><div>c) Only the admin can edit</div><div>d) Only within 24 hours</div></div>
+                <div class="answer hidden">Answer: b) Yes, by selecting the same class, subject, term, and exam type again</div>
+            </div>
+        </div>
+
+        <!-- Lesson 3.2 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 3.2</div>
+            <h2>Understanding Exam Types & Grading</h2>
+            <div class="lesson-obj">Objective: Know when to use each exam type and understand how grades are calculated.</div>
+        </div>
+
+        <h3>Exam Types</h3>
+        <table>
+            <thead><tr><th>Exam Type</th><th>When to Use</th><th>Example</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Mid-Term</strong></td><td>Mid-term test/exam results</td><td>Mid-Term Exam, Week 5 Test</td></tr>
+                <tr><td><strong>Final</strong></td><td>End-of-term main examination</td><td>Final Exam Term 1</td></tr>
+                <tr><td><strong>End of Term Test</strong></td><td>End-of-term test (separate from final exam)</td><td>Term 2 Closing Test</td></tr>
+                <tr><td><strong>Quiz</strong></td><td>Short class quizzes</td><td>Weekly Quiz, Pop Quiz</td></tr>
+                <tr><td><strong>Assignment</strong></td><td>Graded homework assignments</td><td>Research Project, Essay</td></tr>
+                <tr><td><strong>Test</strong></td><td>General class tests</td><td>Chapter Test, Unit Test</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Grading Scale</h3>
+        <table>
+            <thead><tr><th>Mark Range</th><th>Grade</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td>80 &ndash; 100</td><td><span class="badge badge-green">A</span></td><td>Excellent</td></tr>
+                <tr><td>70 &ndash; 79</td><td><span class="badge badge-blue">B</span></td><td>Very Good</td></tr>
+                <tr><td>60 &ndash; 69</td><td><span class="badge badge-blue">C</span></td><td>Good</td></tr>
+                <tr><td>50 &ndash; 59</td><td><span class="badge badge-yellow">D</span></td><td>Satisfactory</td></tr>
+                <tr><td>40 &ndash; 49</td><td><span class="badge badge-yellow">E</span></td><td>Fair</td></tr>
+                <tr><td>0 &ndash; 39</td><td><span class="badge badge-red">F</span></td><td>Below Standard</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Quiz 3.2 -->
+        <div class="quiz-box">
+            <h4>Lesson 3.2 &mdash; Quick Quiz</h4>
+            <div class="quiz-q">
+                <div class="q-text">Q1: A student scores 73 marks. What grade do they receive?</div>
+                <div class="q-options"><div>a) A</div><div>b) B</div><div>c) C</div><div>d) D</div></div>
+                <div class="answer hidden">Answer: b) B (73 falls in the 70-79 range)</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q2: Which exam type would you use for a weekly class quiz?</div>
+                <div class="q-options"><div>a) Mid-Term</div><div>b) Final</div><div>c) Quiz</div><div>d) Assignment</div></div>
+                <div class="answer hidden">Answer: c) Quiz</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q3: What grade does a student with 45 marks receive?</div>
+                <div class="q-options"><div>a) D</div><div>b) E</div><div>c) F</div><div>d) C</div></div>
+                <div class="answer hidden">Answer: b) E (45 falls in the 40-49 range)</div>
+            </div>
+        </div>
+
+        <!-- Lesson 3.3 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 3.3</div>
+            <h2>Report Cards: Generating, Commenting & Distributing</h2>
+            <div class="lesson-obj">Objective: Generate report cards, write meaningful comments, and distribute to parents.</div>
+        </div>
+
+        <h3>Step-by-Step: Generating Report Cards</h3>
+        <ol class="steps">
+            <li><strong>Verify All Results</strong> &mdash; Ensure ALL subjects have marks entered. Check the Results Count column matches the Subject Count.</li>
+            <li><strong>Go to Generate Report Cards</strong> &mdash; Sidebar > Academic > Generate Report Cards</li>
+            <li><strong>Select Class & Term</strong> &mdash; Choose your class and the current term</li>
+            <li><strong>Add Class Teacher Comments</strong> &mdash; Click on each student to write personalised comments</li>
+            <li><strong>Generate</strong> &mdash; Click "Generate" for individual or "Generate All" for the entire class</li>
+            <li><strong>Review</strong> &mdash; Open a few report cards to check accuracy</li>
+        </ol>
+
+        <h3>Writing Effective Comments</h3>
+        <table>
+            <thead><tr><th>Good Comments</th><th>Poor Comments</th></tr></thead>
+            <tbody>
+                <tr><td>"An excellent term. Shows strong analytical skills in Mathematics. Should continue reading widely."</td><td>"Good"</td></tr>
+                <tr><td>"Has improved significantly in English. Needs to work on time management for assignments."</td><td>"OK"</td></tr>
+                <tr><td>"A dedicated student who participates actively. Must practise more in Science practicals."</td><td>"Average"</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Distributing via SMS</h3>
+        <p>You can notify parents via SMS after report cards are ready. The SMS includes the student's name, rank, and top subject marks. This requires available SMS credits.</p>
+
+        <!-- Quiz 3.3 -->
+        <div class="quiz-box">
+            <h4>Lesson 3.3 &mdash; Quick Quiz</h4>
+            <div class="quiz-q">
+                <div class="q-text">Q1: What should you check BEFORE generating report cards?</div>
+                <div class="q-options"><div>a) That students have paid fees</div><div>b) That all subjects have results entered (Results Count = Subject Count)</div><div>c) That the timetable is correct</div><div>d) That parents have been notified</div></div>
+                <div class="answer hidden">Answer: b) That all subjects have results entered (Results Count = Subject Count)</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q2: Who can write class teacher comments on report cards?</div>
+                <div class="q-options"><div>a) Any teacher in the school</div><div>b) Only the class teacher for that specific class</div><div>c) Only subject teachers</div><div>d) Only the admin</div></div>
+                <div class="answer hidden">Answer: b) Only the class teacher for that specific class</div>
+            </div>
+            <div class="quiz-q">
+                <div class="q-text">Q3: What does "Generate All" do?</div>
+                <div class="q-options"><div>a) Generates report cards for the entire school</div><div>b) Creates a single PDF with all students in the selected class</div><div>c) Sends SMS to all parents</div><div>d) Enters marks for all students</div></div>
+                <div class="answer hidden">Answer: b) Creates a single PDF with all students in the selected class</div>
+            </div>
+        </div>
+
+        <!-- MODULE 3 TEST -->
+        <div class="test-box">
+            <h3>Module 3 Test</h3>
+            <div class="test-info">10 Multiple Choice Questions &mdash; Covers Lessons 3.1, 3.2, and 3.3</div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">1.</span> What is the URL for the Enter Results page?</div><div class="q-options"><div>a) /admin/results</div><div>b) /admin/enter-results</div><div>c) /admin/marks</div><div>d) /admin/grading</div></div><div class="test-answer hidden">Answer: b) /admin/enter-results</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">2.</span> A student scores 39 marks. Their grade is:</div><div class="q-options"><div>a) E</div><div>b) D</div><div>c) F</div><div>d) C</div></div><div class="test-answer hidden">Answer: c) F (39 is in the 0-39 range)</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">3.</span> For a graded homework project, which exam type should you select?</div><div class="q-options"><div>a) Quiz</div><div>b) Test</div><div>c) Assignment</div><div>d) Mid-Term</div></div><div class="test-answer hidden">Answer: c) Assignment</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">4.</span> If a Class Teacher has 20 students and only 15 have results entered, what should they do?</div><div class="q-options"><div>a) Generate report cards anyway</div><div>b) Enter the remaining 5 students' results or confirm with subject teachers</div><div>c) Leave it for next term</div><div>d) Delete the existing results</div></div><div class="test-answer hidden">Answer: b) Enter the remaining 5 students' results or confirm with subject teachers</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">5.</span> The "Final" exam type is used for:</div><div class="q-options"><div>a) Weekly quizzes</div><div>b) Homework assignments</div><div>c) End-of-term main examination</div><div>d) Class tests</div></div><div class="test-answer hidden">Answer: c) End-of-term main examination</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">6.</span> What does the report card include?</div><div class="q-options"><div>a) Only the final exam mark</div><div>b) Subject marks, grades, overall average, class position, and teacher comments</div><div>c) Only attendance records</div><div>d) Only the class position</div></div><div class="test-answer hidden">Answer: b) Subject marks, grades, overall average, class position, and teacher comments</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">7.</span> A student scores 60. What grade is auto-calculated?</div><div class="q-options"><div>a) B</div><div>b) C</div><div>c) D</div><div>d) A</div></div><div class="test-answer hidden">Answer: b) C (60 is in the 60-69 range)</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">8.</span> Which is a good class teacher comment?</div><div class="q-options"><div>a) "OK"</div><div>b) "Has improved significantly. Should focus more on Science practicals."</div><div>c) "Average"</div><div>d) "Fine"</div></div><div class="test-answer hidden">Answer: b) "Has improved significantly. Should focus more on Science practicals."</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">9.</span> SMS notifications to parents require:</div><div class="q-options"><div>a) Internet connection only</div><div>b) Available SMS credits</div><div>c) Parent's email address</div><div>d) A printer</div></div><div class="test-answer hidden">Answer: b) Available SMS credits</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">10.</span> A Subject Teacher can enter results for:</div><div class="q-options"><div>a) All subjects in the school</div><div>b) All subjects in their assigned grade</div><div>c) Only subjects they are assigned to teach in specific classes</div><div>d) Only one subject total</div></div><div class="test-answer hidden">Answer: c) Only subjects they are assigned to teach in specific classes</div></div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODULE 4 -->
+    <!-- ============================================================ -->
+    <div class="page-break">
+        <div class="module-header">
+            <div class="module-num">Module 4</div>
+            <h1>Teaching Tools</h1>
+            <div class="module-desc">Learn to create homework, manage student lists, and grade submissions using the portal's teaching tools.</div>
+            <div class="module-lessons">3 Lessons | 9 Quiz Questions | 10 Test Questions</div>
+        </div>
+
+        <!-- Lesson 4.1 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 4.1</div>
+            <h2>Creating & Managing Homework</h2>
+            <div class="lesson-obj">Objective: Create homework assignments and manage them effectively.</div>
+        </div>
+
+        <h3>Creating Homework</h3>
+        <ol class="steps">
+            <li>Go to <strong>Sidebar > Teaching > Homework</strong></li>
+            <li>Click <strong>"Create Homework"</strong> (top right)</li>
+            <li>Fill in the required fields (see table below)</li>
+            <li>Attach any reference materials if needed</li>
+            <li>Set Status to <strong>"Active"</strong> to make it visible to students</li>
+            <li>Click <strong>"Create"</strong></li>
+        </ol>
+
+        <table>
+            <thead><tr><th>Field</th><th>Description</th><th>Required</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Title</strong></td><td>Descriptive name (e.g., "Chapter 5 Exercises")</td><td>Yes</td></tr>
+                <tr><td><strong>Subject</strong></td><td>From your assigned subjects only</td><td>Yes</td></tr>
+                <tr><td><strong>Grade</strong></td><td>From your assigned grades only</td><td>Yes</td></tr>
+                <tr><td><strong>Due Date</strong></td><td>Deadline for submission (default: 1 week)</td><td>Yes</td></tr>
+                <tr><td><strong>Instructions</strong></td><td>Clear, detailed instructions</td><td>Yes</td></tr>
+                <tr><td><strong>Attachments</strong></td><td>PDFs, images, documents</td><td>No</td></tr>
+                <tr><td><strong>Status</strong></td><td>Active (visible) or Inactive (hidden)</td><td>Yes</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Quiz 4.1 -->
+        <div class="quiz-box">
+            <h4>Lesson 4.1 &mdash; Quick Quiz</h4>
+            <div class="quiz-q"><div class="q-text">Q1: Where is the Homework module located in the sidebar?</div><div class="q-options"><div>a) Academic</div><div>b) Reports</div><div>c) Teaching</div><div>d) Staff Management</div></div><div class="answer hidden">Answer: c) Teaching</div></div>
+            <div class="quiz-q"><div class="q-text">Q2: What does setting homework status to "Inactive" do?</div><div class="q-options"><div>a) Deletes the homework</div><div>b) Hides it from students and parents</div><div>c) Marks it as graded</div><div>d) Sends a reminder to students</div></div><div class="answer hidden">Answer: b) Hides it from students and parents</div></div>
+            <div class="quiz-q"><div class="q-text">Q3: Can you create homework for a subject you don't teach?</div><div class="q-options"><div>a) Yes, for any subject</div><div>b) No, only for subjects you are assigned to teach</div><div>c) Yes, but only with admin approval</div><div>d) Only during exam periods</div></div><div class="answer hidden">Answer: b) No, only for subjects you are assigned to teach</div></div>
+        </div>
+
+        <!-- Lesson 4.2 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 4.2</div>
+            <h2>Viewing & Managing Students</h2>
+            <div class="lesson-obj">Objective: View student information and understand access restrictions.</div>
+        </div>
+
+        <h3>What You Can See</h3>
+        <table>
+            <thead><tr><th>Information</th><th>Access</th></tr></thead>
+            <tbody>
+                <tr><td>Student name & admission number</td><td><span class="badge badge-green">Visible</span></td></tr>
+                <tr><td>Gender, date of birth, place of birth</td><td><span class="badge badge-green">Visible</span></td></tr>
+                <tr><td>Class & grade assignment</td><td><span class="badge badge-green">Visible</span></td></tr>
+                <tr><td>Parent/Guardian name & contact</td><td><span class="badge badge-green">Visible</span></td></tr>
+                <tr><td>Enrollment status (active/inactive)</td><td><span class="badge badge-green">Visible</span></td></tr>
+                <tr><td>Fee balances & payment history</td><td><span class="badge badge-red">Not Visible</span></td></tr>
+                <tr><td>Edit/delete student records</td><td><span class="badge badge-red">Not Allowed</span></td></tr>
+            </tbody>
+        </table>
+
+        <h3>Access by Role</h3>
+        <table>
+            <thead><tr><th>Your Role</th><th>Students You Can See</th></tr></thead>
+            <tbody>
+                <tr><td>Class Teacher</td><td>All students in your assigned class</td></tr>
+                <tr><td>Subject Teacher</td><td>Students in classes where you teach</td></tr>
+                <tr><td>Dean / Head Teacher</td><td>All students in your section (Primary or Secondary)</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Quiz 4.2 -->
+        <div class="quiz-box">
+            <h4>Lesson 4.2 &mdash; Quick Quiz</h4>
+            <div class="quiz-q"><div class="q-text">Q1: Can teachers view a student's fee balance?</div><div class="q-options"><div>a) Yes</div><div>b) No, financial information is restricted to administrators</div><div>c) Only class teachers can</div><div>d) Only during fee week</div></div><div class="answer hidden">Answer: b) No, financial information is restricted to administrators</div></div>
+            <div class="quiz-q"><div class="q-text">Q2: A subject teacher for Science in Grade 6A and 6B can see students in:</div><div class="q-options"><div>a) All Grade 6 classes</div><div>b) Only Grade 6A and 6B</div><div>c) All classes in the school</div><div>d) No classes</div></div><div class="answer hidden">Answer: b) Only Grade 6A and 6B</div></div>
+            <div class="quiz-q"><div class="q-text">Q3: Can a teacher edit a student's personal details (name, date of birth)?</div><div class="q-options"><div>a) Yes</div><div>b) Only class teachers can</div><div>c) No, only administrators can edit student details</div><div>d) Yes, with head teacher approval</div></div><div class="answer hidden">Answer: c) No, only administrators can edit student details</div></div>
+        </div>
+
+        <!-- Lesson 4.3 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 4.3</div>
+            <h2>Homework Submissions & Grading</h2>
+            <div class="lesson-obj">Objective: Review, grade, and provide feedback on student homework submissions.</div>
+        </div>
+
+        <h3>Reviewing Submissions</h3>
+        <ul>
+            <li>Click on any homework assignment to see all submissions</li>
+            <li>The system shows which students have submitted and which have not</li>
+            <li><strong>Late submissions</strong> are marked with a late indicator</li>
+            <li>You can <strong>download</strong> attached student files</li>
+            <li>Use the <strong>Grade Submissions</strong> shortcut on the dashboard to quickly access ungraded work</li>
+        </ul>
+
+        <h3>Grading Submissions</h3>
+        <ul>
+            <li>Enter a <strong>mark</strong> for each submission</li>
+            <li>Add <strong>feedback comments</strong> for the student</li>
+            <li>Students and parents can see the grade and feedback through their portal</li>
+        </ul>
+
+        <!-- Quiz 4.3 -->
+        <div class="quiz-box">
+            <h4>Lesson 4.3 &mdash; Quick Quiz</h4>
+            <div class="quiz-q"><div class="q-text">Q1: Where can you quickly find all ungraded homework submissions?</div><div class="q-options"><div>a) Enter Results page</div><div>b) Dashboard > Grade Submissions button</div><div>c) Attendance Reports</div><div>d) My Payslips</div></div><div class="answer hidden">Answer: b) Dashboard > Grade Submissions button</div></div>
+            <div class="quiz-q"><div class="q-text">Q2: How are late submissions indicated?</div><div class="q-options"><div>a) They are automatically deleted</div><div>b) They are marked with a late indicator</div><div>c) They are hidden from the teacher</div><div>d) They receive 0 marks automatically</div></div><div class="answer hidden">Answer: b) They are marked with a late indicator</div></div>
+            <div class="quiz-q"><div class="q-text">Q3: Can parents see homework grades and teacher feedback?</div><div class="q-options"><div>a) No, grades are only visible to teachers</div><div>b) Yes, through their own portal access</div><div>c) Only if the teacher emails them</div><div>d) Only on the report card</div></div><div class="answer hidden">Answer: b) Yes, through their own portal access</div></div>
+        </div>
+
+        <!-- MODULE 4 TEST -->
+        <div class="test-box">
+            <h3>Module 4 Test</h3>
+            <div class="test-info">10 Multiple Choice Questions &mdash; Covers Lessons 4.1, 4.2, and 4.3</div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">1.</span> The default due date when creating homework is:</div><div class="q-options"><div>a) Tomorrow</div><div>b) 3 days from now</div><div>c) 1 week from now</div><div>d) End of the term</div></div><div class="test-answer hidden">Answer: c) 1 week from now</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">2.</span> Who can edit a homework assignment?</div><div class="q-options"><div>a) Any teacher</div><div>b) The teacher who created it and administrators</div><div>c) Only the head teacher</div><div>d) No one after creation</div></div><div class="test-answer hidden">Answer: b) The teacher who created it and administrators</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">3.</span> A Dean of Secondary can see students in:</div><div class="q-options"><div>a) Only their own class</div><div>b) All primary students</div><div>c) All students in the secondary section</div><div>d) Only Grade 8</div></div><div class="test-answer hidden">Answer: c) All students in the secondary section</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">4.</span> What types of files can be attached to homework?</div><div class="q-options"><div>a) Only PDFs</div><div>b) Only images</div><div>c) PDFs, images, and documents</div><div>d) No files can be attached</div></div><div class="test-answer hidden">Answer: c) PDFs, images, and documents</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">5.</span> The "Instructions" field when creating homework is:</div><div class="q-options"><div>a) Optional</div><div>b) Required</div><div>c) Auto-filled</div><div>d) Only needed for secondary classes</div></div><div class="test-answer hidden">Answer: b) Required</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">6.</span> Teachers can search for students by:</div><div class="q-options"><div>a) Name or admission number</div><div>b) Fee balance</div><div>c) Parent's occupation</div><div>d) Home address</div></div><div class="test-answer hidden">Answer: a) Name or admission number</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">7.</span> To hide a homework assignment from students without deleting it, you should:</div><div class="q-options"><div>a) Delete it</div><div>b) Set the due date to a past date</div><div>c) Change the status to "Inactive"</div><div>d) Remove the instructions</div></div><div class="test-answer hidden">Answer: c) Change the status to "Inactive"</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">8.</span> A teacher can delete homework created by another teacher.</div><div class="q-options"><div>a) True</div><div>b) False</div><div>c) Only if they teach the same subject</div><div>d) Only with admin permission</div></div><div class="test-answer hidden">Answer: b) False</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">9.</span> Parent/Guardian contact information is visible to:</div><div class="q-options"><div>a) No teachers</div><div>b) Only class teachers</div><div>c) Teachers who have the student in their classes</div><div>d) Only the head teacher</div></div><div class="test-answer hidden">Answer: c) Teachers who have the student in their classes</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">10.</span> The "Grade Submissions" dashboard button shows:</div><div class="q-options"><div>a) Student grades from exams</div><div>b) Homework submissions awaiting grading</div><div>c) The grading scale</div><div>d) Report card templates</div></div><div class="test-answer hidden">Answer: b) Homework submissions awaiting grading</div></div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODULE 5 -->
+    <!-- ============================================================ -->
+    <div class="page-break">
+        <div class="module-header">
+            <div class="module-num">Module 5</div>
+            <h1>Staff Self-Service & Best Practices</h1>
+            <div class="module-desc">Learn to manage your profile, access payslips, and follow security and efficiency best practices.</div>
+            <div class="module-lessons">3 Lessons | 9 Quiz Questions | 10 Test Questions</div>
+        </div>
+
+        <!-- Lesson 5.1 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 5.1</div>
+            <h2>My Profile & Password Management</h2>
+            <div class="lesson-obj">Objective: Update your profile information and manage your password securely.</div>
+        </div>
+
+        <h3>Accessing Your Profile</h3>
+        <p>Click your <strong>name or avatar</strong> in the top-right corner of the screen, then select <strong>"My Profile"</strong>.</p>
+
+        <h3>What You Can Edit</h3>
+        <table>
+            <thead><tr><th>Section</th><th>Editable Fields</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Profile Photo</strong></td><td>Upload photo (auto-cropped to square, 400x400px)</td></tr>
+                <tr><td><strong>Contact Info</strong></td><td>Email, Phone, Address, City, Province</td></tr>
+                <tr><td><strong>Emergency Contact</strong></td><td>Name, Phone, Relationship</td></tr>
+                <tr><td><strong>Next of Kin</strong></td><td>Name, Phone, Relationship, Address</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Changing Your Password</h3>
+        <ol class="steps">
+            <li>Click <strong>"Change Password"</strong> on your profile page</li>
+            <li>Enter your <strong>current password</strong></li>
+            <li>Enter a <strong>new password</strong> (minimum 8 characters)</li>
+            <li>Confirm the new password</li>
+            <li>Click <strong>"Save"</strong></li>
+        </ol>
+
+        <!-- Quiz 5.1 -->
+        <div class="quiz-box">
+            <h4>Lesson 5.1 &mdash; Quick Quiz</h4>
+            <div class="quiz-q"><div class="q-text">Q1: Where do you access your profile?</div><div class="q-options"><div>a) Sidebar > Staff Management</div><div>b) Click your name/avatar in the top-right corner</div><div>c) Sidebar > Academic</div><div>d) Dashboard > Settings</div></div><div class="answer hidden">Answer: b) Click your name/avatar in the top-right corner</div></div>
+            <div class="quiz-q"><div class="q-text">Q2: What is required before you can set a new password?</div><div class="q-options"><div>a) Admin approval</div><div>b) Entering your current password</div><div>c) Answering security questions</div><div>d) Verifying your email</div></div><div class="answer hidden">Answer: b) Entering your current password</div></div>
+            <div class="quiz-q"><div class="q-text">Q3: Which of these documents can you download from your profile?</div><div class="q-options"><div>a) Payslip</div><div>b) Student list</div><div>c) Employee ID Card with QR code</div><div>d) Timetable</div></div><div class="answer hidden">Answer: c) Employee ID Card with QR code</div></div>
+        </div>
+
+        <!-- Lesson 5.2 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 5.2</div>
+            <h2>My Payslips & Staff Documents</h2>
+            <div class="lesson-obj">Objective: Access your payslips and download staff documents.</div>
+        </div>
+
+        <h3>Viewing Payslips</h3>
+        <p><strong>Location:</strong> Sidebar > Staff Management > My Payslips</p>
+        <ul>
+            <li>Payslips are listed by year and month (most recent first)</li>
+            <li>Click on any entry to view details</li>
+            <li>Payslips are uploaded by the administration</li>
+            <li>Only <strong>you</strong> can see your payslips &mdash; no other teacher has access</li>
+        </ul>
+
+        <h3>Downloadable Staff Documents</h3>
+        <table>
+            <thead><tr><th>Document</th><th>Where to Find</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Profile PDF</strong></td><td>My Profile page</td><td>Full staff profile for your records</td></tr>
+                <tr><td><strong>Business Card</strong></td><td>My Profile page</td><td>Professional card with QR code</td></tr>
+                <tr><td><strong>Employee ID Card</strong></td><td>My Profile page</td><td>ID card with photo and QR code</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Quiz 5.2 -->
+        <div class="quiz-box">
+            <h4>Lesson 5.2 &mdash; Quick Quiz</h4>
+            <div class="quiz-q"><div class="q-text">Q1: Who uploads payslips to the portal?</div><div class="q-options"><div>a) Teachers upload their own</div><div>b) The administration/HR department</div><div>c) The head teacher</div><div>d) An external company</div></div><div class="answer hidden">Answer: b) The administration/HR department</div></div>
+            <div class="quiz-q"><div class="q-text">Q2: Can another teacher see your payslip?</div><div class="q-options"><div>a) Yes, all teachers can see each other's payslips</div><div>b) No, payslips are private to each user</div><div>c) Only the head teacher can</div><div>d) Yes, if they know your password</div></div><div class="answer hidden">Answer: b) No, payslips are private to each user</div></div>
+            <div class="quiz-q"><div class="q-text">Q3: What should you do if you notice an error in your payslip?</div><div class="q-options"><div>a) Edit it yourself in the portal</div><div>b) Contact the HR/Admin office</div><div>c) Ignore it</div><div>d) Ask another teacher to check</div></div><div class="answer hidden">Answer: b) Contact the HR/Admin office</div></div>
+        </div>
+
+        <!-- Lesson 5.3 -->
+        <div class="lesson-header">
+            <div class="lesson-num">Lesson 5.3</div>
+            <h2>Best Practices, Security & Troubleshooting</h2>
+            <div class="lesson-obj">Objective: Follow security best practices and know how to resolve common issues.</div>
+        </div>
+
+        <h3>Security Best Practices</h3>
+        <table>
+            <thead><tr><th>#</th><th>Practice</th><th>Why It Matters</th></tr></thead>
+            <tbody>
+                <tr><td>1</td><td><strong>Never share your password</strong></td><td>Your account tracks all your actions. Sharing gives others access to student data.</td></tr>
+                <tr><td>2</td><td><strong>Log out on shared computers</strong></td><td>Prevents the next person from accessing your account.</td></tr>
+                <tr><td>3</td><td><strong>Use a strong password</strong></td><td>Weak passwords are easily guessed. Use letters, numbers, and symbols.</td></tr>
+                <tr><td>4</td><td><strong>Change password regularly</strong></td><td>Reduces risk if your password is compromised.</td></tr>
+                <tr><td>5</td><td><strong>Don't save passwords in public browsers</strong></td><td>Browser-saved passwords on shared computers are a security risk.</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Efficiency Best Practices</h3>
+        <table>
+            <thead><tr><th>#</th><th>Practice</th></tr></thead>
+            <tbody>
+                <tr><td>1</td><td>Mark attendance <strong>daily before the first period</strong></td></tr>
+                <tr><td>2</td><td>Enter results <strong>promptly after each assessment</strong>, not at end of term</td></tr>
+                <tr><td>3</td><td><strong>Double-check marks</strong> before submitting</td></tr>
+                <tr><td>4</td><td>Write <strong>meaningful, personalised comments</strong> on report cards</td></tr>
+                <tr><td>5</td><td>Keep your <strong>profile information current</strong></td></tr>
+                <tr><td>6</td><td>Use <strong>Chrome or Firefox</strong> for the best experience</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Common Issues & Solutions</h3>
+        <table>
+            <thead><tr><th>Problem</th><th>Solution</th></tr></thead>
+            <tbody>
+                <tr><td>Can't see my class in dropdown</td><td>Contact admin to assign you via Teacher Assignments</td></tr>
+                <tr><td>Can't enter results for a subject</td><td>You need to be assigned as subject teacher. Contact admin.</td></tr>
+                <tr><td>Report card shows 0 results</td><td>Results must be entered via Enter Results first. Check term/year.</td></tr>
+                <tr><td>Forgot my password</td><td>Contact the administrator for a password reset</td></tr>
+                <tr><td>Page not loading properly</td><td>Try refreshing (Ctrl+F5), clearing browser cache, or switching to Chrome</td></tr>
+                <tr><td>SMS failed to send</td><td>SMS credits may be exhausted. Contact admin to top up.</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Quiz 5.3 -->
+        <div class="quiz-box">
+            <h4>Lesson 5.3 &mdash; Quick Quiz</h4>
+            <div class="quiz-q"><div class="q-text">Q1: What should you always do when leaving a shared computer?</div><div class="q-options"><div>a) Close the browser tab</div><div>b) Log out of the portal</div><div>c) Turn off the monitor</div><div>d) Nothing special</div></div><div class="answer hidden">Answer: b) Log out of the portal</div></div>
+            <div class="quiz-q"><div class="q-text">Q2: You can't see a subject in the Enter Results dropdown. What is the most likely cause?</div><div class="q-options"><div>a) The subject doesn't exist</div><div>b) You are not assigned to teach that subject. Contact admin.</div><div>c) The system is broken</div><div>d) It's only available during exam week</div></div><div class="answer hidden">Answer: b) You are not assigned to teach that subject. Contact admin.</div></div>
+            <div class="quiz-q"><div class="q-text">Q3: When should you enter results into the portal?</div><div class="q-options"><div>a) At the end of the year</div><div>b) Only when the admin asks</div><div>c) Promptly after each assessment</div><div>d) During school holidays</div></div><div class="answer hidden">Answer: c) Promptly after each assessment</div></div>
+        </div>
+
+        <!-- MODULE 5 TEST -->
+        <div class="test-box">
+            <h3>Module 5 Test</h3>
+            <div class="test-info">10 Multiple Choice Questions &mdash; Covers Lessons 5.1, 5.2, and 5.3</div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">1.</span> Your profile can be accessed by clicking:</div><div class="q-options"><div>a) Sidebar > Settings</div><div>b) Your name/avatar in the top-right corner</div><div>c) Dashboard > Profile card</div><div>d) Sidebar > Academic</div></div><div class="test-answer hidden">Answer: b) Your name/avatar in the top-right corner</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">2.</span> To change your password, you must first enter:</div><div class="q-options"><div>a) Your email address</div><div>b) Your employee ID</div><div>c) Your current password</div><div>d) The admin's password</div></div><div class="test-answer hidden">Answer: c) Your current password</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">3.</span> Payslips on the portal are visible to:</div><div class="q-options"><div>a) All teachers</div><div>b) Only you (the logged-in user)</div><div>c) Teachers in the same department</div><div>d) Anyone with the portal URL</div></div><div class="test-answer hidden">Answer: b) Only you (the logged-in user)</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">4.</span> Which document includes a QR code?</div><div class="q-options"><div>a) Payslip</div><div>b) Attendance register</div><div>c) Employee ID Card and Business Card</div><div>d) Report card</div></div><div class="test-answer hidden">Answer: c) Employee ID Card and Business Card</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">5.</span> If a page is not loading correctly, you should try:</div><div class="q-options"><div>a) Waiting 24 hours</div><div>b) Refreshing (Ctrl+F5), clearing cache, or using Chrome</div><div>c) Creating a new account</div><div>d) Calling the internet provider</div></div><div class="test-answer hidden">Answer: b) Refreshing (Ctrl+F5), clearing cache, or using Chrome</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">6.</span> Why should you NOT save your password in a browser on a shared computer?</div><div class="q-options"><div>a) It slows down the computer</div><div>b) The next person could access your account</div><div>c) It will change your password</div><div>d) It's not technically possible</div></div><div class="test-answer hidden">Answer: b) The next person could access your account</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">7.</span> If you notice an error in your payslip, you should:</div><div class="q-options"><div>a) Edit it in the portal</div><div>b) Contact the HR/Admin office</div><div>c) Ignore it</div><div>d) Ask a fellow teacher to fix it</div></div><div class="test-answer hidden">Answer: b) Contact the HR/Admin office</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">8.</span> Which is NOT a security best practice?</div><div class="q-options"><div>a) Logging out on shared computers</div><div>b) Sharing your password with a trusted colleague</div><div>c) Using a strong password with letters, numbers, and symbols</div><div>d) Changing your password regularly</div></div><div class="test-answer hidden">Answer: b) Sharing your password with a trusted colleague</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">9.</span> What information can you update in your Emergency Contact section?</div><div class="q-options"><div>a) Bank account details</div><div>b) Name, Phone, and Relationship</div><div>c) Tax number</div><div>d) Salary amount</div></div><div class="test-answer hidden">Answer: b) Name, Phone, and Relationship</div></div>
+
+            <div class="test-q"><div class="q-text"><span class="q-num">10.</span> The best time to enter test results into the portal is:</div><div class="q-options"><div>a) At the end of the academic year</div><div>b) Promptly after each assessment</div><div>c) Only when generating report cards</div><div>d) During school holidays</div></div><div class="test-answer hidden">Answer: b) Promptly after each assessment</div></div>
+        </div>
+    </div>
+
+    <!-- COMPLETION -->
+    <div class="page-break" style="text-align: center; padding: 40px 0;">
+        <div style="border: 3px solid #1e3a5f; border-radius: 12px; padding: 35px; max-width: 600px; margin: 0 auto;">
+            <div style="font-size: 14px; color: #1e3a5f; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;">Training Programme Complete</div>
+            <div style="font-size: 22px; color: #1e3a5f; font-weight: 700; margin-top: 12px;">Certificate of Completion</div>
+            <div style="margin: 20px 0; border-top: 2px dotted #ccc; width: 70%; margin-left: auto; margin-right: auto;"></div>
+            <div style="font-size: 13px; color: #4b5563; margin-top: 15px;">This certifies that</div>
+            <div style="font-size: 18px; margin: 10px 0; border-bottom: 1px solid #999; padding-bottom: 5px; width: 60%; margin-left: auto; margin-right: auto;">&nbsp;</div>
+            <div style="font-size: 12px; color: #666;">(Teacher Name)</div>
+            <div style="font-size: 13px; color: #4b5563; margin-top: 15px;">has successfully completed all 5 modules of the</div>
+            <div style="font-size: 15px; color: #1e3a5f; font-weight: 600; margin-top: 5px;">St. Francis of Assisi School<br>Teacher Portal Training Programme</div>
+            <div style="margin-top: 30px; display: flex; justify-content: space-between; padding: 0 30px;">
+                <div style="text-align: center;">
+                    <div style="border-top: 1px solid #999; width: 150px; margin-top: 40px; padding-top: 5px; font-size: 11px; color: #666;">Date</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="border-top: 1px solid #999; width: 150px; margin-top: 40px; padding-top: 5px; font-size: 11px; color: #666;">Facilitator Signature</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+    <div style="text-align: center; padding: 15px 0; color: #888; font-size: 11px;">
+        <strong>St. Francis of Assisi School</strong> &mdash; School Management Information System<br>
+        5 Modules &bull; 14 Lessons &bull; 42 Quiz Questions &bull; 50 Test Questions<br>
+        <em>End of Training Manual</em>
+    </div>
+
+</div>
+
+</body>
+</html>

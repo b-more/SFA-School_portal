@@ -1,0 +1,485 @@
+<?php
+
+namespace App\Filament\Resources;
+
+use App\Filament\Resources\ResultResource\Pages;
+use App\Filament\Resources\ResultResource\RelationManagers;
+use App\Models\AcademicYear;
+use App\Models\Grade;
+use App\Models\Result;
+use App\Models\Student;
+use App\Models\Subject;
+use App\Models\Employee;
+use App\Models\Homework;
+use App\Models\SmsLog;
+use App\Models\Teacher;
+use App\Models\Term;
+use App\Services\SmsService;
+use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use App\Constants\RoleConstants;
+
+class ResultResource extends Resource
+{
+    protected static ?string $model = Result::class;
+
+    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+
+    protected static ?string $navigationGroup = 'Academic Management';
+
+    public static function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Forms\Components\Section::make('Student & Subject')
+                    ->schema([
+                        Forms\Components\Select::make('student_id')
+                            ->relationship('student', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->reactive()
+                            ->afterStateUpdated(fn (Forms\Set $set) => $set('subject_id', null)),
+                        Forms\Components\Select::make('subject_id')
+                            ->label('Subject')
+                            ->options(function (callable $get) {
+                                $studentId = $get('student_id');
+                                if (!$studentId) {
+                                    return [];
+                                }
+
+                                $student = Student::find($studentId);
+                                if (!$student || !$student->grade_id) {
+                                    return [];
+                                }
+
+                                return Grade::find($student->grade_id)
+                                    ?->subjects()
+                                    ->orderBy('name')
+                                    ->pluck('subjects.name', 'subjects.id')
+                                    ->toArray() ?? [];
+                            })
+                            ->searchable()
+                            ->required()
+                            ->reactive()
+                            ->helperText(function (callable $get) {
+                                $studentId = $get('student_id');
+                                if (!$studentId) {
+                                    return 'Select a student first';
+                                }
+                                $student = Student::find($studentId);
+                                $grade = $student?->grade;
+                                return $grade ? "Subjects for {$grade->name}" : '';
+                            }),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Exam Information')
+                    ->schema([
+                        Forms\Components\Select::make('exam_type')
+                            ->options([
+                                'mid-term' => 'Mid-Term',
+                                'final' => 'Final',
+                                'quiz' => 'Quiz',
+                                'assignment' => 'Assignment',
+                            ])
+                            ->required()
+                            ->reactive(),
+
+                        Forms\Components\Select::make('homework_id')
+                            ->label('Linked Homework')
+                            ->options(function (callable $get) {
+                                $studentId = $get('student_id');
+                                $subjectId = $get('subject_id');
+
+                                if (!$studentId || !$subjectId) {
+                                    return [];
+                                }
+
+                                $student = Student::find($studentId);
+                                if (!$student) {
+                                    return [];
+                                }
+
+                                return Homework::where('subject_id', $subjectId)
+                                    ->where('grade_id', $student->grade_id)
+                                    ->orderBy('title')
+                                    ->pluck('title', 'id')
+                                    ->toArray();
+                            })
+                            ->searchable()
+                            ->preload()
+                            ->visible(fn (callable $get) => $get('exam_type') === 'assignment')
+                            ->required(fn (callable $get) => $get('exam_type') === 'assignment')
+                            ->helperText('Select the homework assignment this result is based on'),
+
+                        Forms\Components\TextInput::make('marks')
+                            ->numeric()
+                            ->required()
+                            ->step(0.01)
+                            ->minValue(0)
+                            ->maxValue(100),
+
+                        Forms\Components\TextInput::make('grade')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\Select::make('term')
+                            ->options([
+                                'first' => 'First Term',
+                                'second' => 'Second Term',
+                                'third' => 'Third Term',
+                            ])
+                            ->required()
+                            ->default(function () {
+                                $currentTerm = Term::where('is_current', true)->first();
+                                if (!$currentTerm) {
+                                    return null;
+                                }
+                                $map = [
+                                    'Term 1' => 'first',
+                                    'Term 2' => 'second',
+                                    'Term 3' => 'third',
+                                ];
+                                return $map[$currentTerm->name] ?? null;
+                            })
+                            ->disabled()
+                            ->dehydrated(),
+
+                        Forms\Components\TextInput::make('year')
+                            ->numeric()
+                            ->required()
+                            ->default(function () {
+                                $currentYear = AcademicYear::current();
+                                return $currentYear ? (int) $currentYear->name : date('Y');
+                            })
+                            ->disabled()
+                            ->dehydrated(),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Additional Information')
+                    ->schema([
+                        Forms\Components\Textarea::make('comment')
+                            ->maxLength(65535)
+                            ->columnSpanFull(),
+
+                        Forms\Components\Select::make('recorded_by')
+                            ->relationship('recordedBy', 'name')
+                            ->default(function () {
+                                $user = Auth::user();
+                                $teacher = Teacher::where('user_id', $user->id)->first();
+                                return $teacher?->id;
+                            })
+                            ->disabled()
+                            ->dehydrated()
+                            ->required(),
+
+                        Forms\Components\Toggle::make('notify_parent')
+                            ->label('Send SMS notification to parent')
+                            ->default(true)
+                            ->reactive(),
+
+                        Forms\Components\Textarea::make('sms_message')
+                            ->label('Custom SMS Message (optional)')
+                            ->placeholder('Leave empty to use the default message template')
+                            ->helperText('Default template includes student name, subject, and result details')
+                            ->visible(fn (callable $get) => $get('notify_parent'))
+                            ->maxLength(160),
+                    ]),
+            ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                Tables\Columns\TextColumn::make('student.name')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('subject.name')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('exam_type')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('homework.title')
+                    ->label('Homework')
+                    ->visible(fn ($record) => $record && $record->exam_type === 'assignment' && $record->homework_id)
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('marks')
+                    ->numeric()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('grade')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('term')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('year')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('recordedBy.name')
+                    ->sortable()
+                    ->label('Recorded By')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('created_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('subject')
+                    ->relationship('subject', 'name'),
+                Tables\Filters\SelectFilter::make('exam_type')
+                    ->options([
+                        'mid-term' => 'Mid-Term',
+                        'final' => 'Final',
+                        'quiz' => 'Quiz',
+                        'assignment' => 'Assignment',
+                    ]),
+                Tables\Filters\SelectFilter::make('term')
+                    ->options([
+                        'first' => 'First Term',
+                        'second' => 'Second Term',
+                        'third' => 'Third Term',
+                    ]),
+                Tables\Filters\Filter::make('year')
+                    ->form([
+                        Forms\Components\TextInput::make('year'),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder =>
+                        $query->when($data['year'], fn($q) => $q->where('year', $data['year']))
+                    ),
+                Tables\Filters\Filter::make('homework')
+                    ->label('Has Linked Homework')
+                    ->query(fn (Builder $query): Builder => $query->whereNotNull('homework_id'))
+                    ->toggle(),
+            ])
+            ->actions([
+                Tables\Actions\ViewAction::make(),
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\Action::make('viewHomework')
+                    ->label('View Homework')
+                    ->icon('heroicon-o-document-text')
+                    ->color('success')
+                    ->url(fn (Result $record) => $record && $record->homework_id
+                        ? route('filament.admin.resources.homework.view', ['record' => $record->homework_id])
+                        : null)
+                    ->visible(fn (Result $record) => $record && $record->exam_type === 'assignment' && $record->homework_id)
+                    ->openUrlInNewTab(),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                ]),
+            ]);
+    }
+
+    /**
+     * Send SMS notification to parent about the result
+     */
+    public static function sendResultNotification(Result $result): void
+    {
+        // Make sure the result is not null
+        if (!$result) {
+            Notification::make()
+                ->title('SMS Not Sent')
+                ->body('Invalid result record.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        // Get the student and parent
+        $student = $result->student;
+        if (!$student || !$student->parentGuardian) {
+            Notification::make()
+                ->title('SMS Not Sent')
+                ->body('No parent/guardian found for this student.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        $parent = $student->parentGuardian;
+        if (!$parent->phone) {
+            Notification::make()
+                ->title('SMS Not Sent')
+                ->body('No phone number found for the parent/guardian.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        try {
+            // Format the message based on the result type
+            $customMessage = $result->sms_message;
+
+            if (empty($customMessage)) {
+                // Create message based on result type
+                $subjectName = $result->subject->name ?? 'N/A';
+                $examType = ucfirst($result->exam_type);
+
+                // Add homework title if it's an assignment
+                $homeworkInfo = '';
+                if ($result->exam_type === 'assignment' && $result->homework) {
+                    $homeworkInfo = " - {$result->homework->title}";
+                }
+
+                // Short SMS under 160 characters
+                $message = "Result for {$student->name} - {$subjectName}: {$result->marks}% ({$result->grade}). Check portal. St Francis";
+            } else {
+                $message = $customMessage;
+            }
+
+            // Send SMS using SmsService (handles logging automatically)
+            $smsService = app(SmsService::class);
+            $success = $smsService->send(
+                $message,
+                $parent->phone,
+                'result_notification',
+                $result->id
+            );
+
+            if ($success) {
+                // Show success notification
+                Notification::make()
+                    ->title('Result Notification Sent')
+                    ->body("SMS notification sent to {$parent->name}")
+                    ->success()
+                    ->send();
+            } else {
+                Notification::make()
+                    ->title('SMS Notification Failed')
+                    ->body('Failed to send SMS. Check logs for details.')
+                    ->danger()
+                    ->send();
+            }
+
+        } catch (\Exception $e) {
+            // Log error
+            Log::error('Failed to send result notification', [
+                'result_id' => $result->id,
+                'student_id' => $student->id,
+                'parent_id' => $parent->id,
+                'error' => $e->getMessage()
+            ]);
+
+            // Show error notification
+            Notification::make()
+                ->title('SMS Notification Failed')
+                ->body("Could not send result notification: {$e->getMessage()}")
+                ->danger()
+                ->send();
+        }
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        return in_array($user->role_id, array_merge(RoleConstants::teachingWithAdmin(), [RoleConstants::STUDENT, RoleConstants::PARENT]));
+    }
+
+    /**
+     * Format phone number to ensure it has the country code
+     */
+    protected static function formatPhoneNumber(string $phoneNumber): string
+    {
+        // Remove any non-numeric characters
+        $phoneNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
+
+        // Check if number already has country code (260 for Zambia)
+        if (substr($phoneNumber, 0, 3) === '260') {
+            // Number already has country code
+            return $phoneNumber;
+        }
+
+        // If starting with 0, replace with country code
+        if (substr($phoneNumber, 0, 1) === '0') {
+            return '260' . substr($phoneNumber, 1);
+        }
+
+        // If number doesn't have country code, add it
+        if (strlen($phoneNumber) === 9) {
+            return '260' . $phoneNumber;
+        }
+
+        return $phoneNumber;
+    }
+
+    public static function canCreate(): bool
+    {
+        $user = Auth::user();
+        return in_array($user?->role_id, [RoleConstants::ADMIN, ...RoleConstants::teaching()]);
+    }
+
+    public static function canEdit($record): bool
+    {
+        $user = Auth::user();
+        return in_array($user?->role_id, [RoleConstants::ADMIN, ...RoleConstants::teaching()]);
+    }
+
+    public static function canDelete($record): bool
+    {
+        return Auth::user()?->role_id === RoleConstants::ADMIN;
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery()
+            ->with(['student', 'subject', 'recordedBy', 'homework']);
+
+        $user = Auth::user();
+
+        // Parents see only their children's results
+        if ($user->role_id === RoleConstants::PARENT) {
+            $parent = \App\Models\ParentGuardian::where('user_id', $user->id)->first();
+            if ($parent) {
+                $studentIds = $parent->students()
+                    ->where('enrollment_status', 'active')
+                    ->pluck('id')
+                    ->toArray();
+                return $query->whereIn('student_id', $studentIds);
+            }
+            return $query->where('id', 0);
+        }
+
+        // Students see only their own results
+        if ($user->role_id === RoleConstants::STUDENT) {
+            $student = Student::where('user_id', $user->id)->first();
+            if ($student) {
+                return $query->where('student_id', $student->id);
+            }
+            return $query->where('id', 0);
+        }
+
+        return $query;
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            //
+        ];
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListResults::route('/'),
+            'create' => Pages\CreateResult::route('/create'),
+            'view' => Pages\ViewResult::route('/{record}'),
+            'edit' => Pages\EditResult::route('/{record}/edit'),
+        ];
+    }
+}
