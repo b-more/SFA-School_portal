@@ -82,7 +82,11 @@
         </div>
     </div>
 
-    <x-filament::form wire:submit="create">
-        {{ $this->getFormActions() }}
-    </x-filament::form>
+    <form wire:submit.prevent="{{ $activeTab === 'assign' ? 'assign' : 'create' }}" class="mt-4 flex justify-end">
+        @if ($activeTab === 'create')
+            <x-filament::button type="submit" color="primary">Create Subject</x-filament::button>
+        @elseif ($activeTab === 'assign')
+            <x-filament::button type="submit" color="success">Assign Subjects</x-filament::button>
+        @endif
+    </form>
 </x-filament::page>

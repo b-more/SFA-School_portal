@@ -248,7 +248,7 @@ def create_primary_teacher_template():
     sample_data = [
         [
             "John Mwale",
-            "john.mwale@stfrancis.tech",
+            "john.mwale@stfrancisofassisizm.com",
             "+260971234567",
             "TEA001",
             "john.mwale",
@@ -274,7 +274,7 @@ def create_primary_teacher_template():
         ],
         [
             "Mary Banda",
-            "mary.banda@stfrancis.tech",
+            "mary.banda@stfrancisofassisizm.com",
             "+260975111001",
             "TEA002",
             "mary.banda",
@@ -300,7 +300,7 @@ def create_primary_teacher_template():
         ],
         [
             "Peter Zulu",
-            "peter.zulu@stfrancis.tech",
+            "peter.zulu@stfrancisofassisizm.com",
             "+260975222003",
             "TEA003",
             "peter.zulu",
@@ -411,7 +411,7 @@ def create_primary_teacher_template():
     ref_sheet.sheet_state = 'hidden'
 
     # Save workbook
-    output_path = "/var/www/stfrancisofassisi.tech/projects/portal/public/downloads/templates/Primary_Teacher_Import_Template.xlsx"
+    output_path = "/var/www/stfrancisofassisizm.com/projects/portal/public/downloads/templates/Primary_Teacher_Import_Template.xlsx"
     wb.save(output_path)
     print(f"✅ Template created successfully: {output_path}")
     return output_path
@@ -421,7 +421,7 @@ if __name__ == "__main__":
         path = create_primary_teacher_template()
         print(f"\n📊 Excel template with data validation created!")
         print(f"📁 Location: {path}")
-        print(f"🌐 Download URL: http://portal.stfrancisofassisi.tech/downloads/templates/Primary_Teacher_Import_Template.xlsx")
+        print(f"🌐 Download URL: http://portal.stfrancisofassisizm.com/downloads/templates/Primary_Teacher_Import_Template.xlsx")
     except Exception as e:
         print(f"❌ Error creating template: {str(e)}")
         import traceback

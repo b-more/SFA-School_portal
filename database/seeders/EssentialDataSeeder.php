@@ -114,7 +114,7 @@ class EssentialDataSeeder extends Seeder
 
         // Create admin user
         $admin = User::updateOrCreate(
-            ['email' => 'admin@stfrancisofassisi.tech'],
+            ['email' => 'admin@stfrancisofassisizm.com'],
             [
                 'role_id' => $adminRole->id,
                 'name' => 'System Administrator',
@@ -144,7 +144,7 @@ class EssentialDataSeeder extends Seeder
             ]
         );
 
-        $this->command->info('✅ Admin user created: admin@stfrancisofassisi.tech / password');
+        $this->command->info('✅ Admin user created: admin@stfrancisofassisizm.com / password');
     }
 
     /**
@@ -670,7 +670,7 @@ class EssentialDataSeeder extends Seeder
             // Primary Teachers (no specialization)
             [
                 'name' => 'Mary Banda',
-                'email' => 'mary.banda@stfrancis.tech',
+                'email' => 'mary.banda@stfrancisofassisizm.com',
                 'phone' => '0975111001',
                 'employee_id' => 'T001',
                 'qualification' => 'Diploma in Primary Education',
@@ -678,7 +678,7 @@ class EssentialDataSeeder extends Seeder
             ],
             [
                 'name' => 'John Mwale',
-                'email' => 'john.mwale@stfrancis.tech',
+                'email' => 'john.mwale@stfrancisofassisizm.com',
                 'phone' => '0975111002',
                 'employee_id' => 'T002',
                 'qualification' => 'Certificate in Early Childhood Education',
@@ -686,7 +686,7 @@ class EssentialDataSeeder extends Seeder
             ],
             [
                 'name' => 'Grace Phiri',
-                'email' => 'grace.phiri@stfrancis.tech',
+                'email' => 'grace.phiri@stfrancisofassisizm.com',
                 'phone' => '0975111003',
                 'employee_id' => 'T003',
                 'qualification' => 'Bachelor of Education (Primary)',
@@ -694,7 +694,7 @@ class EssentialDataSeeder extends Seeder
             ],
             [
                 'name' => 'Peter Zulu',
-                'email' => 'peter.zulu@stfrancis.tech',
+                'email' => 'peter.zulu@stfrancisofassisizm.com',
                 'phone' => '0975111004',
                 'employee_id' => 'T004',
                 'qualification' => 'Diploma in Primary Education',
@@ -704,7 +704,7 @@ class EssentialDataSeeder extends Seeder
             // Secondary Teachers (with specialization)
             [
                 'name' => 'Dr. Sarah Tembo',
-                'email' => 'sarah.tembo@stfrancis.tech',
+                'email' => 'sarah.tembo@stfrancisofassisizm.com',
                 'phone' => '0975111005',
                 'employee_id' => 'T005',
                 'qualification' => 'PhD in Mathematics',
@@ -712,7 +712,7 @@ class EssentialDataSeeder extends Seeder
             ],
             [
                 'name' => 'Prof. Michael Chanda',
-                'email' => 'michael.chanda@stfrancis.tech',
+                'email' => 'michael.chanda@stfrancisofassisizm.com',
                 'phone' => '0975111006',
                 'employee_id' => 'T006',
                 'qualification' => 'Master of Science in Physics',
@@ -720,7 +720,7 @@ class EssentialDataSeeder extends Seeder
             ],
             [
                 'name' => 'Ms. Janet Kasonde',
-                'email' => 'janet.kasonde@stfrancis.tech',
+                'email' => 'janet.kasonde@stfrancisofassisizm.com',
                 'phone' => '0975111007',
                 'employee_id' => 'T007',
                 'qualification' => 'Bachelor of Arts in English',
@@ -728,7 +728,7 @@ class EssentialDataSeeder extends Seeder
             ],
             [
                 'name' => 'Mr. Robert Simwanza',
-                'email' => 'robert.simwanza@stfrancis.tech',
+                'email' => 'robert.simwanza@stfrancisofassisizm.com',
                 'phone' => '0975111008',
                 'employee_id' => 'T008',
                 'qualification' => 'Bachelor of Science in Chemistry',
@@ -1052,12 +1052,12 @@ class EssentialDataSeeder extends Seeder
 
         $this->command->info('');
         $this->command->info('🔐 LOGIN CREDENTIALS:');
-        $this->command->info('Email: admin@stfrancisofassisi.tech');
+        $this->command->info('Email: admin@stfrancisofassisizm.com');
         $this->command->info('Password: password');
         $this->command->info('');
         $this->command->info('👨‍🏫 SAMPLE TEACHER LOGINS:');
-        $this->command->info('Email: mary.banda@stfrancis.tech');
-        $this->command->info('Email: john.mwale@stfrancis.tech');
+        $this->command->info('Email: mary.banda@stfrancisofassisizm.com');
+        $this->command->info('Email: john.mwale@stfrancisofassisizm.com');
         $this->command->info('Password: password123 (for all teachers)');
         $this->command->info('');
         $this->command->info('🎉 System is ready for use!');

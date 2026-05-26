@@ -39,6 +39,7 @@ class ParentGuardianResource extends Resource
             RoleConstants::TEACHER,
             RoleConstants::PARENT,
             RoleConstants::STUDENT,
+            RoleConstants::DRIVER,
         ]) ?? false;
     }
 

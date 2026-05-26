@@ -181,7 +181,7 @@ class StFrancisSchoolDataSeeder extends Seeder
         $admins = [
             [
                 'name' => 'Mr. Francis Mulenga',
-                'email' => 'info@stfrancisschool.tech',
+                'email' => 'info@stfrancisofassisizm.com',
                 'designation' => 'DIR',
                 'employee_id' => 'SFA-ADM-001',
                 'department' => 'Administration',
@@ -208,7 +208,7 @@ class StFrancisSchoolDataSeeder extends Seeder
             ],
             [
                 'name' => "Ms. Kapelang'a Luwi Mercy",
-                'email' => 'kapelanga.mercy@stfrancisschool.tech',
+                'email' => 'kapelanga.mercy@stfrancisofassisizm.com',
                 'designation' => 'DST',
                 'employee_id' => 'SFA-ADM-004',
                 'department' => 'Administration',
@@ -217,7 +217,7 @@ class StFrancisSchoolDataSeeder extends Seeder
             ],
             [
                 'name' => 'Mr. Mpongwe Stephen',
-                'email' => 'mpongwe.stephen@stfrancisschool.tech',
+                'email' => 'mpongwe.stephen@stfrancisofassisizm.com',
                 'designation' => 'ACC',
                 'employee_id' => 'SFA-FIN-001',
                 'department' => 'Finance',
@@ -226,7 +226,7 @@ class StFrancisSchoolDataSeeder extends Seeder
             ],
             [
                 'name' => 'Mr. Enock Lunda',
-                'email' => 'enock.lunda@stfrancisschool.tech',
+                'email' => 'enock.lunda@stfrancisofassisizm.com',
                 'designation' => 'AA',
                 'employee_id' => 'SFA-ADM-005',
                 'department' => 'Administration',
@@ -334,7 +334,7 @@ class StFrancisSchoolDataSeeder extends Seeder
             ],
             [
                 'name' => 'Mr. Sinyangwe Eull',
-                'email' => 'sinyangwe.eull@stfrancisschool.tech',
+                'email' => 'sinyangwe.eull@stfrancisofassisizm.com',
                 'employee_id' => 'SFA-TCH-007',
                 'grade' => 'Grade 4',
                 'school_section_id' => $primary?->id,
@@ -352,7 +352,7 @@ class StFrancisSchoolDataSeeder extends Seeder
             ],
             [
                 'name' => 'Mr. Micheal Mubisa',
-                'email' => 'micheal.mubisa@stfrancisschool.tech',
+                'email' => 'micheal.mubisa@stfrancisofassisizm.com',
                 'employee_id' => 'SFA-TCH-009',
                 'grade' => 'Grade 6',
                 'school_section_id' => $primary?->id,
@@ -400,7 +400,7 @@ class StFrancisSchoolDataSeeder extends Seeder
             ],
             [
                 'name' => 'Mr. Godwin Lubinda',
-                'email' => 'godwin.lubinda@stfrancisschool.tech',
+                'email' => 'godwin.lubinda@stfrancisofassisizm.com',
                 'employee_id' => 'SFA-TCH-014',
                 'grade' => null,
                 'school_section_id' => $secondary?->id,

@@ -203,7 +203,7 @@
             <h1 class="title">St. Francis Of Assisi Private School</h1>
             <p class="subtitle">Complete Payment History</p>
             <p class="contact-info">Plot No 1310/4 East Kamenza, Chililabombwe, Zambia</p>
-            <p class="contact-info">Phone: +260 972 266 217 | Email: info@stfrancisofassisi.tech</p>
+            <p class="contact-info">Phone: +260 972 266 217 | Email: info@stfrancisofassisizm.com</p>
         </div>
 
         <div class="document-info">

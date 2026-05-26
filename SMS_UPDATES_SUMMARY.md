@@ -84,7 +84,7 @@ Login details:
 Username: mary.banda
 Password: Student123!
 
-Portal: https://staff.stfrancisofassisi.tech/
+Portal: https://staff.stfrancisofassisizm.com/
 
 Please help them log in and change their password.
 ```
@@ -109,7 +109,7 @@ Change password on first login. St Francis
 ```
 Hello John Banda, your child Mary Banda has been registered at St Francis of Assisi School.
 
-You can view their information on your parent portal: https://staff.stfrancisofassisi.tech/
+You can view their information on your parent portal: https://staff.stfrancisofassisizm.com/
 Your username: john.banda
 ```
 

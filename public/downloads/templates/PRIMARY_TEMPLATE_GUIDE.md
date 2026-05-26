@@ -4,7 +4,7 @@
 
 ### **Download Link:**
 ```
-http://portal.stfrancisofassisi.tech/downloads/templates/Primary_Teacher_Import_Template.xlsx
+http://portal.stfrancisofassisizm.com/downloads/templates/Primary_Teacher_Import_Template.xlsx
 ```
 
 ---

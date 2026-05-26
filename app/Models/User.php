@@ -3,13 +3,17 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Constants\RoleConstants;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     use SoftDeletes, HasFactory, Notifiable, HasApiTokens;
 
@@ -151,6 +155,32 @@ class User extends Authenticatable
     public function isParent(): bool
     {
         return $this->hasRole('Parent');
+    }
+
+    /**
+     * Check if user is a bus driver
+     */
+    public function isDriver(): bool
+    {
+        return $this->role_id === RoleConstants::DRIVER;
+    }
+
+    /**
+     * Filament v3 panel gate. Returns false for users whose status is anything other than
+     * 'active' — blocks suspended/inactive accounts from logging into any panel, regardless
+     * of role. Per-panel role gating still happens in each Page/Resource.
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->status === 'active';
+    }
+
+    /**
+     * Bus routes this user drives (driver_user_id on bus_fare_structures).
+     */
+    public function busRoutes(): HasMany
+    {
+        return $this->hasMany(\App\Models\BusFareStructure::class, 'driver_user_id');
     }
 
     /**

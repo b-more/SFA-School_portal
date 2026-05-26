@@ -25,10 +25,120 @@ Route::get('/test', function () {
     return 'Routes are working!';
 });
 
-// Root route - redirect to login if not authenticated, otherwise to dashboard
+// Legacy paths from the previous static site → anchors on the Laravel landing.
+// (301 so Google updates indexes; harmless for direct visitors.)
+$legacyMap = [
+    'about'                       => '/#about',
+    'about-us'                    => '/#about',
+    'programs'                    => '/#programs',
+    'academics'                   => '/#programs',
+    'academics/early-childhood'   => '/#programs',
+    'academics/primary'           => '/#programs',
+    'academics/secondary'         => '/#programs',
+    'why'                         => '/#why',
+    'why-us'                      => '/#why',
+    'portal'                      => '/#portal',
+    'admissions'                  => '/#contact',
+    'admissions/apply'            => '/#contact',
+    'contact'                     => '/#contact',
+    'contact-us'                  => '/#contact',
+    'calendar'                    => '/#contact',
+    'events'                      => '/#contact',
+    'news'                        => '/#contact',
+];
+foreach ($legacyMap as $from => $to) {
+    Route::redirect("/{$from}", $to, 301);
+}
+
+// Public gallery — list of albums (collections)
+Route::get('/gallery', function () {
+    $settings = \App\Models\SchoolSettings::first();
+
+    $albums = \App\Models\Album::query()
+        ->where('status', 'published')
+        ->withCount('photos')
+        ->orderBy('order')
+        ->orderByDesc('updated_at')
+        ->get();
+
+    // Legacy GalleryImage records (uncategorised) — surface as a virtual album if present
+    $legacyCount = \App\Models\GalleryImage::query()->count();
+
+    return response()
+        ->view('gallery.index', compact('settings', 'albums', 'legacyCount'))
+        ->header('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+})->name('gallery');
+
+// Public gallery — single album detail
+Route::get('/gallery/{slug}', function (string $slug) {
+    $settings = \App\Models\SchoolSettings::first();
+
+    if ($slug === 'other-photos') {
+        $album = (object) [
+            'title'       => 'Other photos',
+            'slug'        => 'other-photos',
+            'description' => 'Photos uploaded outside an album.',
+            'cover_image' => null,
+            'updated_at'  => now(),
+        ];
+        $photos = \App\Models\GalleryImage::query()
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($g) => (object) [
+                'image_path' => $g->path ?: $g->filename,
+                'caption'    => $g->title ?: $g->description,
+                'alt_text'   => $g->title,
+                'featured'   => false,
+                'created_at' => $g->created_at,
+            ]);
+    } else {
+        $album = \App\Models\Album::query()
+            ->where('slug', $slug)
+            ->where('status', 'published')
+            ->firstOrFail();
+        $photos = $album->photos()->orderBy('order')->orderBy('id')->get();
+    }
+
+    return response()
+        ->view('gallery.show', compact('settings', 'album', 'photos'))
+        ->header('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+})->name('gallery.show');
+
+// Root route - show public landing for guests; redirect signed-in users to their dashboard
 Route::get('/', function () {
     if (! auth()->check()) {
-        return redirect('/admin/login');
+        $settings = \App\Models\SchoolSettings::first();
+
+        $stats = [
+            'students'      => (int) \App\Models\Student::query()->count(),
+            'teachers'      => (int) \App\Models\Teacher::query()->count(),
+            'academic_year' => optional(\App\Models\AcademicYear::query()->where('is_active', true)->first())->name,
+            'years_running' => 25, // editable via custom_settings.landing in future
+        ];
+
+        $latestNews = \App\Models\News::query()
+            ->where('status', 'published')
+            ->orderByDesc('date')
+            ->limit(3)
+            ->get();
+
+        $upcomingEvents = \App\Models\Event::query()
+            ->where('start_date', '>=', now()->startOfDay())
+            ->orderBy('start_date')
+            ->limit(3)
+            ->get();
+
+        $testimonials = \App\Models\Testimonial::query()
+            ->active()
+            ->ordered()
+            ->limit(6)
+            ->get();
+
+        return response()
+            ->view('welcome', compact('settings', 'stats', 'latestNews', 'upcomingEvents', 'testimonials'))
+            ->header('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0');
     }
 
     $user = auth()->user();
@@ -46,7 +156,7 @@ Route::get('/', function () {
         default:
             return redirect('/admin');
     }
-});
+})->name('landing');
 
 // Dashboard route - alias for backward compatibility
 Route::get('/dashboard', function () {
@@ -96,7 +206,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // Enhanced Homework and Submission Routes
-Route::middleware(['auth'])->group(function () {
+Route::middleware([\App\Http\Middleware\TokenFromQuery::class])->group(function () {
     // Primary homework routes
     Route::get('/homework/{homework}/download', [HomeworkController::class, 'download'])
         ->name('homework.download');

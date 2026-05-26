@@ -359,7 +359,7 @@
                 St Francis of Assisi School | Excellence in Education
             </div>
             <div class="footer-info">
-                Email: info@stfrancisofassisi.tech | Phone: +260 XXX XXX XXX
+                Email: info@stfrancisofassisizm.com | Phone: +260 XXX XXX XXX
             </div>
             <div class="generated-date">
                 Generated on: {{ $date ?? now()->format('F d, Y \a\t h:i A') }}

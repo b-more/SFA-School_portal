@@ -16,7 +16,7 @@ class TrainingMaterialController extends Controller
                     ['num' => '1.1', 'title' => 'Logging In & First-Time Setup', 'dur' => '30 min',
                      'objective' => 'Successfully log into the portal and change your default password.',
                      'content' => [
-                         ['heading' => 'Accessing the Portal', 'body' => "Follow these steps to access the school portal:\n\n1. Open your web browser (Chrome, Firefox, or Edge recommended)\n2. Type the portal address: https://portal.stfrancisofassisi.tech/admin\n3. Enter your Email Address provided by the school administrator\n4. Enter your Password (default password is given by admin)\n5. Click \"Sign In\""],
+                         ['heading' => 'Accessing the Portal', 'body' => "Follow these steps to access the school portal:\n\n1. Open your web browser (Chrome, Firefox, or Edge recommended)\n2. Type the portal address: https://portal.stfrancisofassisizm.com/admin\n3. Enter your Email Address provided by the school administrator\n4. Enter your Password (default password is given by admin)\n5. Click \"Sign In\""],
                          ['heading' => 'First-Time Password Change', 'body' => "When you log in for the first time, the system will force you to change your password. This is a security measure.\n\n- Your new password must be at least 8 characters long\n- Use a mix of letters, numbers, and special characters\n- Do not reuse passwords from other websites\n- Remember your password — write it down in a secure place if needed\n\nSECURITY WARNING: Never share your login credentials with anyone. Each teacher has their own unique account."],
                          ['heading' => 'Supported Browsers', 'table' => [
                              'headers' => ['Browser', 'Status', 'Notes'],
@@ -30,7 +30,7 @@ class TrainingMaterialController extends Controller
                          ]],
                      ],
                      'quiz' => [
-                         ['q' => 'What is the correct URL for the school portal?', 'opts' => ['a) www.stfrancisofassisi.tech', 'b) portal.stfrancisofassisi.tech/admin', 'c) stfrancis.school.com', 'd) admin.stfrancis.tech'], 'ans' => 'b'],
+                         ['q' => 'What is the correct URL for the school portal?', 'opts' => ['a) www.stfrancisofassisizm.com', 'b) portal.stfrancisofassisizm.com/admin', 'c) stfrancis.school.com', 'd) admin.stfrancisofassisizm.com'], 'ans' => 'b'],
                          ['q' => 'What is the minimum number of characters required for your password?', 'opts' => ['a) 4 characters', 'b) 6 characters', 'c) 8 characters', 'd) 12 characters'], 'ans' => 'c'],
                          ['q' => 'Which browser is NOT supported for use with the portal?', 'opts' => ['a) Chrome', 'b) Firefox', 'c) Internet Explorer', 'd) Edge'], 'ans' => 'c'],
                      ]
@@ -101,7 +101,7 @@ class TrainingMaterialController extends Controller
                 ],
                 'test' => [
                     ['q' => 'What should you do the FIRST time you log into the portal?', 'opts' => ['a) Mark attendance', 'b) Change your default password', 'c) Create homework', 'd) View your payslip'], 'ans' => 'b'],
-                    ['q' => 'Which is the correct portal URL?', 'opts' => ['a) https://stfrancisofassisi.tech/portal', 'b) https://portal.stfrancisofassisi.tech/admin', 'c) https://admin.stfrancisofassisi.tech', 'd) https://school.stfrancisofassisi.tech'], 'ans' => 'b'],
+                    ['q' => 'Which is the correct portal URL?', 'opts' => ['a) https://stfrancisofassisizm.com/portal', 'b) https://portal.stfrancisofassisizm.com/admin', 'c) https://admin.stfrancisofassisizm.com', 'd) https://school.stfrancisofassisizm.com'], 'ans' => 'b'],
                     ['q' => 'A Class Teacher can enter results for:', 'opts' => ['a) Only Maths and English', 'b) Only their specialised subjects', 'c) ALL subjects in their assigned class', 'd) No subjects (admin only)'], 'ans' => 'c'],
                     ['q' => 'Where can you find the "Homework" menu?', 'opts' => ['a) Sidebar > Academic', 'b) Sidebar > Reports', 'c) Sidebar > Teaching', 'd) Sidebar > Staff Management'], 'ans' => 'c'],
                     ['q' => 'Can a teacher access the financial system?', 'opts' => ['a) Yes, all teachers', 'b) Only class teachers', 'c) No, restricted to administrators', 'd) Only head teachers'], 'ans' => 'c'],

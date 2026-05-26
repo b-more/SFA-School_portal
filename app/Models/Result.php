@@ -24,6 +24,8 @@ class Result extends Model
         'recorded_by',
         'notify_parent',
         'sms_message',
+        'academic_year_id',
+        'term_id',
     ];
 
     /**
@@ -78,6 +80,16 @@ class Result extends Model
     protected static function boot()
     {
         parent::boot();
+
+        // Auto-fill term and year fields
+        static::creating(function ($result) {
+            $activeTerm = Term::where('is_active', true)->first();
+            $activeYear = AcademicYear::where('is_active', true)->first();
+            if (empty($result->term_id) && $activeTerm) $result->term_id = $activeTerm->id;
+            if (empty($result->term) && $activeTerm) $result->term = $activeTerm->name;
+            if (empty($result->academic_year_id) && $activeYear) $result->academic_year_id = $activeYear->id;
+            if (empty($result->year) && $activeYear) $result->year = (int) substr($activeYear->name, 0, 4);
+        });
 
         // When a new result is created, send SMS notification if enabled
         static::created(function ($result) {

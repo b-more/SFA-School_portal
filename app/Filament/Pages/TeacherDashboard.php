@@ -17,6 +17,15 @@ use App\Constants\RoleConstants;
 use App\Traits\HasPageGuide;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
+use App\Models\Term;
+use App\Models\Grade;
+use App\Models\SubjectTeaching;
+use App\Models\StudentFee;
+use App\Models\LeaveApplication;
+use App\Models\Complaint;
+use App\Models\Notice;
+use App\Models\CpdActivity;
+use App\Models\SchoolSettings;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -464,6 +473,207 @@ class TeacherDashboard extends Page
                 'percentage' => round($r->avg_marks, 1),
             ];
         })->toArray();
+    }
+
+    public function isHeadTeacher(): bool
+    {
+        $user = Auth::user();
+        return in_array($user?->role_id, [
+            RoleConstants::HEAD_TEACHER_PRIMARY,
+            RoleConstants::HEAD_TEACHER_SECONDARY,
+            RoleConstants::DEPUTY_HEAD_PRIMARY,
+            RoleConstants::DEPUTY_HEAD_SECONDARY,
+            RoleConstants::ADMIN,
+        ]);
+    }
+
+    public function getHeadDashboardData(): array
+    {
+        $user = Auth::user();
+        $roleId = $user->role_id;
+        $activeYear = AcademicYear::where('is_active', true)->first();
+        $activeTerm = Term::where('is_active', true)->first();
+        $yearId = $activeYear?->id;
+
+        // Section filtering
+        $sectionIds = null;
+        $sectionLabel = 'School';
+        if ($roleId == RoleConstants::HEAD_TEACHER_PRIMARY) {
+            $sectionIds = [1, 2, 3];
+            $sectionLabel = 'Primary Section';
+        } elseif ($roleId == RoleConstants::HEAD_TEACHER_SECONDARY) {
+            $sectionIds = [4, 5];
+            $sectionLabel = 'Secondary Section';
+        }
+
+        $gradeQuery = Grade::query();
+        if ($sectionIds) $gradeQuery->whereIn('school_section_id', $sectionIds);
+        $grades = $gradeQuery->orderBy('id')->get();
+        $gradeIds = $grades->pluck('id')->toArray();
+
+        // Students
+        $studentQuery = Student::where('enrollment_status', 'active');
+        if ($gradeIds) $studentQuery->whereIn('grade_id', $gradeIds);
+        $totalStudents = $studentQuery->count();
+        $studentIds = (clone $studentQuery)->pluck('id')->toArray();
+
+        // Teachers
+        if ($sectionIds) {
+            $sectionClassIds = ClassSection::whereIn('grade_id', $gradeIds)->pluck('id');
+            $teachingTeacherIds = SubjectTeaching::whereIn('class_section_id', $sectionClassIds)
+                ->when($yearId, fn($q) => $q->where('academic_year_id', $yearId))->pluck('teacher_id')->unique();
+            $sectionTeachers = Teacher::where('is_active', true)
+                ->where(fn($q) => $q->whereIn('school_section_id', $sectionIds)->orWhereIn('grade_id', $gradeIds)->orWhereIn('id', $teachingTeacherIds))
+                ->with(['grade', 'classSection'])->get();
+        } else {
+            $sectionTeachers = Teacher::where('is_active', true)->with(['grade', 'classSection'])->get();
+        }
+
+        // Classes
+        $classQuery = ClassSection::where('is_active', true);
+        if ($gradeIds) $classQuery->whereIn('grade_id', $gradeIds);
+        if ($yearId) $classQuery->where('academic_year_id', $yearId);
+        $totalClasses = $classQuery->count();
+
+        // Attendance
+        $todayAtt = Attendance::where('attendance_date', today())
+            ->when($yearId, fn($q) => $q->where('academic_year_id', $yearId))
+            ->when($gradeIds, fn($q) => $q->whereIn('grade_id', $gradeIds))->get();
+        $attPresent = $todayAtt->whereIn('status', ['present', 'late'])->count();
+        $attTotal = $todayAtt->count();
+        $attRate = $attTotal > 0 ? round(($attPresent / $attTotal) * 100) : 0;
+        $classesMarked = $todayAtt->pluck('class_section_id')->unique()->count();
+
+        // Fees
+        $feeQuery = StudentFee::query();
+        if ($yearId) $feeQuery->where('academic_year_id', $yearId);
+        if ($studentIds) $feeQuery->whereIn('student_id', $studentIds);
+        $allFees = $feeQuery->with('feeStructure')->get();
+        $totalFees = $allFees->sum(fn($f) => $f->feeStructure?->basic_fee ?? 0);
+        $totalCollected = $allFees->sum('amount_paid');
+        $collectionRate = $totalFees > 0 ? round(($totalCollected / $totalFees) * 100) : 0;
+
+        // Homework
+        $hwQuery = Homework::where('status', 'active');
+        if ($gradeIds) $hwQuery->whereIn('grade_id', $gradeIds);
+        $pendingGrading = HomeworkSubmission::whereIn('homework_id', $hwQuery->pluck('id'))->where('status', 'submitted')->count();
+
+        // CPD
+        $cpdYear = $activeYear?->name ?? date('Y');
+        $cpdCompliant = 0;
+        foreach ($sectionTeachers as $t) {
+            if (CpdActivity::where('user_id', $t->user_id)->where('academic_year', $cpdYear)->where('status', 'completed')->sum('hours') >= 40) $cpdCompliant++;
+        }
+
+        // Grade attendance
+        $gradeAtt = [];
+        foreach ($grades as $g) {
+            $gIds = Student::where('grade_id', $g->id)->where('enrollment_status', 'active')->pluck('id');
+            if ($gIds->isEmpty()) continue;
+            $gRecs = $todayAtt->whereIn('student_id', $gIds);
+            $gPresent = $gRecs->whereIn('status', ['present', 'late'])->count();
+            $gradeAtt[] = [
+                'grade' => $g->name,
+                'present' => $gPresent,
+                'total' => $gRecs->count(),
+                'students' => $gIds->count(),
+                'rate' => $gRecs->count() > 0 ? round(($gPresent / $gRecs->count()) * 100) : 0,
+            ];
+        }
+
+        // Enhanced data: Homework stats
+        $hwAll = Homework::where('status', 'active');
+        if ($gradeIds) $hwAll->whereIn('grade_id', $gradeIds);
+        $hwAll = $hwAll->get();
+        $totalHomework = $hwAll->count();
+        $hwOverdue = $hwAll->filter(fn($h) => $h->due_date && $h->due_date->isPast())->count();
+
+        // Student gender breakdown
+        $maleStudents = Student::where('enrollment_status', 'active')->where('gender', 'male')->when($gradeIds, fn($q) => $q->whereIn('grade_id', $gradeIds))->count();
+        $femaleStudents = $totalStudents - $maleStudents;
+
+        // Leave breakdown
+        $leaveApproved = LeaveApplication::where('status', 'approved')
+            ->when(!empty($empIds = \App\Models\Employee::whereIn('user_id', $sectionTeachers->pluck('user_id'))->pluck('id')->toArray()), fn($q) => $q->whereIn('employee_id', $empIds))
+            ->where('start_date', '<=', today())->where('end_date', '>=', today())->count();
+        $leavePending = LeaveApplication::where('status', 'pending')
+            ->when(!empty($empIds), fn($q) => $q->whereIn('employee_id', $empIds))->count();
+
+        // Fee by status
+        $feesPaid = $allFees->where('payment_status', 'paid')->count();
+        $feesPartial = $allFees->where('payment_status', 'partial')->count();
+        $feesUnpaid = $allFees->where('payment_status', 'unpaid')->count();
+        $totalFeeRecords = $allFees->count();
+
+        // Attendance weekly trend (last 5 days)
+        $weeklyAtt = [];
+        for ($d = 4; $d >= 0; $d--) {
+            $date = now()->subDays($d);
+            if ($date->isWeekend()) continue;
+            $dayRecs = Attendance::where('attendance_date', $date->toDateString())
+                ->when($yearId, fn($q) => $q->where('academic_year_id', $yearId))
+                ->when($gradeIds, fn($q) => $q->whereIn('grade_id', $gradeIds))->get();
+            $dayPresent = $dayRecs->whereIn('status', ['present', 'late'])->count();
+            $dayTotal = $dayRecs->count();
+            $weeklyAtt[] = [
+                'day' => $date->format('D'),
+                'date' => $date->format('d M'),
+                'rate' => $dayTotal > 0 ? round(($dayPresent / $dayTotal) * 100) : 0,
+                'total' => $dayTotal,
+            ];
+        }
+
+        // Recent notices
+        $recentNotices = Notice::whereNotNull('published_at')->orderBy('published_at', 'desc')->take(5)->get();
+
+        // Open complaints
+        $openComplaints = Complaint::where('status', 'open')->count();
+
+        // Class teacher coverage
+        $classesWithTeacher = ClassSection::where('is_active', true)
+            ->when($gradeIds, fn($q) => $q->whereIn('grade_id', $gradeIds))
+            ->when($yearId, fn($q) => $q->where('academic_year_id', $yearId))
+            ->whereNotNull('class_teacher_id')->count();
+
+        return [
+            'sectionLabel' => $sectionLabel,
+            'schoolName' => SchoolSettings::first()?->school_name ?? 'St. Francis of Assisi',
+            'term' => $activeTerm?->name,
+            'year' => $activeYear?->name,
+            'totalStudents' => $totalStudents,
+            'maleStudents' => $maleStudents,
+            'femaleStudents' => $femaleStudents,
+            'totalTeachers' => $sectionTeachers->count(),
+            'totalClasses' => $totalClasses,
+            'classesWithTeacher' => $classesWithTeacher,
+            'attRate' => $attRate,
+            'attPresent' => $attPresent,
+            'attAbsent' => $todayAtt->where('status', 'absent')->count(),
+            'attLate' => $todayAtt->where('status', 'late')->count(),
+            'attSick' => $todayAtt->where('status', 'sick')->count(),
+            'classesMarked' => $classesMarked,
+            'unmarkedClasses' => $totalClasses - $classesMarked,
+            'weeklyAtt' => $weeklyAtt,
+            'collectionRate' => $collectionRate,
+            'feesPaid' => $feesPaid,
+            'feesPartial' => $feesPartial,
+            'feesUnpaid' => $feesUnpaid,
+            'totalFeeRecords' => $totalFeeRecords,
+            'totalHomework' => $totalHomework,
+            'hwOverdue' => $hwOverdue,
+            'pendingGrading' => $pendingGrading,
+            'leaveApproved' => $leaveApproved,
+            'leavePending' => $leavePending,
+            'cpdCompliant' => $cpdCompliant,
+            'cpdTotal' => $sectionTeachers->count(),
+            'cpdRate' => $sectionTeachers->count() > 0 ? round(($cpdCompliant / $sectionTeachers->count()) * 100) : 0,
+            'pendingLeave' => $leavePending,
+            'teachersOnLeave' => $leaveApproved,
+            'openComplaints' => $openComplaints,
+            'gradeAttendance' => $gradeAtt,
+            'teachers' => $sectionTeachers,
+            'recentNotices' => $recentNotices,
+        ];
     }
 
     protected function getHeaderActions(): array

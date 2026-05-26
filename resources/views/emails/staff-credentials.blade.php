@@ -169,7 +169,7 @@
             <h4 style="color: #1e40af; margin-top: 25px;">Need Help?</h4>
             <p>If you encounter any issues logging in or have questions about using the portal, please contact:</p>
             <ul>
-                <li>IT Support: <a href="mailto:support@stfrancisofassisi.tech">support@stfrancisofassisi.tech</a></li>
+                <li>IT Support: <a href="mailto:support@stfrancisofassisizm.com">support@stfrancisofassisizm.com</a></li>
                 <li>School Office: Phone contact available during school hours</li>
             </ul>
         </div>

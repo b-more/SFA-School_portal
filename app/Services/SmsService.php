@@ -109,7 +109,7 @@ class SmsService
         $formattedPhone = $this->formatPhoneNumber($recipient);
 
         // Get the current authenticated user or default to system
-        $userId = Auth::id() ?? User::where('email', 'system@stfrancisofassisi.tech')->first()?->id;
+        $userId = Auth::id() ?? User::where('email', 'system@stfrancisofassisizm.com')->first()?->id;
 
         // Check if message contains email addresses and sanitize them
         $sanitizedMessage = $this->sanitizeMessage($message);

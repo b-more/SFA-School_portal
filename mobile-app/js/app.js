@@ -68,15 +68,34 @@ function route() {
 
 async function onSplashDone() {
     if (api.isAuthenticated()) {
+        if (localStorage.getItem('remember_login') === 'true' && localStorage.getItem('user_data')) {
+            window.location.hash = '#/dashboard';
+            return;
+        }
         try {
             await api.getUser();
             window.location.hash = '#/dashboard';
         } catch {
-            window.location.hash = '#/login';
+            if (await tryAutoLogin()) { window.location.hash = '#/dashboard'; }
+            else { window.location.hash = '#/login'; }
         }
     } else {
-        window.location.hash = '#/login';
+        if (await tryAutoLogin()) { window.location.hash = '#/dashboard'; }
+        else { window.location.hash = '#/login'; }
     }
+}
+
+async function tryAutoLogin() {
+    const savedLogin = localStorage.getItem('saved_login');
+    const savedPass = localStorage.getItem('saved_pass');
+    if (!savedLogin || !savedPass || localStorage.getItem('remember_login') !== 'true') return false;
+    try {
+        const data = await api.login(savedLogin, savedPass, true);
+        api.setToken(data.token);
+        localStorage.setItem('user_data', JSON.stringify(data.user));
+        localStorage.setItem('children_data', JSON.stringify(data.children));
+        return true;
+    } catch { return false; }
 }
 
 // Init
@@ -92,7 +111,7 @@ async function init() {
     }
 
     // Check for remembered login
-    if (localStorage.getItem('remember_login') === 'true' && api.isAuthenticated()) {
+    if (localStorage.getItem('remember_login') === 'true' && (api.isAuthenticated() || localStorage.getItem('saved_login'))) {
         window.location.hash = '#/splash';
     } else if (!window.location.hash || window.location.hash === '#/') {
         window.location.hash = '#/splash';

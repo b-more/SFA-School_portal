@@ -253,6 +253,16 @@ class ParentApiController extends Controller
     {
         $this->validateChild($student);
 
+        // Surgical sanction: parents cannot view this term's results until fees are settled.
+        if ($student->hasArrears()) {
+            return response()->json([
+                'blocked' => true,
+                'reason' => 'arrears',
+                'arrears_amount' => $student->arrearsAmount(),
+                'message' => "Results unavailable. Outstanding fees balance: ZMW " . number_format($student->arrearsAmount(), 2) . ". Please settle at the school accounts office to view {$student->name}'s results.",
+            ], 402);
+        }
+
         $activeYear = AcademicYear::where('is_active', true)->first();
         $results = Result::where('student_id', $student->id)->with('subject')->orderBy('created_at', 'desc')->get();
 
@@ -282,9 +292,12 @@ class ParentApiController extends Controller
         $termStart = $activeTerm?->start_date;
         $termStartMonday = $termStart ? $termStart->copy()->startOfWeek(\Carbon\Carbon::MONDAY) : null;
 
-        // Get ALL homework for the term, not just 10
+        // Get ALL homework for the active term
         $homework = Homework::where('grade_id', $student->grade_id)
             ->where('status', 'active')
+            ->when($activeTerm, fn($q) => $q->where(function($q2) use ($activeTerm) {
+                $q2->where('term_id', $activeTerm->id)->orWhereNull('term_id');
+            }))
             ->with(['subject', 'assignedBy'])
             ->orderBy('due_date', 'desc')
             ->get();
@@ -374,11 +387,23 @@ class ParentApiController extends Controller
         $this->validateChild($student);
 
         $activeYear = AcademicYear::where('is_active', true)->first();
-        if (!$activeYear) return response()->json(['terms' => []]);
+        if (!$activeYear) return response()->json(['terms' => [], 'fee_status' => 'unknown']);
+
+        // Check fee status — sum of all year balances; carried-forward rows are 0 so this
+        // equals the current outstanding (current-term tuition + any carried arrears).
+        $fees = StudentFee::where('student_id', $student->id)
+            ->where('academic_year_id', $activeYear->id)
+            ->get();
+        $totalBalance = $fees->sum('balance');
+        $totalPaid = $fees->sum('amount_paid');
+        $totalFee = $fees->sum(fn($f) => $f->feeStructure?->basic_fee ?? 0);
+        $feeStatus = $totalFee <= 0 ? 'no_fee' : ($totalBalance <= 0 ? 'paid' : ($totalPaid > 0 ? 'partial' : 'unpaid'));
+        $isFullyPaid = $feeStatus === 'paid' || $feeStatus === 'no_fee';
+        $arrearsAmount = $student->arrearsAmount();
 
         $terms = Term::where('academic_year_id', $activeYear->id)->orderBy('id')->get();
 
-        $cards = $terms->map(function ($term) use ($student, $activeYear) {
+        $cards = $terms->map(function ($term) use ($student, $activeYear, $isFullyPaid) {
             $comment = ReportCardComment::where('student_id', $student->id)
                 ->where('term_id', $term->id)
                 ->where('academic_year_id', $activeYear->id)->first();
@@ -388,12 +413,21 @@ class ParentApiController extends Controller
             return [
                 'term' => $term->name,
                 'is_generated' => $isGenerated,
-                'download_url' => $isGenerated ? '/portal/report-cards/' . $student->id . '/' . $term->id . '?year=' . $activeYear->name : null,
-                'preview_url' => $isGenerated ? '/portal/report-cards/' . $student->id . '/' . $term->id . '/preview?year=' . $activeYear->name : null,
+                'is_locked' => !$isFullyPaid,
+                'download_url' => $isGenerated && $isFullyPaid ? '/portal/report-cards/' . $student->id . '/' . $term->id . '?year=' . $activeYear->name : null,
+                'preview_url' => $isGenerated && $isFullyPaid ? '/portal/report-cards/' . $student->id . '/' . $term->id . '/preview?year=' . $activeYear->name : null,
             ];
         });
 
-        return response()->json(['terms' => $cards]);
+        return response()->json([
+            'terms' => $cards,
+            'fee_status' => $feeStatus,
+            'is_fully_paid' => $isFullyPaid,
+            'arrears_amount' => $arrearsAmount,
+            'message' => $isFullyPaid
+                ? null
+                : "Outstanding fees balance: ZMW " . number_format($arrearsAmount, 2) . ". Settle at the accounts office to unlock report cards.",
+        ]);
     }
 
     public function events()
@@ -942,12 +976,18 @@ class ParentApiController extends Controller
             'expires_at' => now()->addHours(24),
         ]);
 
-        // Initiate CGrate payment
+        // Initiate CGrate payment — single attempt, unique reference per try
         $cgrateService = new CGrateService();
-        $result = $cgrateService->processCustomerPayment($amount, $request->mobile_number, $paymentReference);
+        $result = null;
 
-        if ($result['success']) {
-            // Always mark as processing — only queryCustomerPayment confirms completion
+        try {
+            $result = $cgrateService->processCustomerPayment($amount, $request->mobile_number, $paymentReference);
+        } catch (\Exception $e) {
+            \Log::warning("CGrate payment failed: " . $e->getMessage());
+            $result = ['success' => false, 'message' => 'Payment service is temporarily unavailable. Please try again in a few minutes.'];
+        }
+
+        if ($result && $result['success']) {
             $qrPayment->update([
                 'status' => 'processing',
                 'cgrate_payment_id' => $result['paymentID'] ?? $result['paymentId'] ?? null,
@@ -964,15 +1004,57 @@ class ParentApiController extends Controller
             ]);
         }
 
+        // Determine error type
+        $errorMsg = $result['message'] ?? 'Payment initiation failed.';
+        $responseCode = $result['responseCode'] ?? '';
+        $cgPaymentId = $result['paymentID'] ?? $result['paymentId'] ?? null;
+        $isTimeout = str_contains(strtolower($errorMsg), 'timeout') || str_contains(strtolower($errorMsg), 'timed out') || str_contains(strtolower($errorMsg), 'delay') || str_contains(strtolower($errorMsg), 'unavailable');
+        $isDuplicate = $responseCode === '104' || str_contains(strtolower($errorMsg), 'reference not unique');
+
+        // Code 104 = CGrate already has this payment (from a timed-out first attempt)
+        // This means CGrate DID receive it — treat as processing
+        if ($isDuplicate && $cgPaymentId) {
+            $qrPayment->update([
+                'status' => 'processing',
+                'cgrate_payment_id' => $cgPaymentId,
+                'response_message' => 'Payment accepted by CGrate',
+                'response_code' => $responseCode,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment is being processed. Please check your phone to approve.',
+                'payment_reference' => $paymentReference,
+                'payment_id' => $qrPayment->id,
+                'amount' => $amount,
+            ]);
+        }
+
+        if ($isTimeout) {
+            $qrPayment->update([
+                'status' => 'processing',
+                'response_message' => 'Timeout - awaiting confirmation',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment request sent but confirmation is delayed. Check your phone — if you receive a payment prompt, approve it.',
+                'payment_reference' => $paymentReference,
+                'payment_id' => $qrPayment->id,
+                'amount' => $amount,
+                'is_delayed' => true,
+            ]);
+        }
+
         $qrPayment->update([
             'status' => 'failed',
-            'response_message' => $result['message'] ?? 'Payment initiation failed',
-            'response_code' => $result['responseCode'] ?? null,
+            'response_message' => $errorMsg,
+            'response_code' => $responseCode,
         ]);
 
         return response()->json([
             'success' => false,
-            'message' => $result['message'] ?? 'Payment initiation failed. Please try again.',
+            'message' => $errorMsg,
         ], 422);
     }
 
@@ -1014,9 +1096,14 @@ class ParentApiController extends Controller
             ]);
         }
 
-        // Query CGrate for live status
+        // Query CGrate for live status — try payment reference first, then CGrate paymentID
         $cgrateService = new CGrateService();
         $result = $cgrateService->queryCustomerPayment($qrPayment->payment_reference);
+
+        // If reference not found (code 106) and we have CGrate's paymentID, try that
+        if (($result['responseCode'] ?? '') === '106' && $qrPayment->cgrate_payment_id) {
+            $result = $cgrateService->queryCustomerPayment($qrPayment->cgrate_payment_id);
+        }
 
         if ($result['payment_complete']) {
             $qrPayment->update([

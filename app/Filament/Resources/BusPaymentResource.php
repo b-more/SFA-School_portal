@@ -58,9 +58,19 @@ class BusPaymentResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('student_id')
                             ->label('Student')
-                            ->relationship('student', 'name')
-                            ->searchable()
+                            ->relationship(
+                                'student',
+                                'name',
+                                fn (Builder $query) => $query->orderBy('name')
+                            )
+                            ->getOptionLabelFromRecordUsing(
+                                fn ($record) => $record->student_id_number
+                                    ? "{$record->name} ({$record->student_id_number})"
+                                    : $record->name
+                            )
+                            ->searchable(['name', 'student_id_number'])
                             ->preload()
+                            ->optionsLimit(600)
                             ->required()
                             ->columnSpanFull(),
 

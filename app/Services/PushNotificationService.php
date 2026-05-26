@@ -14,7 +14,7 @@ class PushNotificationService
     {
         $auth = [
             'VAPID' => [
-                'subject' => 'mailto:' . (env('MAIL_FROM_ADDRESS', 'admin@stfrancisofassisi.tech')),
+                'subject' => 'mailto:' . (env('MAIL_FROM_ADDRESS', 'admin@stfrancisofassisizm.com')),
                 'publicKey' => env('VAPID_PUBLIC_KEY'),
                 'privateKey' => env('VAPID_PRIVATE_KEY'),
             ],

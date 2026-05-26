@@ -120,9 +120,11 @@ export function renderLogin(container, settings, api) {
             if (remember) {
                 localStorage.setItem('remember_login', 'true');
                 localStorage.setItem('saved_login', login);
+                localStorage.setItem('saved_pass', password);
             } else {
                 localStorage.removeItem('remember_login');
                 localStorage.removeItem('saved_login');
+                localStorage.removeItem('saved_pass');
             }
 
             // Store user data

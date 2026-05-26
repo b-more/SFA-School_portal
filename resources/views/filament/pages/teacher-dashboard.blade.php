@@ -516,6 +516,7 @@
         @endforelse
     </div>
 
+    @push('styles')
     <style>
         .sfa-td-stats {
             display: grid;
@@ -1251,4 +1252,5 @@
             color: #6b7280;
         }
     </style>
+    @endpush
 </x-filament-panels::page>

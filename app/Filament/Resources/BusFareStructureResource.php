@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Constants\RoleConstants;
 use App\Filament\Resources\BusFareStructureResource\Pages;
 use App\Models\BusFareStructure;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -71,6 +72,22 @@ class BusFareStructureResource extends Resource
                             ->visible(fn (Get $get) => $get('payment_plan') === 'per_term')
                             ->helperText('Amount to be paid per term'),
 
+                        Forms\Components\Select::make('driver_user_id')
+                            ->label('Assigned Driver')
+                            ->options(fn () => User::query()
+                                ->where('role_id', RoleConstants::DRIVER)
+                                ->where('status', 'active')
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                                ->toArray()
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->optionsLimit(200)
+                            ->placeholder('No driver assigned')
+                            ->helperText('Driver who will see this route\'s paid-up students. Add drivers under Users → Drivers.')
+                            ->columnSpanFull(),
+
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true)
@@ -118,6 +135,14 @@ class BusFareStructureResource extends Resource
                     ->sortable()
                     ->visible(fn ($record) => $record && $record->payment_plan === 'per_term')
                     ->color('success'),
+
+                Tables\Columns\TextColumn::make('driver.name')
+                    ->label('Driver')
+                    ->placeholder('Unassigned')
+                    ->icon('heroicon-m-user')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Status')

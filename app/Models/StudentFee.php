@@ -43,19 +43,35 @@ class StudentFee extends Model
     {
         parent::boot();
 
-        // Automatically calculate balance when saving (based on tuition/basic fee only)
+        // Automatically calculate balance when saving (tuition + carry-forward arrears).
+        // Skips recompute when status is 'carried_forward' (that row is closed; balance must stay 0).
         static::saving(function ($studentFee) {
-            if ($studentFee->feeStructure && $studentFee->isDirty('amount_paid')) {
-                $tuitionFee = (float) $studentFee->feeStructure->basic_fee;
-                $amountPaid = (float) $studentFee->amount_paid;
-                $studentFee->balance = max(0, $tuitionFee - $amountPaid);
+            if ($studentFee->payment_status === 'carried_forward') {
+                return;
+            }
 
-                // Auto-set payment status
+            $shouldRecompute = $studentFee->isDirty('amount_paid')
+                || $studentFee->isDirty('previous_balance')
+                || $studentFee->isDirty('discount_amount')
+                || $studentFee->isDirty('fee_structure_id')
+                || ! $studentFee->exists;
+
+            if ($studentFee->feeStructure && $shouldRecompute) {
+                $tuitionFee = (float) $studentFee->feeStructure->basic_fee;
+                $arrears = (float) ($studentFee->previous_balance ?? 0);
+                $discount = (float) ($studentFee->discount_amount ?? 0);
+                $amountPaid = (float) $studentFee->amount_paid;
+
+                $totalOwed = max(0, $tuitionFee + $arrears - $discount);
+                $studentFee->balance = max(0, $totalOwed - $amountPaid);
+
                 if ($amountPaid <= 0) {
                     $studentFee->payment_status = 'unpaid';
-                } elseif ($amountPaid >= $tuitionFee) {
-                    $studentFee->payment_status = 'paid';
-                    $studentFee->balance = 0;
+                } elseif ($amountPaid >= $totalOwed) {
+                    $studentFee->payment_status = $amountPaid > $totalOwed ? 'overpaid' : 'paid';
+                    if ($studentFee->payment_status === 'paid') {
+                        $studentFee->balance = 0;
+                    }
                 } else {
                     $studentFee->payment_status = 'partial';
                 }

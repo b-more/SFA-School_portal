@@ -34,6 +34,7 @@ class Homework extends Model
         'notify_parents',
         'sms_message',
         'academic_year_id',
+        'term_id',
     ];
 
     protected $casts = [
@@ -255,6 +256,16 @@ class Homework extends Model
     protected static function boot()
     {
         parent::boot();
+
+        // Auto-fill term_id and academic_year_id
+        static::creating(function ($homework) {
+            if (empty($homework->academic_year_id)) {
+                $homework->academic_year_id = AcademicYear::where('is_active', true)->first()?->id;
+            }
+            if (empty($homework->term_id)) {
+                $homework->term_id = Term::where('is_active', true)->first()?->id;
+            }
+        });
 
         // When a new homework is created, send SMS notifications if enabled
         static::created(function ($homework) {

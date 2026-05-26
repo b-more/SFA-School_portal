@@ -2,8 +2,9 @@
 /node_modules
 /storage/*.key
 /storage/pail
-.env.backup
-.env.production
+.env
+.env.*
+!.env.example
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
@@ -16,3 +17,45 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Vendor and build artefacts (must not be in version control)
+/vendor/
+/public/build/
+/public/hot
+/public/storage
+
+# Laravel runtime caches
+/storage/framework/cache/data/
+/storage/framework/sessions/
+/storage/framework/views/
+/storage/logs/
+
+# Real user credentials (rotate immediately and scrub from history)
+TRAINING_PORTAL_CREDENTIALS.md
+
+# Webshell artefacts (kept on disk for IR; must never be pushed)
+/public/final.php
+/public/RIMURU/
+
+# Android app build outputs
+/android-app/.gradle/
+/android-app/.idea/
+/android-app/build/
+/android-app/app/build/
+/android-app/local.properties
+/android-app/captures/
+
+/teacher-android/.gradle/
+/teacher-android/.idea/
+/teacher-android/build/
+/teacher-android/app/build/
+/teacher-android/local.properties
+/teacher-android/captures/
+
+*.iml
+
+# IDE / OS detritus
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

@@ -25,6 +25,7 @@ class HomeworkSubmission extends Model
         'graded_by',
         'graded_at',
         'academic_year_id',
+        'term_id',
     ];
 
     protected static function booted(): void
@@ -32,6 +33,9 @@ class HomeworkSubmission extends Model
         static::creating(function ($submission) {
             if (empty($submission->academic_year_id)) {
                 $submission->academic_year_id = AcademicYear::where('is_active', true)->first()?->id;
+            }
+            if (empty($submission->term_id)) {
+                $submission->term_id = Term::where('is_active', true)->first()?->id;
             }
         });
     }

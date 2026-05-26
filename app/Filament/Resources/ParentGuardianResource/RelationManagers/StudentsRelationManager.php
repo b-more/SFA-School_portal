@@ -454,7 +454,7 @@ class StudentsRelationManager extends RelationManager
      */
     protected function generateStudentEmail(string $name, string $studentId): string
     {
-        // Create an email like firstname.lastname@stfrancisofassisi.tech
+        // Create an email like firstname.lastname@stfrancisofassisizm.com
         $nameParts = explode(' ', $name);
         $firstName = $nameParts[0] ?? '';
         $lastName = end($nameParts) ?? '';
@@ -463,11 +463,11 @@ class StudentsRelationManager extends RelationManager
         $baseEmail = preg_replace('/[^a-z0-9\.]/', '', $baseEmail); // Remove special characters
 
         // Check if the email exists, if it does, append numbers
-        $email = $baseEmail . '@stfrancisofassisi.tech';
+        $email = $baseEmail . '@stfrancisofassisizm.com';
         $counter = 1;
 
         while (User::where('email', $email)->exists()) {
-            $email = $baseEmail . $counter . '@stfrancisofassisi.tech';
+            $email = $baseEmail . $counter . '@stfrancisofassisizm.com';
             $counter++;
         }
 

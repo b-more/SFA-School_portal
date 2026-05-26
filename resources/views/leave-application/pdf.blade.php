@@ -255,7 +255,7 @@
         <div class="school-motto">"For God and For Country"</div>
         <div class="school-address">
             1310/4 East Kamenza, Chililabombwe, Zambia<br>
-            Tel: +260 972 266 217 | Email: info@stfrancisschool.tech
+            Tel: +260 972 266 217 | Email: info@stfrancisofassisizm.com
         </div>
     </div>
 

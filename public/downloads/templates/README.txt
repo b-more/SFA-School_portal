@@ -10,20 +10,20 @@ ST. FRANCIS OF ASSISI SCHOOL PORTAL - TEACHER IMPORT TEMPLATES
    - Includes built-in instructions and sample data
    - Smart validation prevents common errors
    
-   Download: http://portal.stfrancisofassisi.tech/downloads/templates/Primary_Teacher_Import_Template.xlsx
+   Download: http://portal.stfrancisofassisizm.com/downloads/templates/Primary_Teacher_Import_Template.xlsx
 
 2. teacher_import_template.csv
    - CSV format with sample data
    - For all teacher types (Primary, Secondary, ECL)
    - Can be opened in any spreadsheet software
    
-   Download: http://portal.stfrancisofassisi.tech/downloads/templates/teacher_import_template.csv
+   Download: http://portal.stfrancisofassisizm.com/downloads/templates/teacher_import_template.csv
 
 3. teacher_import_blank_template.csv
    - Blank CSV template (headers only)
    - For advanced users
    
-   Download: http://portal.stfrancisofassisi.tech/downloads/templates/teacher_import_blank_template.csv
+   Download: http://portal.stfrancisofassisizm.com/downloads/templates/teacher_import_blank_template.csv
 
 ================================================================================
 

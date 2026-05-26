@@ -188,7 +188,7 @@ class PaymentStatementController extends Controller
             'name' => 'St. Francis Of Assisi Private School',
             'address' => 'Plot No 1310/4 East Kamenza, Chililabombwe, Zambia',
             'phone' => '+260 972 266 217',
-            'email' => 'info@stfrancisofassisi.tech',
+            'email' => 'info@stfrancisofassisizm.com',
             'logo_path' => public_path('images/logo.png'),
         ];
     }

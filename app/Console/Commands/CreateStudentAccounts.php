@@ -179,11 +179,11 @@ class CreateStudentAccounts extends Command
         $baseEmail = $firstName.'.'.$lastName;
         $baseEmail = preg_replace('/[^a-z0-9\.]/', '', $baseEmail);
 
-        $email = $baseEmail.'@student.stfrancisofassisi.tech';
+        $email = $baseEmail.'@student.stfrancisofassisizm.com';
         $counter = 1;
 
         while (User::where('email', $email)->exists()) {
-            $email = $baseEmail.$counter.'@student.stfrancisofassisi.tech';
+            $email = $baseEmail.$counter.'@student.stfrancisofassisizm.com';
             $counter++;
         }
 

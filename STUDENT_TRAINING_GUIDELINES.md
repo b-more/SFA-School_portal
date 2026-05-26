@@ -117,7 +117,7 @@ You'll see a page with:
 
 **Email Box:**
 - Type your school email address
-- Example: `5@student.com` or `charles.mwaba@student.stfrancisofassisi.tech`
+- Example: `5@student.com` or `charles.mwaba@student.stfrancisofassisizm.com`
 - Be careful with spelling!
 
 **Password Box:**

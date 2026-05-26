@@ -202,7 +202,7 @@
 
     <div class="school-info">
         <p>Plot No 1310/4 East Kamenza, Chililabombwe, Zambia</p>
-        <p>Phone: +260 972 266 217, Email: info@stfrancisofassisi.tech</p>
+        <p>Phone: +260 972 266 217, Email: info@stfrancisofassisizm.com</p>
     </div>
 
     <div class="divider"></div>
@@ -324,7 +324,7 @@
 
     <div class="school-info">
         <p>Plot No 1310/4 East Kamenza, Chililabombwe, Zambia</p>
-        <p>Phone: +260 972 266 217, Email: info@stfrancisofassisi.tech</p>
+        <p>Phone: +260 972 266 217, Email: info@stfrancisofassisizm.com</p>
     </div>
 
     <div class="divider"></div>

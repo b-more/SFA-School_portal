@@ -31,7 +31,7 @@ class UserSeeder extends Seeder
         $admin = User::create([
             'role_id' => $adminRole->id,
             'name' => 'System Administrator',
-            'email' => 'admin@stfrancisofassisi.tech',
+            'email' => 'admin@stfrancisofassisizm.com',
             'username' => 'admin',
             'email_verified_at' => now(),
             'password' => Hash::make('password'), // Change this to a secure password
@@ -337,7 +337,7 @@ class UserSeeder extends Seeder
         }
 
         // Add domain
-        $email .= '@stfrancisofassisi.tech';
+        $email .= '@stfrancisofassisizm.com';
 
         // Ensure uniqueness
         $counter = 1;

@@ -31,9 +31,9 @@ class EmployeeSeeder extends Seeder
 
         // Get staff users that aren't assigned to employees yet
         $staffUsers = User::whereDoesntHave('employee')
-                        ->where('email', 'not like', '%.student@stfrancisofassisi.tech')
-                        ->where('email', 'not like', '%.parent@stfrancisofassisi.tech')
-                        ->where('email', '!=', 'admin@stfrancisofassisi.tech')
+                        ->where('email', 'not like', '%.student@stfrancisofassisizm.com')
+                        ->where('email', 'not like', '%.parent@stfrancisofassisizm.com')
+                        ->where('email', '!=', 'admin@stfrancisofassisizm.com')
                         ->get();
 
         // Admin staff

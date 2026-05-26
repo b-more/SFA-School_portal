@@ -24,7 +24,39 @@ class Term extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'is_active' => 'boolean',
+        'is_current' => 'boolean',
     ];
+
+    /**
+     * Keep is_active and is_current in lock-step.
+     *
+     * The schema has two booleans (is_active, is_current) that mean the same
+     * thing in practice but were introduced at different times. The admin form
+     * sets is_active; the dashboard widgets read is_current. This observer
+     * mirrors any change so admins only have to set one — and unsets every
+     * other term, guaranteeing exactly one canonical "current term".
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $term) {
+            if ($term->isDirty('is_active') && ! $term->isDirty('is_current')) {
+                $term->is_current = (bool) $term->is_active;
+            } elseif ($term->isDirty('is_current') && ! $term->isDirty('is_active')) {
+                $term->is_active = (bool) $term->is_current;
+            }
+        });
+
+        static::saved(function (self $term) {
+            if ($term->is_active || $term->is_current) {
+                static::query()
+                    ->where('id', '!=', $term->id)
+                    ->where(function ($q) {
+                        $q->where('is_active', true)->orWhere('is_current', true);
+                    })
+                    ->update(['is_active' => false, 'is_current' => false]);
+            }
+        });
+    }
 
     public function academicYear(): BelongsTo
     {

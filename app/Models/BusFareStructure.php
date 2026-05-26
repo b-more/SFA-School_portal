@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BusFareStructure extends Model
@@ -17,6 +18,7 @@ class BusFareStructure extends Model
         'term_amount',
         'academic_year_id',
         'term_id',
+        'driver_user_id',
         'is_active',
         'description',
     ];
@@ -30,6 +32,16 @@ class BusFareStructure extends Model
     public function busPayments(): HasMany
     {
         return $this->hasMany(BusPayment::class);
+    }
+
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'driver_user_id');
+    }
+
+    public function boardingLogs(): HasMany
+    {
+        return $this->hasMany(BusBoardingLog::class);
     }
 
     /**

@@ -2,7 +2,7 @@
 # TEACHER PORTAL TRAINING MANUAL
 ### School Management Information System (MIS)
 ---
-**Portal URL**: https://portal.stfrancisofassisi.tech/admin
+**Portal URL**: https://portal.stfrancisofassisizm.com/admin
 **Document Version**: 1.0
 **Date**: March 2026
 **Audience**: All Teaching Staff (Primary & Secondary)
@@ -31,7 +31,7 @@
 ### 1.1 Logging In
 
 1. Open your web browser (Chrome, Firefox, or Edge recommended)
-2. Go to: **https://portal.stfrancisofassisi.tech/admin**
+2. Go to: **https://portal.stfrancisofassisizm.com/admin**
 3. Enter your **Email Address** and **Password**
 4. Click **Sign In**
 

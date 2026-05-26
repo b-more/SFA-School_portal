@@ -47,6 +47,13 @@ class Dashboard extends Page
 
     public function mount()
     {
+        $user = auth()->user();
+
+        if ($user?->role_id === RoleConstants::DRIVER) {
+            redirect()->to(DriverDashboard::getUrl());
+            return;
+        }
+
         if (!static::canAccess()) {
             abort(403);
         }

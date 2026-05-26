@@ -29,7 +29,7 @@ public class WebViewActivity extends AppCompatActivity {
 
     private WebView webView;
     private ProgressBar progressBar;
-    private static final String APP_URL = "http://76.13.57.29:8085";
+    private static final String APP_URL = "https://parent.stfrancisofassisizm.com";
     private ValueCallback<Uri[]> fileUploadCallback;
     private static final int FILE_CHOOSER_REQUEST = 1001;
 
@@ -115,7 +115,7 @@ public class WebViewActivity extends AppCompatActivity {
                     return true;
                 }
                 // External links open in browser
-                if (!url.startsWith(APP_URL) && !url.contains("76.13.57.29")) {
+                if (!url.startsWith(APP_URL) && !url.contains("parent.stfrancisofassisizm.com")) {
                     startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
                     return true;
                 }

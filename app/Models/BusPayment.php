@@ -70,6 +70,44 @@ class BusPayment extends Model
         return $this->belongsTo(BusFareStructure::class);
     }
 
+    public function term(): BelongsTo
+    {
+        return $this->belongsTo(Term::class);
+    }
+
+    /**
+     * Effective expiry date of this payment's bus pass.
+     *
+     * Monthly plan  → last day of the paid month + year.
+     * Per-term plan → term.end_date.
+     *
+     * Returns null if data is incomplete (e.g. a monthly row with no month name).
+     */
+    public function getExpiresAtAttribute(): ?\Illuminate\Support\Carbon
+    {
+        $plan = $this->busFareStructure?->payment_plan;
+
+        if ($plan === 'monthly') {
+            if (! $this->month || ! $this->year) {
+                return null;
+            }
+
+            try {
+                return \Illuminate\Support\Carbon::parse("{$this->month} 1 {$this->year}")->endOfMonth();
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        if ($plan === 'per_term') {
+            return $this->term?->end_date
+                ? \Illuminate\Support\Carbon::parse($this->term->end_date)->endOfDay()
+                : null;
+        }
+
+        return null;
+    }
+
     /**
      * Update payment status based on balance
      */

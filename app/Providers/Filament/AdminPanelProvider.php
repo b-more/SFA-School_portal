@@ -3,12 +3,14 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\HeadTeacherDashboard;
 use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\TeacherDashboard;
 use App\Filament\Pages\TeacherProfile;
 use App\Filament\Pages\MySchedule;
 use App\Filament\Pages\MyTeachingDocuments;
 use App\Filament\Pages\MyReports;
+use App\Filament\Pages\DriverDashboard;
 use App\Filament\Pages\ParentDashboard;
 use App\Filament\Pages\StudentDashboard;
 use App\Filament\Pages\MarkAttendance;
@@ -22,7 +24,9 @@ use App\Filament\Pages\TeacherSchedules;
 use App\Filament\Pages\AccountsDashboard;
 use App\Filament\Pages\FinancialReports;
 use App\Filament\Pages\ForcePasswordChange;
+use App\Filament\Pages\ManageLandingPage;
 use App\Http\Middleware\ForcePasswordChange as ForcePasswordChangeMiddleware;
+use App\Http\Middleware\RestrictDriverRoutes;
 use App\Models\SchoolSettings;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -147,6 +151,7 @@ class AdminPanelProvider extends PanelProvider
                 // Register your custom admin dashboard
                 Dashboard::class,
                 // Register role-specific dashboards
+                HeadTeacherDashboard::class,
                 TeacherDashboard::class,
                 TeacherProfile::class,
                 MySchedule::class,
@@ -154,6 +159,7 @@ class AdminPanelProvider extends PanelProvider
                 MyReports::class,
                 ParentDashboard::class,
                 StudentDashboard::class,
+                DriverDashboard::class,
                 // Register custom pages (hidden from nav, accessed via buttons)
                 MarkAttendance::class,
                 AttendanceReports::class,
@@ -168,6 +174,8 @@ class AdminPanelProvider extends PanelProvider
                 // Accounts & Finance
                 AccountsDashboard::class,
                 FinancialReports::class,
+                // Website Management
+                ManageLandingPage::class,
                 // Profile
                 EditProfile::class,
                 ForcePasswordChange::class,
@@ -186,6 +194,7 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 ForcePasswordChangeMiddleware::class,
+                RestrictDriverRoutes::class,
             ])
             ->authGuard('web')
             ->brandName('St. Francis of Assisi')

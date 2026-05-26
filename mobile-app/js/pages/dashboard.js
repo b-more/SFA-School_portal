@@ -211,7 +211,7 @@ async function renderHome(el, api, children) {
                 form.innerHTML = `
                     <textarea placeholder="Add a comment (optional)" rows="2" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:inherit;resize:vertical"></textarea>
                     <div style="background:rgba(30,58,95,0.05);border-radius:6px;padding:8px 10px;margin:6px 0;border-left:3px solid var(--navy)">
-                        <div class="text-xs text-gray">Save file as: <strong style="color:var(--text)">${child.name.trim().split(' ')[0]}_${h.subject ? h.subject.replace(/\s+/g, '') : 'Subject'}_HW${h.id}.pdf</strong></div>
+                        <div class="text-xs text-gray">Save file as: <strong style="color:var(--text)">ChildName_Subject_HW${hwId}.pdf</strong></div>
                     </div>
                     <div class="file-upload-area" id="hw-file-area">
                         <input type="file" id="hw-file-input" accept=".jpg,.jpeg,.png,.pdf,.doc,.docx">
@@ -284,7 +284,7 @@ async function renderHome(el, api, children) {
         // Pay Now buttons
         el.querySelectorAll('.btn-pay-now').forEach(btn => {
             btn.addEventListener('click', () => {
-                showPaymentModal(api, btn.dataset.child, btn.dataset.name, parseFloat(btn.dataset.balance));
+                alert('Coming Soon!\n\nMobile money payments will be available shortly. Please pay via the school office for now.');
             });
         });
 
@@ -414,10 +414,11 @@ function renderChildCard({ child, att, fees, results, hw, bookLoans, busPayments
     }
     html += '</div>';
 
-    // Results - full view
+    // Results - full view (locked if fees not fully paid)
+    const resultsLocked = fees.total_balance > 0;
     if (results.total_subjects > 0) {
-        html += `<div class="section">
-            <div class="section-title"><span class="section-dot" style="background:var(--purple)"></span>Academic Results</div>
+        html += `<div class="section" style="${resultsLocked ? 'position:relative;overflow:hidden' : ''}">
+            <div class="section-title"><span class="section-dot" style="background:var(--purple)"></span>Academic Results ${resultsLocked ? '<span class="badge badge-red" style="margin-left:6px">🔒 Locked</span>' : ''}</div>
             <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
                 <div style="text-align:center"><div class="mono bold" style="font-size:1.6rem;${(results.average >= 50) ? 'color:var(--green)' : 'color:var(--red)'}">${results.average}%</div><div class="text-xs text-gray">Average</div></div>
                 <div class="text-xs text-gray"><div>Highest: <strong>${results.highest}%</strong></div><div>Lowest: <strong>${results.lowest}%</strong></div><div>${results.total_subjects} subjects</div></div>
@@ -448,6 +449,13 @@ function renderChildCard({ child, att, fees, results, hw, bookLoans, busPayments
                 </div>`;
             }
             html += '</div>';
+        }
+        if (resultsLocked) {
+            html += `<div style="position:absolute;inset:0;top:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,0.85);backdrop-filter:blur(4px);border-radius:8px">
+                <div style="font-size:1.5rem;margin-bottom:6px">🔒</div>
+                <div class="text-sm bold text-red">Fees Outstanding</div>
+                <div class="text-xs text-gray" style="margin-top:4px;text-align:center">Clear your fee balance to view results</div>
+            </div>`;
         }
         html += '</div>';
     } else {
@@ -501,7 +509,7 @@ function renderChildCard({ child, att, fees, results, hw, bookLoans, busPayments
         html += `<div class="section">
             <div class="section-title"><span class="section-dot" style="background:var(--amber)"></span>Homework <span class="text-xs text-gray" style="font-weight:400">(${hw.total_submitted}/${hw.total_assigned})</span></div>
             <div class="hw-list">`;
-        for (const h of hw.homework.slice(0, 5)) {
+        for (const h of hw.homework.slice(0, 3)) {
             const badge = h.submitted ? `<span class="badge badge-green">Done${h.marks !== null ? ' &middot; ' + h.marks : ''}</span>`
                 : h.is_overdue ? '<span class="badge badge-red">Overdue</span>'
                 : h.is_due_soon ? '<span class="badge badge-amber">Due Soon</span>'
@@ -527,6 +535,9 @@ function renderChildCard({ child, att, fees, results, hw, bookLoans, busPayments
                 ${feedbackHtml}
                 ${submitBtn}
             </div>`;
+        }
+        if (hw.homework.length > 3) {
+            html += `<a href="#/dashboard/homework" style="display:block;text-align:center;padding:10px;font-size:0.78rem;font-weight:600;color:var(--navy);text-decoration:none;border-top:1px solid var(--border);margin-top:8px">View All Homework (${hw.total_assigned}) &rarr;</a>`;
         }
         html += '</div></div>';
     }
@@ -796,8 +807,8 @@ async function renderPayments(el, api) {
                     </div>
                     ${c.total_fee > 0 ? `<div class="progress" style="margin-bottom:10px"><div class="progress-bar ${c.progress >= 100 ? 'bg-green' : c.progress > 0 ? 'bg-amber' : 'bg-red'}" style="width:${Math.min(c.progress, 100)}%"></div></div>` : ''}
                     <div style="display:flex;gap:8px;flex-wrap:wrap">
-                        ${c.balance > 0 ? `<button class="btn-primary btn-pay-child" data-child="${c.id}" data-name="${c.name}" data-balance="${c.balance}" style="flex:1;padding:10px;border:none;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--navy);color:#fff">${SVG.wallet} Pay K ${fmt(c.balance)}</button>` : ''}
-                        <a href="${api.downloadUrl(c.statement_url)}" target="_blank" class="btn-outline" style="flex:${c.balance > 0 ? '0' : '1'};padding:10px;border-radius:6px;font-size:0.78rem;font-weight:600;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--border);color:var(--text2);background:var(--card)">${SVG.download} Statement</a>
+                        ${c.balance > 0 ? `<button class="btn-primary btn-pay-child" data-child="${c.id}" data-name="${c.name}" data-balance="${c.balance}" style="flex:1;padding:10px;border:none;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--navy);color:#fff"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"/></svg> Pay K ${fmt(c.balance)}</button>` : ''}
+                        <a href="${api.downloadUrl(c.statement_url)}" target="_blank" class="btn-outline" style="flex:${c.balance > 0 ? '0' : '1'};padding:10px;border-radius:6px;font-size:0.78rem;font-weight:600;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--border);color:var(--text2);background:var(--card)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg> Statement</a>
                     </div>
                 </div>`;
             }
@@ -841,7 +852,7 @@ async function renderPayments(el, api) {
         // Bind pay buttons
         el.querySelectorAll('.btn-pay-child').forEach(btn => {
             btn.addEventListener('click', () => {
-                showPaymentModal(api, btn.dataset.child, btn.dataset.name, parseFloat(btn.dataset.balance));
+                alert('Coming Soon!\n\nMobile money payments will be available shortly. Please pay via the school office for now.');
             });
         });
 
@@ -1375,11 +1386,24 @@ async function renderReportCardsPage(el, api, children) {
             const c = data.child;
             const terms = data.terms || [];
             const readyCount = terms.filter(t => t.is_generated).length;
+            const isFullyPaid = data.is_fully_paid;
+            const feeStatus = data.fee_status;
+
+            // Fee warning banner for unpaid/partial
+            if (!isFullyPaid && feeStatus !== 'no_fee') {
+                html += `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.15);border-radius:var(--radius);margin-bottom:12px">
+                    <div style="width:36px;height:36px;border-radius:10px;background:rgba(220,38,38,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem">🔒</div>
+                    <div><div class="text-sm bold text-red">Report Cards Locked</div><div class="text-xs text-gray" style="margin-top:2px">Please clear the outstanding tuition fee balance to access report cards and results for ${c.name}.</div></div>
+                </div>`;
+            }
 
             html += `<div class="card">
                 <div class="card-head" style="background:linear-gradient(135deg,var(--navy),var(--navy-light));border:none">
                     <div class="card-title" style="color:#fff"><span class="section-dot" style="background:#fff"></span>${c.name}</div>
-                    <span class="badge" style="background:rgba(255,255,255,0.2);color:#fff">${readyCount}/${terms.length} ready</span>
+                    <div style="display:flex;gap:6px">
+                        ${!isFullyPaid && feeStatus !== 'no_fee' ? '<span class="badge badge-red">Locked</span>' : ''}
+                        <span class="badge" style="background:rgba(255,255,255,0.2);color:#fff">${readyCount}/${terms.length} ready</span>
+                    </div>
                 </div>
                 <div class="card-body" style="padding:0">`;
 
@@ -1390,8 +1414,10 @@ async function renderReportCardsPage(el, api, children) {
                     const t = terms[i];
                     const border = i < terms.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
                     const shareText = `${c.name} - ${t.term} Report Card - St. Francis of Assisi School`;
+                    const locked = t.is_locked;
 
-                    if (t.is_generated) {
+                    if (t.is_generated && !locked) {
+                        // Fully paid — full access
                         html += `<div style="padding:16px;${border}">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                                 <div>
@@ -1401,9 +1427,25 @@ async function renderReportCardsPage(el, api, children) {
                                 <span class="badge badge-green">Ready</span>
                             </div>
                             <div style="display:flex;gap:8px;flex-wrap:wrap">
-                                <a href="${api.downloadUrl(t.download_url)}" target="_blank" class="share-btn" style="flex:1;justify-content:center;background:var(--navy);color:#fff;padding:10px 12px;font-size:0.78rem">${SVG.download} Download PDF</a>
+                                <a href="${api.downloadUrl(t.download_url)}" target="_blank" class="share-btn" style="flex:1;justify-content:center;background:var(--navy);color:#fff;padding:10px 12px;font-size:0.78rem"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg> Download PDF</a>
                                 <a href="https://wa.me/?text=${encodeURIComponent(shareText + ' ' + window.location.origin + api.downloadUrl(t.download_url))}" target="_blank" class="share-btn share-whatsapp" style="padding:10px 12px;font-size:0.78rem">WhatsApp</a>
                                 <button class="share-btn share-copy btn-share-rc" data-url="${api.downloadUrl(t.download_url)}" data-text="${shareText}" style="padding:10px 12px;font-size:0.78rem">${SVG.share} Copy</button>
+                            </div>
+                        </div>`;
+                    } else if (t.is_generated && locked) {
+                        // Partial/unpaid — blurred/locked
+                        html += `<div style="padding:16px;${border}position:relative;overflow:hidden">
+                            <div style="filter:blur(6px);pointer-events:none;user-select:none">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                                    <div><div class="list-title">${t.term}</div><div class="text-xs text-green bold" style="margin-top:2px">Ready for download</div></div>
+                                    <span class="badge badge-green">Ready</span>
+                                </div>
+                                <div style="display:flex;gap:8px"><div class="share-btn" style="flex:1;justify-content:center;background:var(--navy);color:#fff;padding:10px 12px;font-size:0.78rem">Download PDF</div></div>
+                            </div>
+                            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,0.7);backdrop-filter:blur(2px)">
+                                <div style="font-size:1.5rem;margin-bottom:6px">🔒</div>
+                                <div class="text-sm bold" style="color:var(--red)">Fees Outstanding</div>
+                                <div class="text-xs text-gray" style="margin-top:4px;text-align:center;max-width:200px">Clear your fee balance to unlock this report card</div>
                             </div>
                         </div>`;
                     } else {
@@ -2179,6 +2221,12 @@ function showPaymentModal(api, childId, childName, balance) {
             const result = await api.initiatePayment(childId, amount, mobile);
             document.getElementById('pay-ref').textContent = result.payment_reference;
 
+            // If delayed (timeout), show a helpful message but still poll
+            if (result.is_delayed) {
+                document.querySelector('#pay-processing .list-title').textContent = 'Payment Request Sent';
+                document.querySelector('#pay-processing .text-sm').textContent = 'Confirmation delayed — check your phone for the payment prompt. If you approve it, we will detect it automatically.';
+            }
+
             // Poll for status — only queryCustomerPayment confirms completion
             const paymentId = result.payment_id;
             let attempts = 0;
@@ -2207,7 +2255,13 @@ function showPaymentModal(api, childId, childName, balance) {
                     if (attempts < maxAttempts) {
                         setTimeout(pollStatus, 5000);
                     } else {
-                        showFailed('Payment timed out. If you approved on your phone, the payment will still be processed and your balance updated.');
+                        // Don't show as failed — show as pending with reference
+                        processingEl.style.display = 'none';
+                        failedEl.style.display = '';
+                        document.getElementById('pay-fail-msg').innerHTML = `Confirmation is taking longer than expected.<br><br>
+                            <strong>Ref: ${result.payment_reference}</strong><br><br>
+                            If you approved the payment on your phone, it will be processed and your balance will update automatically. Check back later.`;
+                        document.getElementById('pay-retry').textContent = 'Close';
                     }
                 } catch (pollErr) {
                     networkErrors++;

@@ -16,7 +16,7 @@ class ParentGuardianSeeder extends Seeder
         $this->command->info('Creating parent/guardian records...');
 
         // Get parent users
-        $parentUsers = User::where('email', 'like', '%.parent@stfrancisofassisi.tech')->get();
+        $parentUsers = User::where('email', 'like', '%.parent@stfrancisofassisizm.com')->get();
 
         foreach ($parentUsers as $user) {
             $this->createParentGuardian($user);

@@ -504,6 +504,17 @@ class StudentResource extends Resource
                     ->sortable()
                     ->weight('bold'),
 
+                Tables\Columns\TextColumn::make('arrears_status')
+                    ->label('Fees')
+                    ->state(fn (Student $record) => $record->hasArrears() ? 'ARREARS' : 'OK')
+                    ->badge()
+                    ->color(fn ($state) => $state === 'ARREARS' ? 'danger' : 'success')
+                    ->icon(fn ($state) => $state === 'ARREARS' ? 'heroicon-o-exclamation-triangle' : 'heroicon-o-check-circle')
+                    ->tooltip(fn (Student $record) => $record->hasArrears()
+                        ? 'Outstanding balance: ZMW ' . number_format($record->arrearsAmount(), 2)
+                        : 'Current term fees paid')
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('grade.name')
                     ->label('Grade')
                     ->searchable()
@@ -698,8 +709,24 @@ class StudentResource extends Resource
                             ->pluck('name', 'id')
                             ->toArray();
                     })
-                    ->default(fn () => Term::where('is_active', true)->first()?->id)
                     ->visible($isAdmin),
+
+                Tables\Filters\Filter::make('has_arrears')
+                    ->label('Has arrears (current term)')
+                    ->toggle()
+                    ->query(function ($query) {
+                        $currentTermId = Term::where('is_current', true)->value('id');
+                        if (! $currentTermId) {
+                            return $query;
+                        }
+                        return $query->whereExists(function ($q) use ($currentTermId) {
+                            $q->select(\DB::raw(1))
+                                ->from('student_fees')
+                                ->whereColumn('student_fees.student_id', 'students.id')
+                                ->where('student_fees.term_id', $currentTermId)
+                                ->where('student_fees.balance', '>', 0);
+                        });
+                    }),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

@@ -12,7 +12,7 @@ This template allows you to bulk import teacher data into the St. Francis of Ass
 | Column | Description | Example | Rules |
 |--------|-------------|---------|-------|
 | **name** | Full name of teacher | John Mwale | Must not be empty |
-| **email** | Email address | john.mwale@stfrancis.tech | Must be unique, valid email format |
+| **email** | Email address | john.mwale@stfrancisofassisizm.com | Must be unique, valid email format |
 | **phone** | Phone number | +260971234567 | Zambian format recommended |
 | **employee_id** | Unique employee identifier | TEA001 | Must be unique |
 
@@ -129,17 +129,17 @@ Use dot (.) for decimals:
 
 ### Example 1: Primary Class Teacher
 ```csv
-John Mwale,john.mwale@stfrancis.tech,+260971234567,TEA001,john.mwale,password123,active,Primary,Teacher,Diploma in Primary Education,,2024-01-15,8500.00,123456/78/1,1234567890,0123456789,Zanaco,Cairo Road,"Plot 123, Kabulonga, Lusaka",TRUE,TRUE,FALSE,Grade 5,A
+John Mwale,john.mwale@stfrancisofassisizm.com,+260971234567,TEA001,john.mwale,password123,active,Primary,Teacher,Diploma in Primary Education,,2024-01-15,8500.00,123456/78/1,1234567890,0123456789,Zanaco,Cairo Road,"Plot 123, Kabulonga, Lusaka",TRUE,TRUE,FALSE,Grade 5,A
 ```
 
 ### Example 2: Secondary Subject Teacher (Grade Teacher)
 ```csv
-Sarah Tembo,sarah.tembo@stfrancis.tech,+260975111005,TEA002,sarah.tembo,password123,active,Secondary,Senior Teacher,PhD in Mathematics,Mathematics,2023-09-01,15000.00,234567/89/1,2345678901,9876543210,Stanbic,Longacres,"Plot 456, Roma, Lusaka",TRUE,FALSE,TRUE,Grade 11,
+Sarah Tembo,sarah.tembo@stfrancisofassisizm.com,+260975111005,TEA002,sarah.tembo,password123,active,Secondary,Senior Teacher,PhD in Mathematics,Mathematics,2023-09-01,15000.00,234567/89/1,2345678901,9876543210,Stanbic,Longacres,"Plot 456, Roma, Lusaka",TRUE,FALSE,TRUE,Grade 11,
 ```
 
 ### Example 3: ECL Teacher
 ```csv
-Mary Banda,mary.banda@stfrancis.tech,+260975111001,TEA003,mary.banda,password123,active,ECL,Teacher,Certificate in Early Childhood Education,,2023-05-10,7500.00,345678/90/1,3456789012,1234567890,Zanaco,Woodlands,"Plot 789, Chilenje, Lusaka",TRUE,TRUE,FALSE,Baby Class,A
+Mary Banda,mary.banda@stfrancisofassisizm.com,+260975111001,TEA003,mary.banda,password123,active,ECL,Teacher,Certificate in Early Childhood Education,,2023-05-10,7500.00,345678/90/1,3456789012,1234567890,Zanaco,Woodlands,"Plot 789, Chilenje, Lusaka",TRUE,TRUE,FALSE,Baby Class,A
 ```
 
 ---

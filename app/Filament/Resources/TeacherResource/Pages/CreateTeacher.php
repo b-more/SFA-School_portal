@@ -202,11 +202,11 @@ class CreateTeacher extends CreateRecord
         $baseEmail = $firstName.'.'.$lastName;
         $baseEmail = preg_replace('/[^a-z0-9\.]/', '', $baseEmail);
 
-        $email = $baseEmail.'@stfrancisofassisi.tech';
+        $email = $baseEmail.'@stfrancisofassisizm.com';
         $counter = 1;
 
         while (User::where('email', $email)->exists()) {
-            $email = $baseEmail.$counter.'@stfrancisofassisi.tech';
+            $email = $baseEmail.$counter.'@stfrancisofassisizm.com';
             $counter++;
         }
 

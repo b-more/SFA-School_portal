@@ -315,7 +315,7 @@ class FeeStructureResource extends Resource
                 'schoolName' => 'St. Francis Of Assisi Private School',
                 'schoolLogo' => public_path('images/logo.png'),
                 'schoolAddress' => 'Plot No 1310/4 East Kamenza, Chililabombwe, Zambia',
-                'schoolContact' => 'Phone: +260 972 266 217, Email: info@stfrancisofassisi.tech'
+                'schoolContact' => 'Phone: +260 972 266 217, Email: info@stfrancisofassisizm.com'
             ]);
 
             // Save PDF to storage
@@ -411,7 +411,7 @@ class FeeStructureResource extends Resource
                         'schoolName' => 'St. Francis Of Assisi Private School',
                         'schoolLogo' => public_path('images/logo.png'),
                         'schoolAddress' => 'Plot No 1310/4 East Kamenza, Chililabombwe, Zambia',
-                        'schoolContact' => 'Phone: +260 972 266 217, Email: info@stfrancisofassisi.tech'
+                        'schoolContact' => 'Phone: +260 972 266 217, Email: info@stfrancisofassisizm.com'
                     ]);
 
                     // Create a sanitized filename

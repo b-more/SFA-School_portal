@@ -245,8 +245,38 @@ class SetupStudentParentAccounts extends Command
     protected function createParentAccount(ParentGuardian $parent): void
     {
         DB::transaction(function () use ($parent) {
+            // Check if a user with this phone already exists
+            $existingUser = User::where('phone', $parent->phone)->first();
+
+            if ($existingUser) {
+                // Link parent to existing user
+                $parent->update(['user_id' => $existingUser->id]);
+
+                // Store for export with existing credentials note
+                $children = Student::where('parent_guardian_id', $parent->id)->pluck('name')->implode(', ');
+                $this->credentials[] = [
+                    'type' => 'Parent',
+                    'name' => $parent->name,
+                    'student_id' => '-',
+                    'grade' => '-',
+                    'email' => $existingUser->email,
+                    'password' => '(existing account)',
+                    'parent_phone' => $parent->phone,
+                    'children' => $children,
+                ];
+                return;
+            }
+
             // Generate email from phone or name
             $email = $this->generateParentEmail($parent);
+
+            // Check if email also exists, make unique
+            $baseEmail = $email;
+            $counter = 1;
+            while (User::where('email', $email)->exists()) {
+                $email = str_replace('@', $counter . '@', $baseEmail);
+                $counter++;
+            }
 
             // Generate password
             $password = Str::password(10);
@@ -300,7 +330,7 @@ class SetupStudentParentAccounts extends Command
         // Use student ID if available
         if ($student->student_id_number) {
             $baseEmail = strtolower(str_replace(['STU-', '-'], '', $student->student_id_number));
-            $email = "student{$baseEmail}@stfrancisofassisi.tech";
+            $email = "student{$baseEmail}@stfrancisofassisizm.com";
 
             if (!User::where('email', $email)->exists()) {
                 return $email;
@@ -313,11 +343,11 @@ class SetupStudentParentAccounts extends Command
         $lastName = strtolower(preg_replace('/[^a-z]/', '', end($nameParts) ?? ''));
 
         $baseEmail = "{$firstName}.{$lastName}";
-        $email = "{$baseEmail}@student.stfrancisofassisi.tech";
+        $email = "{$baseEmail}@student.stfrancisofassisizm.com";
         $counter = 1;
 
         while (User::where('email', $email)->exists()) {
-            $email = "{$baseEmail}{$counter}@student.stfrancisofassisi.tech";
+            $email = "{$baseEmail}{$counter}@student.stfrancisofassisizm.com";
             $counter++;
         }
 
@@ -330,7 +360,7 @@ class SetupStudentParentAccounts extends Command
         if ($parent->phone) {
             $phone = preg_replace('/[^0-9]/', '', $parent->phone);
             $phone = substr($phone, -9); // Last 9 digits
-            $email = "parent{$phone}@stfrancisofassisi.tech";
+            $email = "parent{$phone}@stfrancisofassisizm.com";
 
             if (!User::where('email', $email)->exists()) {
                 return $email;
@@ -343,11 +373,11 @@ class SetupStudentParentAccounts extends Command
         $lastName = strtolower(preg_replace('/[^a-z]/', '', end($nameParts) ?? ''));
 
         $baseEmail = "{$firstName}.{$lastName}";
-        $email = "{$baseEmail}@parent.stfrancisofassisi.tech";
+        $email = "{$baseEmail}@parent.stfrancisofassisizm.com";
         $counter = 1;
 
         while (User::where('email', $email)->exists()) {
-            $email = "{$baseEmail}{$counter}@parent.stfrancisofassisi.tech";
+            $email = "{$baseEmail}{$counter}@parent.stfrancisofassisizm.com";
             $counter++;
         }
 

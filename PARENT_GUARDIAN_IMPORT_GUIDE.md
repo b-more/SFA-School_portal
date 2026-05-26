@@ -2,7 +2,7 @@
 
 ## Overview
 You can now bulk import parent guardian data using Excel or CSV files at:
-https://portal.stfrancisofassisi.tech/admin/parent-guardians
+https://portal.stfrancisofassisizm.com/admin/parent-guardians
 
 ## Features Added
 1. **Import** - Bulk import parent guardians from CSV/Excel files
@@ -42,7 +42,7 @@ Jane Smith,jane.smith@example.com,260971234567,260971234568,mother,987654/32/1,Z
 A sample file is available at: `storage/app/public/parent_guardian_import_sample.csv`
 
 ### Step 4: Import Process
-1. Go to https://portal.stfrancisofassisi.tech/admin/parent-guardians
+1. Go to https://portal.stfrancisofassisizm.com/admin/parent-guardians
 2. Click the **"Import"** button (green button with upload icon)
 3. Upload your CSV or Excel file
 4. Map the columns if needed (Filament will auto-detect if column names match)
@@ -59,7 +59,7 @@ A sample file is available at: `storage/app/public/parent_guardian_import_sample
 ## Export Instructions
 
 ### Creating a Template
-1. Go to https://portal.stfrancisofassisi.tech/admin/parent-guardians
+1. Go to https://portal.stfrancisofassisizm.com/admin/parent-guardians
 2. Click the **"Export"** button (blue button with download icon)
 3. Select your preferred format (CSV or Excel)
 4. The system will export all current parent guardians

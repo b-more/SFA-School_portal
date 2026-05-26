@@ -29,6 +29,10 @@ class ReportCardController extends Controller
      */
     public function generate(Request $request, Student $student, Term $term)
     {
+        if ($this->blockForArrears($student)) {
+            return $this->arrearsResponse($student);
+        }
+
         $year = $request->get('year', now()->year);
 
         $reportData = $this->prepareReportCardData($student, $term, $year);
@@ -51,6 +55,10 @@ class ReportCardController extends Controller
      */
     public function preview(Request $request, Student $student, Term $term)
     {
+        if ($this->blockForArrears($student)) {
+            return $this->arrearsResponse($student);
+        }
+
         $year = $request->get('year', now()->year);
 
         $reportData = $this->prepareReportCardData($student, $term, $year);
@@ -60,19 +68,80 @@ class ReportCardController extends Controller
     }
 
     /**
+     * Should this user be stopped from accessing the report card because the student
+     * has outstanding fees? Admins/accountants can bypass for office reprints (rare).
+     */
+    private function blockForArrears(Student $student): bool
+    {
+        $user = auth()->user();
+        $bypassRoles = [
+            \App\Constants\RoleConstants::ADMIN,
+            \App\Constants\RoleConstants::ACCOUNTANT,
+            \App\Constants\RoleConstants::DIRECTOR,
+        ];
+
+        if ($user && in_array($user->role_id, $bypassRoles, true)) {
+            return false;
+        }
+
+        return $student->hasArrears();
+    }
+
+    private function arrearsResponse(Student $student)
+    {
+        $amount = number_format($student->arrearsAmount(), 2);
+        $message = "Report card unavailable. {$student->name} has an outstanding fees balance of ZMW {$amount}. Please settle the balance at the school office before the report card can be issued.";
+
+        if (request()->expectsJson() || request()->is('api/*')) {
+            return response()->json([
+                'blocked' => true,
+                'reason' => 'arrears',
+                'student_id' => $student->id,
+                'student_name' => $student->name,
+                'arrears_amount' => $student->arrearsAmount(),
+                'message' => $message,
+            ], 402);
+        }
+
+        return response()->view('errors.arrears-block', [
+            'student' => $student,
+            'amount' => $student->arrearsAmount(),
+            'message' => $message,
+        ], 402);
+    }
+
+    /**
      * Generate report cards for all students in a class section (ZIP download).
      */
     public function bulkGenerate(Request $request, ClassSection $classSection, Term $term)
     {
         $year = $request->get('year', now()->year);
 
-        $students = $classSection->students()
+        $allStudents = $classSection->students()
             ->where('enrollment_status', 'active')
             ->orderBy('name')
             ->get();
 
-        if ($students->isEmpty()) {
+        if ($allStudents->isEmpty()) {
             return back()->with('error', 'No active students found in this class.');
+        }
+
+        // Filter out arrears students unless the requester is admin/accountant/director.
+        $user = auth()->user();
+        $bypassRoles = [
+            \App\Constants\RoleConstants::ADMIN,
+            \App\Constants\RoleConstants::ACCOUNTANT,
+            \App\Constants\RoleConstants::DIRECTOR,
+        ];
+        $canBypass = $user && in_array($user->role_id, $bypassRoles, true);
+
+        $blocked = $canBypass ? collect() : $allStudents->filter(fn ($s) => $s->hasArrears());
+        $students = $canBypass ? $allStudents : $allStudents->reject(fn ($s) => $s->hasArrears());
+
+        if ($students->isEmpty()) {
+            return back()->with('error',
+                'Every student in this class has outstanding fees. Report cards cannot be generated until the balances are settled.'
+            );
         }
 
         $academicYear = AcademicYear::where('is_active', true)->first();
@@ -125,6 +194,15 @@ class ReportCardController extends Controller
             }
         }
         rmdir($tempDir);
+
+        // Flash a notice listing which students were skipped due to arrears (if any).
+        if (! empty($blocked) && $blocked->count() > 0) {
+            $names = $blocked->take(6)->pluck('name')->join(', ');
+            $more = $blocked->count() > 6 ? ' and ' . ($blocked->count() - 6) . ' more' : '';
+            session()->flash('arrears_notice',
+                $blocked->count() . ' student(s) skipped due to outstanding fees: ' . $names . $more
+            );
+        }
 
         // Download and delete ZIP
         return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);

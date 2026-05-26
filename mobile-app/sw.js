@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sfa-parent-v8';
+const CACHE_NAME = 'sfa-parent-v9';
 const API_CACHE = 'sfa-api-cache-v1';
 const ASSETS = ['/', '/css/app.css', '/js/app.js', '/js/api.js', '/js/pages/splash.js', '/js/pages/login.js', '/js/pages/dashboard.js'];
 
@@ -39,8 +39,8 @@ self.addEventListener('push', e => {
     const title = data.title || 'St. Francis of Assisi';
     const options = {
         body: data.body || 'You have a new notification.',
-        icon: data.icon || '/images/logo.png',
-        badge: '/images/badge.png',
+        icon: data.icon || '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
         tag: data.tag || 'sfa-notification',
         data: { url: data.url || '/' },
     };

@@ -194,7 +194,7 @@ class SchoolSettingsResource extends Resource
                                         Forms\Components\TextInput::make('website')
                                             ->maxLength(255)
                                             ->placeholder('www.example.com')
-                                            ->helperText('Enter website address (e.g., www.stfrancisofassisi.tech)'),
+                                            ->helperText('Enter website address (e.g., www.stfrancisofassisizm.com)'),
                                     ])
                                     ->columns(2),
 
