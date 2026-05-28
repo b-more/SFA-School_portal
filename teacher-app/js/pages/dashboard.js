@@ -2089,9 +2089,19 @@ async function renderProfile(el, api, user) {
         let html = '<div class="dash-scroll">';
 
         // Header card
+        const avatarInner = profile.profile_photo
+            ? `<img id="avatar-img" src="${profile.profile_photo}" style="width:64px;height:64px;border-radius:16px;object-fit:cover;border:3px solid rgba(255,255,255,0.3);display:block">`
+            : `<div id="avatar-img" style="width:64px;height:64px;border-radius:16px;background:rgba(255,255,255,0.12);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700">${initial(profile.name)}</div>`;
         html += `<div class="card">
             <div style="background:linear-gradient(135deg,var(--navy),var(--primary-dark));padding:24px;text-align:center;color:#fff">
-                ${profile.profile_photo ? `<img src="${profile.profile_photo}" style="width:64px;height:64px;border-radius:16px;object-fit:cover;border:3px solid rgba(255,255,255,0.3);margin:0 auto 10px;display:block">` : `<div style="width:64px;height:64px;border-radius:16px;background:rgba(255,255,255,0.12);border:2px solid rgba(255,255,255,0.2);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700">${initial(profile.name)}</div>`}
+                <div id="avatar-tap" style="position:relative;width:64px;height:64px;margin:0 auto 10px;cursor:pointer" title="Change photo">
+                    ${avatarInner}
+                    <div style="position:absolute;right:-4px;bottom:-4px;width:24px;height:24px;border-radius:50%;background:var(--primary);border:2px solid #fff;display:flex;align-items:center;justify-content:center">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    </div>
+                    <input type="file" id="avatar-input" accept="image/*" style="display:none">
+                </div>
+                <div id="avatar-msg" style="font-size:0.66rem;opacity:0.85;height:14px;margin-bottom:4px"></div>
                 <div style="font-size:1.1rem;font-weight:700">${profile.name || ''}</div>
                 <div style="font-size:0.75rem;opacity:0.6;margin-top:4px">${profile.position || 'Teacher'} · ${profile.department || ''}</div>
                 ${profile.employee_number ? `<div style="font-size:0.68rem;opacity:0.5;margin-top:2px">${profile.employee_number}</div>` : ''}
@@ -2177,6 +2187,32 @@ async function renderProfile(el, api, user) {
         html += `<button class="btn btn-outline" id="profile-logout" style="color:var(--red);border-color:var(--red)">${SVG.logout} Sign Out</button>`;
         html += '</div>';
         el.innerHTML = html;
+
+        // Profile photo upload
+        const avatarTap = document.getElementById('avatar-tap');
+        const avatarInput = document.getElementById('avatar-input');
+        avatarTap?.addEventListener('click', () => avatarInput?.click());
+        avatarInput?.addEventListener('change', async () => {
+            const file = avatarInput.files && avatarInput.files[0];
+            const msg = document.getElementById('avatar-msg');
+            if (!file) return;
+            if (!file.type.startsWith('image/')) { msg.textContent = 'Please choose an image file.'; avatarInput.value = ''; return; }
+            if (file.size > 5 * 1024 * 1024) { msg.textContent = 'Image must be under 5MB.'; avatarInput.value = ''; return; }
+            msg.textContent = 'Uploading…';
+            try {
+                const res = await api.updateProfilePhoto(file);
+                const newImg = document.createElement('img');
+                newImg.id = 'avatar-img';
+                newImg.src = (res.photo_url || '') + '?t=' + Date.now();
+                newImg.style.cssText = 'width:64px;height:64px;border-radius:16px;object-fit:cover;border:3px solid rgba(255,255,255,0.3);display:block';
+                document.getElementById('avatar-img')?.replaceWith(newImg);
+                msg.textContent = 'Photo updated';
+                setTimeout(() => { if (msg.textContent === 'Photo updated') msg.textContent = ''; }, 2500);
+            } catch (err) {
+                msg.textContent = err.message || 'Upload failed.';
+            }
+            avatarInput.value = '';
+        });
 
         // Password toggle
         document.getElementById('pw-toggle')?.addEventListener('click', () => {
