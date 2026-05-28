@@ -2326,7 +2326,10 @@ function showNewQuizModal(api, pageEl, classes) {
         <div class="form-group"><label class="form-label">Due date (optional)</label><input type="date" id="quiz-due" class="form-input" style="padding:10px 12px"></div>
         <div style="font-weight:700;font-size:0.82rem;margin:10px 0 6px">Questions</div>
         <div id="quiz-questions"></div>
-        <button id="add-question" class="btn btn-outline" style="margin-top:6px;width:auto;padding:7px 12px;font-size:0.72rem">${SVG.plus} Add Question</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button id="add-question" class="btn btn-outline" style="margin-top:6px;width:auto;padding:7px 12px;font-size:0.72rem">${SVG.plus} Add Question</button>
+            <button id="add-from-bank" class="btn btn-outline" style="margin-top:6px;width:auto;padding:7px 12px;font-size:0.72rem">${SVG.clipboard} Add from bank</button>
+        </div>
         <div id="quiz-err" class="form-error" style="display:none;margin:10px 0 8px"></div>
         <button id="quiz-submit" class="btn btn-primary" style="padding:11px;margin-top:10px">Create Quiz</button>
     </div>`;
@@ -2396,6 +2399,12 @@ function showNewQuizModal(api, pageEl, classes) {
     }
 
     modal.querySelector('#add-question').addEventListener('click', () => { syncFromDom(); questions.push(newQuestion('mcq')); renderQuestions(); });
+    modal.querySelector('#add-from-bank').addEventListener('click', () => {
+        syncFromDom();
+        const subjectId = (modal.querySelector('#quiz-class').value || '').split('|')[1];
+        if (!subjectId || subjectId === 'null') { alert('Select a class first.'); return; }
+        showQuizBankPicker(api, subjectId, (added) => { added.forEach(q => questions.push(q)); renderQuestions(); });
+    });
 
     modal.querySelector('#quiz-submit').addEventListener('click', async () => {
         syncFromDom();
@@ -2650,4 +2659,49 @@ function showBankItemEditor(api, pageEl, meta, existing) {
 
     applyCurriculumLock();
     renderDynamic();
+}
+
+// Picker: copy objective bank questions into the quiz builder (snapshot).
+async function showQuizBankPicker(api, subjectId, onConfirm) {
+    const modal = document.createElement('div'); modal.className = 'modal-overlay'; document.body.appendChild(modal);
+    const close = () => modal.remove();
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    modal.innerHTML = `<div class="modal" style="max-height:88vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div class="list-title" style="font-size:0.95rem">Add from Question Bank</div>
+            <button id="bp-close" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text3)">&times;</button>
+        </div>
+        <div class="text-xs text-gray" style="margin-bottom:8px">Auto-gradable questions (multiple-choice / true-false) for this subject.</div>
+        <div id="bp-list"><div class="card"><div class="card-empty">Loading…</div></div></div>
+        <button id="bp-add" class="btn btn-primary" style="margin-top:10px;padding:10px" disabled>Add selected</button>
+    </div>`;
+    modal.querySelector('#bp-close').onclick = close;
+    const listEl = modal.querySelector('#bp-list');
+    const addBtn = modal.querySelector('#bp-add');
+    let items = [];
+    try {
+        const all = await api.getQuestionBank({ subject_id: subjectId });
+        items = all.filter(i => i.type === 'mcq' || i.type === 'true_false');
+    } catch (e) { listEl.innerHTML = `<div class="card"><div class="card-empty">${e.message}</div></div>`; return; }
+    if (!items.length) { listEl.innerHTML = '<div class="card"><div class="card-empty">No auto-gradable questions in the bank for this subject yet.</div></div>'; return; }
+    listEl.innerHTML = items.map(i => `<label class="card" style="display:block;cursor:pointer"><div style="padding:10px 14px;display:flex;gap:8px;align-items:flex-start">
+        <input type="checkbox" class="bp-check" data-id="${i.id}" style="margin-top:3px">
+        <div><div style="font-size:0.82rem;font-weight:600">${quizEsc((i.question_text || '').slice(0, 120))}${(i.question_text || '').length > 120 ? '…' : ''}</div>
+        <div class="text-xs text-gray mt-2">${qbTypeLabel(i.type)} · ${i.max_marks} mk${i.topic ? ' · ' + quizEsc(i.topic) : ''}</div></div>
+    </div></label>`).join('');
+    const refresh = () => { addBtn.disabled = !listEl.querySelectorAll('.bp-check:checked').length; };
+    listEl.querySelectorAll('.bp-check').forEach(c => c.addEventListener('change', refresh));
+    addBtn.addEventListener('click', async () => {
+        const ids = Array.from(listEl.querySelectorAll('.bp-check:checked')).map(c => c.dataset.id);
+        if (!ids.length) return;
+        addBtn.disabled = true; addBtn.innerHTML = '<div class="btn-spinner"></div> Adding...';
+        try {
+            const details = await Promise.all(ids.map(id => api.getBankItem(id)));
+            const mapped = details.map(d => ({
+                text: d.question_text, type: d.type, points: d.max_marks || 1,
+                options: (d.options || []).map(o => ({ text: o.option_text, correct: !!o.is_correct })),
+            }));
+            onConfirm(mapped); close();
+        } catch (e) { addBtn.disabled = false; addBtn.textContent = 'Add selected'; alert(e.message); }
+    });
 }

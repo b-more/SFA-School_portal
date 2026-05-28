@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sfa-teacher-v4';
+const CACHE_NAME = 'sfa-teacher-v5';
 const API_CACHE = 'sfa-teacher-api-v1';
 const ASSETS = ['/', '/css/app.css', '/js/app.js', '/js/api.js', '/js/pages/splash.js', '/js/pages/login.js', '/js/pages/dashboard.js'];
 
