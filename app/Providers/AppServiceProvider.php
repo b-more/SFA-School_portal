@@ -14,8 +14,10 @@ use App\Observers\HomeworkSubmissionObserver;
 use App\Observers\PaymentTransactionObserver;
 use App\Observers\StudentObserver;
 use App\Observers\StudentFeeObserver;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Filament\Facades\Filament;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -35,6 +37,16 @@ class AppServiceProvider extends ServiceProvider
         if (config('app.env') === 'production' || request()->header('X-Forwarded-Proto') === 'https') {
             URL::forceScheme('https');
         }
+
+        // The default password-reset notification (used by the mobile-app and
+        // teacher-app /forgot-password endpoints) builds its link from the
+        // route('password.reset') name, which this app doesn't define — only
+        // Filament's reset routes exist. Point it at Filament's reset page so
+        // the emailed link works. Filament's own reset flow uses a separate
+        // notification and is unaffected.
+        ResetPassword::createUrlUsing(
+            fn ($notifiable, string $token) => Filament::getPanel('admin')->getResetPasswordUrl($token, $notifiable)
+        );
 
         // Register model observers for admin notifications
         Student::observe(StudentObserver::class);
