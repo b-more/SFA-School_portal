@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\TeacherAuthController;
 use App\Http\Controllers\Api\TeacherApiController;
 use App\Http\Controllers\Api\TeacherQuizController;
 use App\Http\Controllers\Api\TeacherQuestionBankController;
+use App\Http\Controllers\Api\TeacherAssessmentController;
 use Illuminate\Support\Facades\Route;
 
 // Public
@@ -34,6 +35,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/question-bank/{item}', [TeacherQuestionBankController::class, 'show']);
     Route::put('/question-bank/{item}', [TeacherQuestionBankController::class, 'update']);
     Route::delete('/question-bank/{item}', [TeacherQuestionBankController::class, 'destroy']);
+
+    // CBC assessments (scenario / Theory), SBA gradebook, 70/30 weighting
+    Route::get('/assessments', [TeacherAssessmentController::class, 'index']);
+    Route::post('/assessments', [TeacherAssessmentController::class, 'store']);
+    Route::get('/assessment-submissions/{submission}', [TeacherAssessmentController::class, 'submissionDetail']);
+    Route::post('/assessment-submissions/{submission}/mark', [TeacherAssessmentController::class, 'markSubmission']);
+    Route::get('/assessment-summary', [TeacherAssessmentController::class, 'subjectSummary']);
+    Route::get('/assessments/{assessment}/submissions', [TeacherAssessmentController::class, 'submissions']);
+    Route::get('/assessments/{assessment}', [TeacherAssessmentController::class, 'show']);
+    Route::post('/assessments/{assessment}/close', [TeacherAssessmentController::class, 'close']);
+    Route::delete('/assessments/{assessment}', [TeacherAssessmentController::class, 'destroy']);
+    Route::get('/sba', [TeacherAssessmentController::class, 'sbaGradebook']);
+    Route::post('/sba', [TeacherAssessmentController::class, 'saveSba']);
+    Route::get('/ecz-settings', [TeacherAssessmentController::class, 'getSettings']);
+    Route::post('/ecz-settings', [TeacherAssessmentController::class, 'saveSettings']);
     Route::get('/my-classes', [TeacherApiController::class, 'myClasses']);
     Route::get('/class/{classSectionId}/students', [TeacherApiController::class, 'classStudents']);
 

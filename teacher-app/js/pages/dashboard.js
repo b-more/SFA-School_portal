@@ -51,6 +51,7 @@ export async function renderDashboard(container, api, settings) {
                     <a href="#/dashboard/homework" class="drawer-link">${SVG.clipboard}<span>Homework</span></a>
                     <a href="#/dashboard/quiz" class="drawer-link">${SVG.check}<span>Quizzes</span></a>
                     <a href="#/dashboard/question-bank" class="drawer-link">${SVG.clipboard}<span>Question Bank</span></a>
+                    <a href="#/dashboard/assessments" class="drawer-link">${SVG.chart}<span>CBC Assessments</span></a>
                     <a href="#/dashboard/results" class="drawer-link">${SVG.chart}<span>Results</span></a>
                     <a href="#/dashboard/timetable" class="drawer-link">${SVG.clock}<span>Timetable</span></a>` : ''}
                     <a href="#/dashboard/notices" class="drawer-link">${SVG.megaphone}<span>Notices</span></a>
@@ -132,6 +133,7 @@ export async function renderDashboard(container, api, settings) {
     else if (hash.includes('/cpd')) await renderCpdDashboard(content, api);
     else if (hash.includes('/hw-analytics')) await renderHwAnalytics(content, api);
     else if (hash.includes('/question-bank')) await renderQuestionBank(content, api);
+    else if (hash.includes('/assessments')) await renderAssessments(content, api);
     else if (hash.includes('/quiz')) await renderQuiz(content, api);
     else if (hash.includes('/homework')) await renderHomework(content, api);
     else if (hash.includes('/results')) await renderResults(content, api);
@@ -2703,5 +2705,282 @@ async function showQuizBankPicker(api, subjectId, onConfirm) {
             }));
             onConfirm(mapped); close();
         } catch (e) { addBtn.disabled = false; addBtn.textContent = 'Add selected'; alert(e.message); }
+    });
+}
+
+// ─── CBC ASSESSMENTS (teacher) ───
+function asClassOptions(classes) {
+    return classes.map(c => `<option value="${c.class_section_id}|${c.subject_id}|${c.grade_id}">${c.grade} ${c.class_section} - ${c.subject}</option>`).join('');
+}
+
+async function renderAssessments(el, api) {
+    let classes = [], items = [];
+    try { [classes, items] = await Promise.all([api.getMyClasses(), api.getAssessments()]); }
+    catch (err) { el.innerHTML = `<div class="dash-scroll card-empty">${err.message}</div>`; return; }
+    let html = '<div class="dash-scroll">';
+    html += `<div class="flex-between" style="margin-bottom:8px"><div style="font-size:1rem;font-weight:700">CBC Assessments</div>
+        <button id="as-new" class="btn btn-primary" style="width:auto;padding:8px 14px;font-size:0.72rem">${SVG.plus} New</button></div>`;
+    html += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <button id="as-sba" class="btn btn-outline" style="width:auto;padding:6px 11px;font-size:0.7rem">SBA Gradebook</button>
+        <button id="as-summary" class="btn btn-outline" style="width:auto;padding:6px 11px;font-size:0.7rem">Subject Summary</button>
+        <button id="as-weight" class="btn btn-outline" style="width:auto;padding:6px 11px;font-size:0.7rem">Weighting</button></div>`;
+    if (!items.length) html += '<div class="card"><div class="card-empty">No assessments yet. Tap “New” to create a scenario assessment.</div></div>';
+    else for (const a of items) {
+        const badge = a.status === 'closed' ? '<span class="badge badge-red">Closed</span>' : '<span class="badge badge-green">Open</span>';
+        html += `<div class="card"><div style="padding:12px 14px">
+            <div class="flex-between"><div class="list-title">${quizEsc(a.title)}</div>${badge}</div>
+            <div class="list-sub mt-2">${a.class_section || ''}${a.subject ? ' · ' + a.subject : ''} · ${a.num_questions} Q · ${a.total_marks} mk</div>
+            <div class="text-xs text-gray mt-2">${a.submissions} submitted${a.to_mark > 0 ? ` · <span style="color:var(--amber)">${a.to_mark} to mark</span>` : (a.submissions ? ' · all marked' : '')}</div>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+                <button class="btn btn-outline as-subs" data-id="${a.id}" style="width:auto;padding:6px 12px;font-size:0.7rem">Submissions</button>
+                ${a.status !== 'closed' ? `<button class="btn btn-outline as-close" data-id="${a.id}" style="width:auto;padding:6px 12px;font-size:0.7rem">Close</button>` : ''}
+                <button class="btn btn-outline as-del" data-id="${a.id}" style="width:auto;padding:6px 12px;font-size:0.7rem;color:var(--red);border-color:var(--red)">Delete</button>
+            </div></div></div>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+    document.getElementById('as-new').addEventListener('click', () => showNewAssessmentModal(api, el, classes));
+    document.getElementById('as-sba').addEventListener('click', () => renderSbaGradebook(el, api, classes));
+    document.getElementById('as-summary').addEventListener('click', () => renderSubjectSummary(el, api, classes));
+    document.getElementById('as-weight').addEventListener('click', () => showWeightingModal(api));
+    el.querySelectorAll('.as-subs').forEach(b => b.addEventListener('click', () => showAssessmentSubmissions(el, api, classes, b.dataset.id)));
+    el.querySelectorAll('.as-close').forEach(b => b.addEventListener('click', async () => { if (!confirm('Close this assessment? Pupils can no longer submit.')) return; b.disabled = true; try { await api.closeAssessment(b.dataset.id); renderAssessments(el, api); } catch (e) { alert(e.message); b.disabled = false; } }));
+    el.querySelectorAll('.as-del').forEach(b => b.addEventListener('click', async () => { if (!confirm('Delete this assessment and all submissions?')) return; b.disabled = true; try { await api.deleteAssessment(b.dataset.id); renderAssessments(el, api); } catch (e) { alert(e.message); b.disabled = false; } }));
+}
+
+function showNewAssessmentModal(api, pageEl, classes) {
+    const modal = document.createElement('div'); modal.className = 'modal-overlay'; document.body.appendChild(modal);
+    const close = () => modal.remove(); modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    let questions = [{ text: '', criteria: [{ criterion: '', marks: 1 }] }];
+    modal.innerHTML = `<div class="modal" style="max-height:88vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="list-title" style="font-size:0.95rem">New Assessment (CBC scenario)</div><button id="as-close-m" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text3)">&times;</button></div>
+        <div class="form-group"><label class="form-label">Title</label><input id="as-title" class="form-input" style="padding:9px" placeholder="e.g. RE Scenario Assessment"></div>
+        <div class="form-group"><label class="form-label">Class & Subject</label><select id="as-class" class="form-input" style="padding:9px">${asClassOptions(classes)}</select></div>
+        <div class="form-group"><label class="form-label">Instructions (optional)</label><textarea id="as-desc" class="form-input" rows="2" style="padding:9px;resize:vertical;font-family:inherit"></textarea></div>
+        <div class="form-group"><label class="form-label">Due date (optional)</label><input id="as-due" type="date" class="form-input" style="padding:9px"></div>
+        <div style="font-weight:700;font-size:0.82rem;margin:8px 0 6px">Scenario questions</div>
+        <div id="as-questions"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button id="as-addq" class="btn btn-outline" style="margin-top:6px;width:auto;padding:7px 12px;font-size:0.72rem">${SVG.plus} Add question</button>
+            <button id="as-addbank" class="btn btn-outline" style="margin-top:6px;width:auto;padding:7px 12px;font-size:0.72rem">${SVG.clipboard} Add from bank</button>
+        </div>
+        <div id="as-err" class="form-error" style="display:none;margin:10px 0 8px"></div>
+        <button id="as-save" class="btn btn-primary" style="padding:11px;margin-top:10px">Create Assessment</button>
+    </div>`;
+    modal.querySelector('#as-close-m').onclick = close;
+    const qc = modal.querySelector('#as-questions');
+    function syncQ() {
+        questions.forEach((q, qi) => {
+            const t = qc.querySelector(`.asq-text[data-qi="${qi}"]`); if (t) q.text = t.value;
+            qc.querySelectorAll(`.asq-crit[data-qi="${qi}"]`).forEach(inp => { q.criteria[+inp.dataset.ci].criterion = inp.value; });
+            qc.querySelectorAll(`.asq-crit-mk[data-qi="${qi}"]`).forEach(inp => { q.criteria[+inp.dataset.ci].marks = parseInt(inp.value) || 1; });
+        });
+    }
+    function renderQ() {
+        qc.innerHTML = questions.map((q, qi) => `<div class="card" style="padding:12px;margin-bottom:8px;background:#f8fafc">
+            <div class="flex-between" style="margin-bottom:6px"><span class="text-xs bold">Scenario ${qi + 1}</span>${questions.length > 1 ? `<button class="asq-del" data-qi="${qi}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.72rem">Remove</button>` : ''}</div>
+            <textarea class="form-input asq-text" data-qi="${qi}" rows="3" placeholder="Type or paste the real-life scenario and the task..." style="padding:8px;font-size:0.82rem;resize:vertical;font-family:inherit;margin-bottom:6px">${quizEsc(q.text)}</textarea>
+            <div class="text-xs text-gray" style="margin-bottom:4px">Marking rubric (criterion + marks):</div>
+            ${q.criteria.map((c, ci) => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <input type="text" class="form-input asq-crit" data-qi="${qi}" data-ci="${ci}" value="${quizEscAttr(c.criterion)}" placeholder="Criterion" style="padding:7px 9px;font-size:0.8rem;flex:1">
+                <input type="number" min="1" class="form-input asq-crit-mk" data-qi="${qi}" data-ci="${ci}" value="${c.marks}" style="padding:7px 9px;font-size:0.8rem;width:56px">
+                ${q.criteria.length > 1 ? `<button class="asq-crit-del" data-qi="${qi}" data-ci="${ci}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem">&times;</button>` : ''}</div>`).join('')}
+            <button class="asq-crit-add btn btn-outline" data-qi="${qi}" style="margin-top:4px;width:auto;padding:5px 10px;font-size:0.7rem">+ Criterion</button>
+        </div>`).join('');
+        qc.querySelectorAll('.asq-del').forEach(b => b.addEventListener('click', () => { syncQ(); questions.splice(+b.dataset.qi, 1); renderQ(); }));
+        qc.querySelectorAll('.asq-crit-add').forEach(b => b.addEventListener('click', () => { syncQ(); questions[+b.dataset.qi].criteria.push({ criterion: '', marks: 1 }); renderQ(); }));
+        qc.querySelectorAll('.asq-crit-del').forEach(b => b.addEventListener('click', () => { syncQ(); questions[+b.dataset.qi].criteria.splice(+b.dataset.ci, 1); renderQ(); }));
+    }
+    modal.querySelector('#as-addq').addEventListener('click', () => { syncQ(); questions.push({ text: '', criteria: [{ criterion: '', marks: 1 }] }); renderQ(); });
+    modal.querySelector('#as-addbank').addEventListener('click', () => {
+        syncQ();
+        const subjectId = (modal.querySelector('#as-class').value || '').split('|')[1];
+        if (!subjectId || subjectId === 'null') { alert('Select a class first.'); return; }
+        showAssessmentBankPicker(api, subjectId, (added) => { added.forEach(q => questions.push(q)); renderQ(); });
+    });
+    modal.querySelector('#as-save').addEventListener('click', async () => {
+        syncQ();
+        const errEl = modal.querySelector('#as-err'); const showErr = m => { errEl.textContent = m; errEl.style.display = ''; };
+        const title = modal.querySelector('#as-title').value.trim();
+        const [classSectionId, subjectId, gradeId] = (modal.querySelector('#as-class').value || '').split('|');
+        if (!title) return showErr('Enter a title.');
+        if (!classSectionId) return showErr('Select a class.');
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            if (!q.text.trim()) return showErr(`Scenario ${i + 1}: enter the question.`);
+            if (q.criteria.some(c => !c.criterion.trim())) return showErr(`Scenario ${i + 1}: fill in all rubric criteria.`);
+        }
+        const payload = {
+            title, class_section_id: parseInt(classSectionId),
+            subject_id: subjectId && subjectId !== 'null' ? parseInt(subjectId) : null,
+            grade_id: gradeId && gradeId !== 'null' ? parseInt(gradeId) : null,
+            description: modal.querySelector('#as-desc').value.trim() || null,
+            due_at: modal.querySelector('#as-due').value || null,
+            questions: questions.map(q => ({ question_text: q.text.trim(), criteria: q.criteria.map(c => ({ criterion: c.criterion.trim(), max_marks: c.marks })) })),
+        };
+        const btn = modal.querySelector('#as-save'); btn.disabled = true; btn.innerHTML = '<div class="btn-spinner"></div> Creating...';
+        try { await api.createAssessment(payload); close(); renderAssessments(pageEl, api); }
+        catch (e) { showErr(e.message); btn.disabled = false; btn.textContent = 'Create Assessment'; }
+    });
+    renderQ();
+}
+
+async function showAssessmentBankPicker(api, subjectId, onConfirm) {
+    const modal = document.createElement('div'); modal.className = 'modal-overlay'; document.body.appendChild(modal);
+    const close = () => modal.remove(); modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    modal.innerHTML = `<div class="modal" style="max-height:88vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="list-title" style="font-size:0.95rem">Add scenario from bank</div><button id="ap-close" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text3)">&times;</button></div>
+        <div id="ap-list"><div class="card"><div class="card-empty">Loading…</div></div></div>
+        <button id="ap-add" class="btn btn-primary" style="margin-top:10px;padding:10px" disabled>Add selected</button></div>`;
+    modal.querySelector('#ap-close').onclick = close;
+    const listEl = modal.querySelector('#ap-list'); const addBtn = modal.querySelector('#ap-add');
+    let items = [];
+    try { items = await api.getQuestionBank({ subject_id: subjectId, type: 'scenario' }); }
+    catch (e) { listEl.innerHTML = `<div class="card"><div class="card-empty">${e.message}</div></div>`; return; }
+    if (!items.length) { listEl.innerHTML = '<div class="card"><div class="card-empty">No scenario questions in the bank for this subject yet.</div></div>'; return; }
+    listEl.innerHTML = items.map(i => `<label class="card" style="display:block;cursor:pointer"><div style="padding:10px 14px;display:flex;gap:8px;align-items:flex-start"><input type="checkbox" class="ap-check" data-id="${i.id}" style="margin-top:3px"><div><div style="font-size:0.82rem;font-weight:600">${quizEsc((i.question_text || '').slice(0, 120))}${(i.question_text || '').length > 120 ? '…' : ''}</div><div class="text-xs text-gray mt-2">${i.curriculum === 'cbc' ? 'CBC' : 'Ordinary'} · ${i.max_marks} mk${i.topic ? ' · ' + quizEsc(i.topic) : ''}</div></div></div></label>`).join('');
+    const refresh = () => { addBtn.disabled = !listEl.querySelectorAll('.ap-check:checked').length; };
+    listEl.querySelectorAll('.ap-check').forEach(c => c.addEventListener('change', refresh));
+    addBtn.addEventListener('click', async () => {
+        const ids = Array.from(listEl.querySelectorAll('.ap-check:checked')).map(c => c.dataset.id);
+        if (!ids.length) return; addBtn.disabled = true; addBtn.innerHTML = '<div class="btn-spinner"></div> Adding...';
+        try {
+            const details = await Promise.all(ids.map(id => api.getBankItem(id)));
+            const mapped = details.map(d => {
+                const criteria = (d.rubric || []).map(r => ({ criterion: r.criterion, marks: r.max_marks }));
+                return { text: d.question_text, criteria: criteria.length ? criteria : [{ criterion: 'Overall response', marks: 1 }] };
+            });
+            onConfirm(mapped); close();
+        } catch (e) { addBtn.disabled = false; addBtn.textContent = 'Add selected'; alert(e.message); }
+    });
+}
+
+async function showAssessmentSubmissions(el, api, classes, assessmentId) {
+    try {
+        const data = await api.getAssessmentSubmissions(assessmentId);
+        let html = '<div class="dash-scroll">';
+        html += `<button id="as-back" class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:0.7rem;margin-bottom:10px">← Back</button>`;
+        html += `<div style="font-size:1rem;font-weight:700">${quizEsc(data.title)}</div><div class="text-xs text-gray" style="margin-bottom:12px">${data.submissions.length} submission(s) · ${data.total_marks} marks</div>`;
+        if (!data.submissions.length) html += '<div class="card"><div class="card-empty">No pupil submissions yet.</div></div>';
+        else for (const s of data.submissions) {
+            const badge = s.status === 'marked' ? `<span class="badge badge-green">${s.percentage}%</span>` : '<span class="badge badge-amber">To mark</span>';
+            html += `<div class="card"><div style="padding:10px 14px" class="flex-between"><div><div class="list-title">${quizEsc(s.student || '')}</div><div class="list-sub">${s.submitted_at || ''}${s.status === 'marked' ? ' · ' + s.score + '/' + data.total_marks : ''}</div></div>
+            <div style="display:flex;gap:6px;align-items:center">${badge}<button class="btn btn-outline as-mark" data-id="${s.id}" style="width:auto;padding:5px 11px;font-size:0.7rem">${s.status === 'marked' ? 'Review' : 'Mark'}</button></div></div></div>`;
+        }
+        html += '</div>'; el.innerHTML = html;
+        document.getElementById('as-back').addEventListener('click', () => renderAssessments(el, api));
+        el.querySelectorAll('.as-mark').forEach(b => b.addEventListener('click', () => showMarkSubmission(el, api, classes, b.dataset.id, assessmentId)));
+    } catch (err) { el.innerHTML = `<div class="dash-scroll card-empty">${err.message}</div>`; }
+}
+
+async function showMarkSubmission(el, api, classes, submissionId, assessmentId) {
+    try {
+        const data = await api.getAssessmentSubmission(submissionId);
+        let html = '<div class="dash-scroll">';
+        html += `<button id="mk-back" class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:0.7rem;margin-bottom:10px">← Back</button>`;
+        html += `<div style="font-size:0.95rem;font-weight:700;margin-bottom:8px">Mark submission</div>`;
+        for (const q of data.questions) {
+            html += `<div class="card" style="margin-bottom:8px"><div style="padding:12px 14px">
+                <div class="text-sm bold">${quizEsc(q.question_text)}</div>
+                <div class="text-sm" style="margin-top:6px;background:#f8fafc;padding:8px;border-radius:6px;white-space:pre-wrap;color:var(--text2)">${q.response_text ? quizEsc(q.response_text) : '<span class="text-gray">No answer.</span>'}</div>
+                <div class="text-xs text-gray" style="margin:8px 0 4px">Award marks:</div>
+                ${q.criteria.map(c => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="flex:1;font-size:0.78rem">${quizEsc(c.criterion)}</div><input type="number" min="0" max="${c.max_marks}" class="form-input mk-crit" data-crit="${c.id}" value="${c.awarded != null ? c.awarded : ''}" placeholder="0" style="padding:6px 8px;font-size:0.8rem;width:56px"><span class="text-xs text-gray">/ ${c.max_marks}</span></div>`).join('')}
+            </div></div>`;
+        }
+        html += `<div id="mk-err" class="form-error" style="display:none;margin:8px 0"></div><button id="mk-save" class="btn btn-primary" style="padding:11px">Save marks</button></div>`;
+        el.innerHTML = html;
+        document.getElementById('mk-back').addEventListener('click', () => showAssessmentSubmissions(el, api, classes, assessmentId));
+        document.getElementById('mk-save').addEventListener('click', async () => {
+            const marks = Array.from(el.querySelectorAll('.mk-crit')).map(inp => ({ criterion_id: parseInt(inp.dataset.crit), awarded: parseFloat(inp.value) || 0 }));
+            const btn = document.getElementById('mk-save'); btn.disabled = true; btn.innerHTML = '<div class="btn-spinner"></div> Saving...';
+            try { await api.markAssessmentSubmission(submissionId, marks); showAssessmentSubmissions(el, api, classes, assessmentId); }
+            catch (e) { const errEl = document.getElementById('mk-err'); errEl.textContent = e.message; errEl.style.display = ''; btn.disabled = false; btn.textContent = 'Save marks'; }
+        });
+    } catch (err) { el.innerHTML = `<div class="dash-scroll card-empty">${err.message}</div>`; }
+}
+
+function renderSbaGradebook(el, api, classes) {
+    let html = '<div class="dash-scroll">';
+    html += `<button id="sba-back" class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:0.7rem;margin-bottom:10px">← Back</button>`;
+    html += `<div style="font-size:1rem;font-weight:700;margin-bottom:8px">SBA Gradebook</div>`;
+    html += `<div class="form-group"><label class="form-label">Class & Subject</label><select id="sba-class" class="form-input" style="padding:9px"><option value="">— select —</option>${asClassOptions(classes)}</select></div>`;
+    html += `<div id="sba-body"></div></div>`;
+    el.innerHTML = html;
+    document.getElementById('sba-back').addEventListener('click', () => renderAssessments(el, api));
+    const body = document.getElementById('sba-body');
+    document.getElementById('sba-class').addEventListener('change', async (e) => {
+        const [classId, subjectId] = (e.target.value || '').split('|');
+        if (!classId) { body.innerHTML = ''; return; }
+        body.innerHTML = '<div class="card"><div class="card-empty">Loading…</div></div>';
+        try {
+            const data = await api.getSba(classId, subjectId);
+            if (!data.students.length) { body.innerHTML = '<div class="card"><div class="card-empty">No pupils in this class.</div></div>'; return; }
+            body.innerHTML = data.students.map(s => `<div class="card"><div style="padding:8px 12px;display:flex;align-items:center;gap:8px"><div style="flex:1;font-size:0.82rem;font-weight:600">${quizEsc(s.name)}</div>
+                <input type="number" min="0" class="form-input sba-score" data-id="${s.student_id}" value="${s.score != null ? s.score : ''}" placeholder="score" style="padding:6px 8px;font-size:0.8rem;width:64px">
+                <span class="text-xs text-gray">/</span>
+                <input type="number" min="1" class="form-input sba-max" data-id="${s.student_id}" value="${s.max_score || 100}" style="padding:6px 8px;font-size:0.8rem;width:56px"></div></div>`).join('')
+                + `<div id="sba-err" class="form-error" style="display:none;margin:8px 0"></div><button id="sba-save" class="btn btn-primary" style="padding:11px;margin-top:8px">Save SBA marks</button>`;
+            document.getElementById('sba-save').addEventListener('click', async () => {
+                const marks = data.students.map(s => {
+                    const sc = body.querySelector(`.sba-score[data-id="${s.student_id}"]`).value;
+                    const mx = body.querySelector(`.sba-max[data-id="${s.student_id}"]`).value;
+                    return { student_id: s.student_id, score: sc === '' ? null : parseFloat(sc), max_score: parseFloat(mx) || 100 };
+                });
+                const btn = document.getElementById('sba-save'); btn.disabled = true; btn.innerHTML = '<div class="btn-spinner"></div> Saving...';
+                try { const r = await api.saveSba({ class_section_id: parseInt(classId), subject_id: parseInt(subjectId), marks }); btn.textContent = r.message || 'Saved'; setTimeout(() => { btn.disabled = false; btn.textContent = 'Save SBA marks'; }, 1500); }
+                catch (e) { const errEl = document.getElementById('sba-err'); errEl.textContent = e.message; errEl.style.display = ''; btn.disabled = false; btn.textContent = 'Save SBA marks'; }
+            });
+        } catch (err) { body.innerHTML = `<div class="card"><div class="card-empty">${err.message}</div></div>`; }
+    });
+}
+
+function renderSubjectSummary(el, api, classes) {
+    let html = '<div class="dash-scroll">';
+    html += `<button id="sum-back" class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:0.7rem;margin-bottom:10px">← Back</button>`;
+    html += `<div style="font-size:1rem;font-weight:700;margin-bottom:8px">Subject Summary</div>`;
+    html += `<div class="form-group"><label class="form-label">Class & Subject</label><select id="sum-class" class="form-input" style="padding:9px"><option value="">— select —</option>${asClassOptions(classes)}</select></div>`;
+    html += `<div id="sum-body"></div></div>`;
+    el.innerHTML = html;
+    document.getElementById('sum-back').addEventListener('click', () => renderAssessments(el, api));
+    const body = document.getElementById('sum-body');
+    document.getElementById('sum-class').addEventListener('change', async (e) => {
+        const [classId, subjectId] = (e.target.value || '').split('|');
+        if (!classId) { body.innerHTML = ''; return; }
+        body.innerHTML = '<div class="card"><div class="card-empty">Loading…</div></div>';
+        try {
+            const data = await api.getAssessmentSummary(classId, subjectId);
+            let h = `<div class="text-xs text-gray" style="margin-bottom:8px">Final = ${data.theory_weight}% Theory + ${data.sba_weight}% SBA</div>`;
+            for (const r of data.results) {
+                const fb = r.final_pct != null ? `<span class="badge ${r.final_pct >= 50 ? 'badge-green' : 'badge-red'}">${r.final_pct}%</span>` : '<span class="badge badge-amber">—</span>';
+                h += `<div class="card"><div style="padding:8px 12px" class="flex-between"><div><div class="list-title">${quizEsc(r.name)}</div><div class="list-sub">Theory ${r.theory_pct != null ? r.theory_pct + '%' : '—'} · SBA ${r.sba_pct != null ? r.sba_pct + '%' : '—'}</div></div>${fb}</div></div>`;
+            }
+            body.innerHTML = h;
+        } catch (err) { body.innerHTML = `<div class="card"><div class="card-empty">${err.message}</div></div>`; }
+    });
+}
+
+async function showWeightingModal(api) {
+    let s;
+    try { s = await api.getEczSettings(); } catch (e) { alert(e.message); return; }
+    const modal = document.createElement('div'); modal.className = 'modal-overlay'; document.body.appendChild(modal);
+    const close = () => modal.remove(); modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    modal.innerHTML = `<div class="modal">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="list-title" style="font-size:0.95rem">ECZ Weighting</div><button id="w-close" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text3)">&times;</button></div>
+        <div class="text-xs text-gray" style="margin-bottom:8px">Theory + SBA must total 100%.</div>
+        <div style="display:flex;gap:8px">
+            <div class="form-group" style="flex:1"><label class="form-label">Theory %</label><input id="w-theory" type="number" min="0" max="100" class="form-input" style="padding:9px" value="${s.theory_weight}"></div>
+            <div class="form-group" style="flex:1"><label class="form-label">SBA %</label><input id="w-sba" type="number" min="0" max="100" class="form-input" style="padding:9px" value="${s.sba_weight}"></div>
+        </div>
+        <div id="w-err" class="form-error" style="display:none;margin:8px 0"></div>
+        <button id="w-save" class="btn btn-primary" style="padding:11px">Save</button></div>`;
+    modal.querySelector('#w-close').onclick = close;
+    modal.querySelector('#w-save').addEventListener('click', async () => {
+        const theory = parseInt(modal.querySelector('#w-theory').value) || 0;
+        const sba = parseInt(modal.querySelector('#w-sba').value) || 0;
+        const errEl = modal.querySelector('#w-err');
+        if (theory + sba !== 100) { errEl.textContent = 'Theory + SBA must total 100%.'; errEl.style.display = ''; return; }
+        const btn = modal.querySelector('#w-save'); btn.disabled = true; btn.textContent = 'Saving...';
+        try { await api.saveEczSettings({ theory_weight: theory, sba_weight: sba }); close(); }
+        catch (e) { errEl.textContent = e.message; errEl.style.display = ''; btn.disabled = false; btn.textContent = 'Save'; }
     });
 }

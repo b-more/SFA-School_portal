@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sfa-parent-v10';
+const CACHE_NAME = 'sfa-parent-v11';
 const API_CACHE = 'sfa-api-cache-v1';
 const ASSETS = ['/', '/css/app.css', '/js/app.js', '/js/api.js', '/js/pages/splash.js', '/js/pages/login.js', '/js/pages/dashboard.js'];
 

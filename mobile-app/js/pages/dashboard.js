@@ -73,6 +73,7 @@ export async function renderDashboard(container, api, settings) {
                     <a href="#/dashboard/payments" class="drawer-link">${SVG.wallet}<span>Payments</span></a>
                     <a href="#/dashboard/homework" class="drawer-link">${SVG.homework}<span>Homework</span></a>
                     <a href="#/dashboard/quiz" class="drawer-link">${SVG.check}<span>Quizzes</span></a>
+                    <a href="#/dashboard/assessments" class="drawer-link">${SVG.news}<span>Assessments</span></a>
                     <a href="#/dashboard/library" class="drawer-link">${SVG.book}<span>Library</span></a>
                     <a href="#/dashboard/timetable" class="drawer-link">${SVG.clock}<span>Timetable</span></a>
                     <a href="#/dashboard/report-cards" class="drawer-link">${SVG.download}<span>Report Cards</span></a>
@@ -134,6 +135,7 @@ export async function renderDashboard(container, api, settings) {
     else if (hash.includes('/events')) await renderEvents(content, api, children);
     else if (hash.includes('/payments')) await renderPayments(content, api);
     else if (hash.includes('/quiz')) await renderQuizzesPage(content, api, children);
+    else if (hash.includes('/assessments')) await renderAssessmentsPage(content, api, children);
     else if (hash.includes('/homework')) await renderHomeworkPage(content, api, children);
     else if (hash.includes('/library')) await renderLibraryPage(content, api, children);
     else if (hash.includes('/timetable')) await renderTimetablePage(content, api, children);
@@ -2468,4 +2470,77 @@ async function showQuizTake(el, api, children, child, quizId) {
     }
 
     renderIntro();
+}
+
+// ─── CBC ASSESSMENTS (parent/pupil) ───
+async function renderAssessmentsPage(el, api, children) {
+    el.innerHTML = '<div class="dash-scroll"><div class="skeleton skeleton-card"></div></div>';
+    try {
+        const perChild = await Promise.all(children.map(c =>
+            api.getAssessments(c.id).then(a => ({ child: c, items: a })).catch(() => ({ child: c, items: [] }))));
+        let html = '<div class="dash-scroll"><div style="font-size:1.05rem;font-weight:700;margin-bottom:10px">Assessments</div>';
+        for (const { child, items } of perChild) {
+            html += `<div class="text-xs bold text-gray" style="margin:12px 0 6px;text-transform:uppercase;letter-spacing:0.04em">${pquizEsc(child.name)}${child.class ? ' · ' + child.class : ''}</div>`;
+            if (!items.length) { html += `<div class="card"><div style="padding:14px;text-align:center;color:#9ca3af;font-size:0.85rem">No assessments assigned.</div></div>`; continue; }
+            for (const a of items) {
+                let badge, action;
+                if (a.submission_status === 'marked') { badge = `<span class="badge ${a.percentage >= 50 ? 'badge-green' : 'badge-red'}">${a.percentage}%</span>`; action = 'View result'; }
+                else if (a.submission_status === 'submitted') { badge = '<span class="badge badge-amber">Awaiting marking</span>'; action = 'View'; }
+                else if (a.closed) { badge = '<span class="badge" style="background:#9ca3af;color:#fff">Closed</span>'; action = null; }
+                else { badge = '<span class="badge badge-amber">Not done</span>'; action = 'Start'; }
+                html += `<div class="card"><div style="padding:12px 14px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-weight:700;font-size:0.9rem">${pquizEsc(a.title)}</div>${badge}</div>
+                    <div class="text-xs text-gray" style="margin-top:4px">${a.subject || ''} · ${a.num_questions} question${a.num_questions > 1 ? 's' : ''} · ${a.total_marks} marks</div>
+                    ${action ? `<button class="btn btn-primary as-open" data-child="${child.id}" data-id="${a.id}" style="width:auto;padding:8px 16px;font-size:0.75rem;margin-top:8px">${action}</button>` : ''}
+                </div></div>`;
+            }
+        }
+        html += '</div>'; el.innerHTML = html;
+        el.querySelectorAll('.as-open').forEach(b => b.addEventListener('click', () => {
+            const child = children.find(c => String(c.id) === b.dataset.child);
+            showAssessmentTake(el, api, children, child, b.dataset.id);
+        }));
+    } catch (err) {
+        el.innerHTML = `<div class="dash-scroll"><div class="card"><div style="padding:14px;text-align:center;color:#9ca3af">${err.message}</div></div></div>`;
+    }
+}
+
+async function showAssessmentTake(el, api, children, child, assessmentId) {
+    el.innerHTML = '<div class="dash-scroll"><div class="skeleton skeleton-card"></div></div>';
+    let a;
+    try { a = await api.getAssessment(child.id, assessmentId); }
+    catch (err) { el.innerHTML = `<div class="dash-scroll"><div class="card"><div style="padding:14px;text-align:center;color:#9ca3af">${err.message}</div></div></div>`; return; }
+    const marked = a.submission_status === 'marked';
+    const submitted = a.submission_status === 'submitted' || marked;
+    let html = '<div class="dash-scroll">';
+    html += `<button id="as-back" class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:0.72rem;margin-bottom:10px">← Back</button>`;
+    html += `<div style="font-size:1.1rem;font-weight:700">${pquizEsc(a.title)}</div>`;
+    if (a.subject) html += `<div class="text-xs text-gray" style="margin-top:2px">${a.subject} · ${a.total_marks} marks</div>`;
+    if (a.description) html += `<div class="text-sm" style="margin-top:8px;color:#4b5563">${pquizEsc(a.description)}</div>`;
+    if (marked) html += `<div class="card" style="margin-top:10px"><div style="padding:14px;text-align:center"><div style="font-size:1.6rem;font-weight:800;color:${a.percentage >= 50 ? '#059669' : '#dc2626'}">${a.percentage}%</div><div class="text-sm bold" style="margin-top:2px">${a.score} / ${a.total_marks}</div></div></div>`;
+    else if (submitted) html += `<div class="card" style="margin-top:10px"><div style="padding:12px;text-align:center;color:#d97706;font-size:0.85rem">Submitted — awaiting your teacher's marking.</div></div>`;
+
+    a.questions.forEach((q, qi) => {
+        html += `<div class="card" style="margin-top:8px"><div style="padding:12px 14px">
+            <div style="font-weight:600;font-size:0.88rem">${qi + 1}. ${pquizEsc(q.question_text)} <span class="text-xs text-gray">(${q.points} mk)</span></div>`;
+        if (!submitted) {
+            html += `<textarea class="as-answer" data-id="${q.id}" rows="5" placeholder="Type your answer..." style="width:100%;margin-top:8px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:0.85rem;resize:vertical;box-sizing:border-box"></textarea>`;
+        } else {
+            html += `<div class="text-sm" style="margin-top:8px;background:#f8fafc;padding:8px;border-radius:6px;white-space:pre-wrap;color:#374151">${q.response_text ? pquizEsc(q.response_text) : '<span style="color:#9ca3af">No answer.</span>'}</div>`;
+            if (marked && q.criteria) {
+                html += `<div style="margin-top:8px">` + q.criteria.map(c => `<div style="display:flex;justify-content:space-between;font-size:0.76rem;padding:2px 0"><span>${pquizEsc(c.criterion)}</span><span class="bold">${c.awarded != null ? c.awarded : 0} / ${c.max_marks}</span></div>`).join('') + `</div>`;
+            }
+        }
+        html += '</div></div>';
+    });
+    if (!submitted) html += `<button id="as-submit" class="btn btn-primary" style="margin:10px 0 4px">Submit</button>`;
+    html += '</div>'; el.innerHTML = html;
+    document.getElementById('as-back').addEventListener('click', () => renderAssessmentsPage(el, api, children));
+    const submitBtn = document.getElementById('as-submit');
+    if (submitBtn) submitBtn.addEventListener('click', async () => {
+        const answers = a.questions.map(q => ({ question_id: q.id, response_text: (el.querySelector(`.as-answer[data-id="${q.id}"]`)?.value || '') }));
+        submitBtn.disabled = true; submitBtn.textContent = 'Submitting...';
+        try { await api.submitAssessment(child.id, assessmentId, answers); showAssessmentTake(el, api, children, child, assessmentId); }
+        catch (e) { submitBtn.disabled = false; submitBtn.textContent = 'Submit'; alert(e.message); }
+    });
 }

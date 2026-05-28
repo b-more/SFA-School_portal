@@ -1,7 +1,7 @@
-import { api, SERVER_BASE } from './api.js?v=9';
-import { renderSplash } from './pages/splash.js?v=9';
-import { renderLogin } from './pages/login.js?v=9';
-import { renderDashboard } from './pages/dashboard.js?v=9';
+import { api, SERVER_BASE } from './api.js?v=10';
+import { renderSplash } from './pages/splash.js?v=10';
+import { renderLogin } from './pages/login.js?v=10';
+import { renderDashboard } from './pages/dashboard.js?v=10';
 
 const app = document.getElementById('app');
 let schoolSettings = null;

@@ -101,6 +101,10 @@ class Api {
     getQuiz(studentId, quizId) { return this.get(`/children/${studentId}/quizzes/${quizId}`); }
     startQuiz(studentId, quizId) { return this.post(`/children/${studentId}/quizzes/${quizId}/start`, {}); }
     submitQuiz(studentId, quizId, attemptId, answers) { return this.post(`/children/${studentId}/quizzes/${quizId}/submit`, { attempt_id: attemptId, answers }); }
+    // CBC assessments
+    getAssessments(studentId) { return this.get(`/children/${studentId}/assessments`); }
+    getAssessment(studentId, id) { return this.get(`/children/${studentId}/assessments/${id}`); }
+    submitAssessment(studentId, id, answers) { return this.post(`/children/${studentId}/assessments/${id}/submit`, { answers }); }
     submitHomework(studentId, homeworkId, content, file) {
         if (file) {
             const formData = new FormData();

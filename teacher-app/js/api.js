@@ -87,6 +87,21 @@ class Api {
     updateBankItem(id, payload) { return this.request(`/question-bank/${id}`, { method: 'PUT', body: JSON.stringify(payload) }); }
     deleteBankItem(id) { return this.request(`/question-bank/${id}`, { method: 'DELETE' }); }
 
+    // CBC assessments (scenario / Theory), SBA, weighting
+    getAssessments() { return this.get('/assessments'); }
+    createAssessment(payload) { return this.post('/assessments', payload); }
+    getAssessment(id) { return this.get(`/assessments/${id}`); }
+    getAssessmentSubmissions(id) { return this.get(`/assessments/${id}/submissions`); }
+    getAssessmentSubmission(subId) { return this.get(`/assessment-submissions/${subId}`); }
+    markAssessmentSubmission(subId, marks) { return this.post(`/assessment-submissions/${subId}/mark`, { marks }); }
+    closeAssessment(id) { return this.post(`/assessments/${id}/close`, {}); }
+    deleteAssessment(id) { return this.request(`/assessments/${id}`, { method: 'DELETE' }); }
+    getSba(classSectionId, subjectId) { return this.get(`/sba?class_section_id=${classSectionId}&subject_id=${subjectId}`); }
+    saveSba(payload) { return this.post('/sba', payload); }
+    getEczSettings() { return this.get('/ecz-settings'); }
+    saveEczSettings(payload) { return this.post('/ecz-settings', payload); }
+    getAssessmentSummary(classSectionId, subjectId) { return this.get(`/assessment-summary?class_section_id=${classSectionId}&subject_id=${subjectId}`); }
+
     // Results
     enterResults(data) { return this.post('/results/enter', data); }
     getResults(classSectionId, subjectId) { return this.get(`/results/${classSectionId}/${subjectId}`); }

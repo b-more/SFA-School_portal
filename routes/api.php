@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ParentApiController;
 use App\Http\Controllers\Api\ParentQuizController;
+use App\Http\Controllers\Api\ParentAssessmentController;
 use Illuminate\Support\Facades\Route;
 
 // Public
@@ -39,6 +40,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/children/{student}/quizzes/{quiz}', [ParentQuizController::class, 'show']);
     Route::post('/children/{student}/quizzes/{quiz}/start', [ParentQuizController::class, 'start']);
     Route::post('/children/{student}/quizzes/{quiz}/submit', [ParentQuizController::class, 'submit']);
+
+    // CBC assessments (scenario, teacher-marked)
+    Route::get('/children/{student}/assessments', [ParentAssessmentController::class, 'index']);
+    Route::get('/children/{student}/assessments/{assessment}', [ParentAssessmentController::class, 'show']);
+    Route::post('/children/{student}/assessments/{assessment}/submit', [ParentAssessmentController::class, 'submit']);
 
     // Payments
     Route::post('/children/{student}/pay', [ParentApiController::class, 'initiatePayment']);
