@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\TeacherAuthController;
 use App\Http\Controllers\Api\TeacherApiController;
+use App\Http\Controllers\Api\TeacherQuizController;
+use App\Http\Controllers\Api\TeacherQuestionBankController;
 use Illuminate\Support\Facades\Route;
 
 // Public
@@ -16,6 +18,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/dashboard', [TeacherApiController::class, 'dashboard']);
     Route::get('/head-dashboard', [TeacherApiController::class, 'headDashboard']);
+
+    // Quizzes
+    Route::get('/quizzes', [TeacherQuizController::class, 'index']);
+    Route::post('/quizzes', [TeacherQuizController::class, 'store']);
+    Route::get('/quizzes/{quiz}', [TeacherQuizController::class, 'show']);
+    Route::get('/quizzes/{quiz}/results', [TeacherQuizController::class, 'results']);
+    Route::post('/quizzes/{quiz}/close', [TeacherQuizController::class, 'close']);
+    Route::delete('/quizzes/{quiz}', [TeacherQuizController::class, 'destroy']);
+
+    // Question bank
+    Route::get('/question-bank/meta', [TeacherQuestionBankController::class, 'meta']);
+    Route::get('/question-bank', [TeacherQuestionBankController::class, 'index']);
+    Route::post('/question-bank', [TeacherQuestionBankController::class, 'store']);
+    Route::get('/question-bank/{item}', [TeacherQuestionBankController::class, 'show']);
+    Route::put('/question-bank/{item}', [TeacherQuestionBankController::class, 'update']);
+    Route::delete('/question-bank/{item}', [TeacherQuestionBankController::class, 'destroy']);
     Route::get('/my-classes', [TeacherApiController::class, 'myClasses']);
     Route::get('/class/{classSectionId}/students', [TeacherApiController::class, 'classStudents']);
 

@@ -49,6 +49,8 @@ export async function renderDashboard(container, api, settings) {
                     <a href="#/dashboard/classes" class="drawer-link">${SVG.users}<span>My Classes</span></a>
                     <a href="#/dashboard/attendance" class="drawer-link">${SVG.check}<span>Attendance</span></a>
                     <a href="#/dashboard/homework" class="drawer-link">${SVG.clipboard}<span>Homework</span></a>
+                    <a href="#/dashboard/quiz" class="drawer-link">${SVG.check}<span>Quizzes</span></a>
+                    <a href="#/dashboard/question-bank" class="drawer-link">${SVG.clipboard}<span>Question Bank</span></a>
                     <a href="#/dashboard/results" class="drawer-link">${SVG.chart}<span>Results</span></a>
                     <a href="#/dashboard/timetable" class="drawer-link">${SVG.clock}<span>Timetable</span></a>` : ''}
                     <a href="#/dashboard/notices" class="drawer-link">${SVG.megaphone}<span>Notices</span></a>
@@ -129,6 +131,8 @@ export async function renderDashboard(container, api, settings) {
     else if (hash.includes('/cpd-observations')) await renderCpdObservations(content, api);
     else if (hash.includes('/cpd')) await renderCpdDashboard(content, api);
     else if (hash.includes('/hw-analytics')) await renderHwAnalytics(content, api);
+    else if (hash.includes('/question-bank')) await renderQuestionBank(content, api);
+    else if (hash.includes('/quiz')) await renderQuiz(content, api);
     else if (hash.includes('/homework')) await renderHomework(content, api);
     else if (hash.includes('/results')) await renderResults(content, api);
     else if (hash.includes('/timetable')) await renderTimetable(content, api);
@@ -2244,4 +2248,406 @@ async function renderProfile(el, api, user) {
             try { await api.logout(); } catch {} api.setToken(null); localStorage.removeItem('teacher_data'); window.location.hash = '#/login';
         });
     } catch (err) { el.innerHTML = `<div class="dash-scroll card-empty">${err.message}</div>`; }
+}
+
+// ─── QUIZZES (teacher) ───
+function quizEsc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function quizEscAttr(s) { return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+async function renderQuiz(el, api) {
+    try {
+        const [quizzes, classes] = await Promise.all([api.getMyQuizzes(), api.getMyClasses()]);
+        let html = '<div class="dash-scroll">';
+        html += `<div class="flex-between" style="margin-bottom:12px">
+            <div style="font-size:1rem;font-weight:700">Quizzes</div>
+            <button id="btn-new-quiz" class="btn btn-primary" style="width:auto;padding:8px 14px;font-size:0.72rem">${SVG.plus} New</button></div>`;
+        if (!quizzes.length) {
+            html += '<div class="card"><div class="card-empty">No quizzes yet. Tap “New” to create one.</div></div>';
+        } else {
+            for (const q of quizzes) {
+                const timed = q.time_limit_minutes ? `${q.time_limit_minutes} min` : 'Untimed';
+                const statusBadge = q.status === 'closed' ? '<span class="badge badge-red">Closed</span>' : '<span class="badge badge-green">Open</span>';
+                html += `<div class="card"><div style="padding:12px 14px">
+                    <div class="flex-between"><div class="list-title">${quizEsc(q.title)}</div>${statusBadge}</div>
+                    <div class="list-sub mt-2">${q.class_section || ''}${q.subject ? ' · ' + q.subject : ''} · ${q.num_questions} Q · ${timed}</div>
+                    <div class="text-xs text-gray mt-2">${q.students_attempted} attempted${q.average_percentage !== null ? ' · avg ' + q.average_percentage + '%' : ''}</div>
+                    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+                        <button class="btn btn-outline btn-quiz-results" data-id="${q.id}" style="width:auto;padding:6px 12px;font-size:0.7rem">${SVG.chart} Results</button>
+                        ${q.status !== 'closed' ? `<button class="btn btn-outline btn-quiz-close" data-id="${q.id}" style="width:auto;padding:6px 12px;font-size:0.7rem">Close</button>` : ''}
+                        <button class="btn btn-outline btn-quiz-del" data-id="${q.id}" style="width:auto;padding:6px 12px;font-size:0.7rem;color:var(--red);border-color:var(--red)">Delete</button>
+                    </div></div></div>`;
+            }
+        }
+        html += '</div>';
+        el.innerHTML = html;
+
+        document.getElementById('btn-new-quiz')?.addEventListener('click', () => showNewQuizModal(api, el, classes));
+        el.querySelectorAll('.btn-quiz-results').forEach(b => b.addEventListener('click', () => showQuizResults(api, el, b.dataset.id)));
+        el.querySelectorAll('.btn-quiz-close').forEach(b => b.addEventListener('click', async () => {
+            if (!confirm('Close this quiz? Pupils will no longer be able to take it.')) return;
+            b.disabled = true;
+            try { await api.closeQuiz(b.dataset.id); renderQuiz(el, api); } catch (e) { alert(e.message); b.disabled = false; }
+        }));
+        el.querySelectorAll('.btn-quiz-del').forEach(b => b.addEventListener('click', async () => {
+            if (!confirm('Delete this quiz and all its attempts? This cannot be undone.')) return;
+            b.disabled = true;
+            try { await api.deleteQuiz(b.dataset.id); renderQuiz(el, api); } catch (e) { alert(e.message); b.disabled = false; }
+        }));
+    } catch (err) { el.innerHTML = `<div class="dash-scroll card-empty">${err.message}</div>`; }
+}
+
+function showNewQuizModal(api, pageEl, classes) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+    const close = () => modal.remove();
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+    const newQuestion = (type) => type === 'true_false'
+        ? { text: '', type: 'true_false', points: 1, options: [{ text: 'True', correct: true }, { text: 'False', correct: false }] }
+        : { text: '', type: 'mcq', points: 1, options: [{ text: '', correct: true }, { text: '', correct: false }] };
+    let questions = [newQuestion('mcq')];
+
+    modal.innerHTML = `<div class="modal" style="max-height:88vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div class="list-title" style="font-size:0.95rem">Create Quiz</div>
+            <button id="close-quiz" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text3)">&times;</button>
+        </div>
+        <div class="form-group"><label class="form-label">Title</label><input type="text" id="quiz-title" class="form-input" placeholder="e.g. Week 3 Maths Quiz" style="padding:10px 12px"></div>
+        <div class="form-group"><label class="form-label">Class & Subject</label>
+            <select id="quiz-class" class="form-input" style="padding:10px 12px">
+                ${classes.map(c => `<option value="${c.class_section_id}|${c.subject_id}|${c.grade_id}">${c.grade} ${c.class_section} - ${c.subject}</option>`).join('')}
+            </select></div>
+        <div class="form-group"><label class="form-label">Instructions (optional)</label><textarea id="quiz-desc" class="form-input" rows="2" placeholder="Any instructions for pupils..." style="padding:10px 12px;resize:vertical;font-family:inherit"></textarea></div>
+        <div class="form-group">
+            <label class="checkbox-wrap" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="quiz-timed"><span class="form-label" style="margin:0">Timed quiz</span></label>
+            <div id="quiz-time-wrap" style="display:none;margin-top:6px"><input type="number" id="quiz-minutes" class="form-input" min="1" value="10" placeholder="Minutes" style="padding:10px 12px"><div class="text-xs text-gray mt-2">Auto-submits when the time runs out.</div></div>
+        </div>
+        <div class="form-group"><label class="form-label">Due date (optional)</label><input type="date" id="quiz-due" class="form-input" style="padding:10px 12px"></div>
+        <div style="font-weight:700;font-size:0.82rem;margin:10px 0 6px">Questions</div>
+        <div id="quiz-questions"></div>
+        <button id="add-question" class="btn btn-outline" style="margin-top:6px;width:auto;padding:7px 12px;font-size:0.72rem">${SVG.plus} Add Question</button>
+        <div id="quiz-err" class="form-error" style="display:none;margin:10px 0 8px"></div>
+        <button id="quiz-submit" class="btn btn-primary" style="padding:11px;margin-top:10px">Create Quiz</button>
+    </div>`;
+
+    modal.querySelector('#close-quiz').onclick = close;
+    const timedCb = modal.querySelector('#quiz-timed');
+    const timeWrap = modal.querySelector('#quiz-time-wrap');
+    timedCb.addEventListener('change', () => { timeWrap.style.display = timedCb.checked ? '' : 'none'; });
+    const qContainer = modal.querySelector('#quiz-questions');
+
+    function questionHtml(q, qi) {
+        const opts = q.options.map((o, oi) => {
+            const radio = `<input type="radio" name="correct-${qi}" data-qi="${qi}" data-oi="${oi}" class="q-correct" ${o.correct ? 'checked' : ''}>`;
+            if (q.type === 'true_false') {
+                return `<label style="display:flex;align-items:center;gap:8px;padding:3px 0">${radio}<span style="font-size:0.82rem">${o.text}</span></label>`;
+            }
+            return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">${radio}
+                <input type="text" class="form-input q-opt" data-qi="${qi}" data-oi="${oi}" value="${quizEscAttr(o.text)}" placeholder="Option ${oi + 1}" style="padding:7px 9px;font-size:0.8rem;flex:1">
+                ${q.options.length > 2 ? `<button class="q-opt-del" data-qi="${qi}" data-oi="${oi}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem">&times;</button>` : ''}</div>`;
+        }).join('');
+        return `<div class="card" style="padding:12px;margin-bottom:8px;background:#f8fafc">
+            <div class="flex-between" style="margin-bottom:6px"><span class="text-xs bold">Question ${qi + 1}</span>
+                ${questions.length > 1 ? `<button class="q-del" data-qi="${qi}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.72rem">Remove</button>` : ''}</div>
+            <textarea class="form-input q-text" data-qi="${qi}" rows="2" placeholder="Enter the question..." style="padding:8px;font-size:0.82rem;resize:vertical;font-family:inherit;margin-bottom:6px">${quizEsc(q.text)}</textarea>
+            <div style="display:flex;gap:8px;margin-bottom:6px">
+                <select class="form-input q-type" data-qi="${qi}" style="padding:7px 9px;font-size:0.8rem;flex:1">
+                    <option value="mcq" ${q.type === 'mcq' ? 'selected' : ''}>Multiple choice</option>
+                    <option value="true_false" ${q.type === 'true_false' ? 'selected' : ''}>True / False</option>
+                </select>
+                <input type="number" class="form-input q-points" data-qi="${qi}" value="${q.points}" min="1" title="Points" style="padding:7px 9px;font-size:0.8rem;width:64px">
+            </div>
+            <div class="text-xs text-gray" style="margin-bottom:4px">Select the correct answer:</div>
+            ${opts}
+            ${q.type === 'mcq' && q.options.length < 6 ? `<button class="q-opt-add btn btn-outline" data-qi="${qi}" style="margin-top:4px;width:auto;padding:5px 10px;font-size:0.7rem">+ Option</button>` : ''}
+        </div>`;
+    }
+
+    function syncFromDom() {
+        questions.forEach((q, qi) => {
+            const t = qContainer.querySelector(`.q-text[data-qi="${qi}"]`); if (t) q.text = t.value;
+            const p = qContainer.querySelector(`.q-points[data-qi="${qi}"]`); if (p) q.points = parseInt(p.value) || 1;
+            if (q.type !== 'true_false') {
+                qContainer.querySelectorAll(`.q-opt[data-qi="${qi}"]`).forEach(inp => { q.options[+inp.dataset.oi].text = inp.value; });
+            }
+            qContainer.querySelectorAll(`.q-correct[data-qi="${qi}"]`).forEach(r => { q.options[+r.dataset.oi].correct = r.checked; });
+        });
+    }
+
+    function renderQuestions() {
+        qContainer.innerHTML = questions.map((q, qi) => questionHtml(q, qi)).join('');
+        qContainer.querySelectorAll('.q-type').forEach(s => s.addEventListener('change', () => {
+            syncFromDom(); const qi = +s.dataset.qi;
+            questions[qi] = { ...questions[qi], type: s.value, options: newQuestion(s.value).options };
+            renderQuestions();
+        }));
+        qContainer.querySelectorAll('.q-opt-add').forEach(b => b.addEventListener('click', () => {
+            syncFromDom(); questions[+b.dataset.qi].options.push({ text: '', correct: false }); renderQuestions();
+        }));
+        qContainer.querySelectorAll('.q-opt-del').forEach(b => b.addEventListener('click', () => {
+            syncFromDom(); const qi = +b.dataset.qi; questions[qi].options.splice(+b.dataset.oi, 1);
+            if (!questions[qi].options.some(o => o.correct)) questions[qi].options[0].correct = true;
+            renderQuestions();
+        }));
+        qContainer.querySelectorAll('.q-del').forEach(b => b.addEventListener('click', () => {
+            syncFromDom(); questions.splice(+b.dataset.qi, 1); renderQuestions();
+        }));
+    }
+
+    modal.querySelector('#add-question').addEventListener('click', () => { syncFromDom(); questions.push(newQuestion('mcq')); renderQuestions(); });
+
+    modal.querySelector('#quiz-submit').addEventListener('click', async () => {
+        syncFromDom();
+        const errEl = modal.querySelector('#quiz-err');
+        const showErr = (m) => { errEl.textContent = m; errEl.style.display = ''; };
+        const title = modal.querySelector('#quiz-title').value.trim();
+        const [classSectionId, subjectId, gradeId] = (modal.querySelector('#quiz-class').value || '').split('|');
+        const desc = modal.querySelector('#quiz-desc').value.trim();
+        const timed = modal.querySelector('#quiz-timed').checked;
+        const minutes = parseInt(modal.querySelector('#quiz-minutes').value) || null;
+        const due = modal.querySelector('#quiz-due').value;
+        if (!title) return showErr('Enter a quiz title.');
+        if (!classSectionId) return showErr('Select a class.');
+        if (!questions.length) return showErr('Add at least one question.');
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            if (!q.text.trim()) return showErr(`Question ${i + 1}: enter the question text.`);
+            if (q.options.some(o => !o.text.trim())) return showErr(`Question ${i + 1}: fill in all options.`);
+            if (q.options.filter(o => o.correct).length !== 1) return showErr(`Question ${i + 1}: mark exactly one correct answer.`);
+        }
+        if (timed && (!minutes || minutes < 1)) return showErr('Enter a valid time limit.');
+        errEl.style.display = 'none';
+        const payload = {
+            title, description: desc || null,
+            class_section_id: parseInt(classSectionId),
+            subject_id: subjectId && subjectId !== 'null' ? parseInt(subjectId) : null,
+            grade_id: gradeId && gradeId !== 'null' ? parseInt(gradeId) : null,
+            time_limit_minutes: timed ? minutes : null,
+            due_at: due || null,
+            questions: questions.map(q => ({
+                question_text: q.text.trim(), type: q.type, points: q.points,
+                options: q.options.map(o => ({ option_text: o.text.trim(), is_correct: !!o.correct })),
+            })),
+        };
+        const btn = modal.querySelector('#quiz-submit');
+        btn.disabled = true; btn.innerHTML = '<div class="btn-spinner"></div> Creating...';
+        try { await api.createQuiz(payload); close(); renderQuiz(pageEl, api); }
+        catch (e) { showErr(e.message); btn.disabled = false; btn.textContent = 'Create Quiz'; }
+    });
+
+    renderQuestions();
+}
+
+async function showQuizResults(api, pageEl, quizId) {
+    try {
+        const data = await api.getQuizResults(quizId);
+        let html = '<div class="dash-scroll">';
+        html += `<button id="quiz-back" class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:0.7rem;margin-bottom:10px">← Back</button>`;
+        html += `<div style="font-size:1rem;font-weight:700">${quizEsc(data.title)}</div>`;
+        html += `<div class="text-xs text-gray" style="margin-bottom:12px">${data.students_attempted}/${data.class_size} attempted${data.average_percentage !== null ? ' · class avg ' + data.average_percentage + '%' : ''}</div>`;
+        for (const r of data.results) {
+            const badge = r.best_percentage !== null
+                ? `<span class="badge ${r.best_percentage >= 50 ? 'badge-green' : 'badge-red'}">${r.best_percentage}%</span>`
+                : '<span class="badge badge-amber">Not attempted</span>';
+            html += `<div class="card"><div style="padding:10px 14px" class="flex-between">
+                <div><div class="list-title">${quizEsc(r.name)}</div>${r.attempts ? `<div class="list-sub">${r.best_score}/${data.total_points} · ${r.attempts} attempt${r.attempts > 1 ? 's' : ''} · ${r.last_attempt || ''}</div>` : ''}</div>
+                ${badge}</div></div>`;
+        }
+        html += '</div>';
+        pageEl.innerHTML = html;
+        document.getElementById('quiz-back').addEventListener('click', () => renderQuiz(pageEl, api));
+    } catch (err) { pageEl.innerHTML = `<div class="dash-scroll card-empty">${err.message}</div>`; }
+}
+
+// ─── QUESTION BANK (teacher) ───
+function qbTypeLabel(t) { return ({ mcq: 'MCQ', true_false: 'True/False', structured: 'Structured', scenario: 'Scenario' })[t] || t; }
+
+async function renderQuestionBank(el, api) {
+    let meta;
+    try { meta = await api.getQuestionBankMeta(); }
+    catch (err) { el.innerHTML = `<div class="dash-scroll card-empty">${err.message}</div>`; return; }
+    el.innerHTML = `<div class="dash-scroll">
+        <div class="flex-between" style="margin-bottom:10px">
+            <div style="font-size:1rem;font-weight:700">Question Bank</div>
+            <button id="qb-new" class="btn btn-primary" style="width:auto;padding:8px 14px;font-size:0.72rem">${SVG.plus} New</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+            <select id="qb-f-subject" class="form-input" style="flex:1;min-width:110px;padding:7px 9px;font-size:0.78rem"><option value="">All subjects</option>${meta.subjects.map(s => `<option value="${s.id}">${s.name || ''}</option>`).join('')}</select>
+            <select id="qb-f-curr" class="form-input" style="width:auto;padding:7px 9px;font-size:0.78rem"><option value="">Any curriculum</option><option value="ordinary">Ordinary</option><option value="cbc">New (CBC)</option></select>
+            <select id="qb-f-type" class="form-input" style="width:auto;padding:7px 9px;font-size:0.78rem"><option value="">Any type</option><option value="mcq">MCQ</option><option value="true_false">True/False</option><option value="structured">Structured</option><option value="scenario">Scenario</option></select>
+        </div>
+        <input id="qb-f-q" class="form-input" placeholder="Search question text or topic..." style="padding:8px 10px;font-size:0.8rem;margin-bottom:10px">
+        <div id="qb-list"><div class="card"><div class="card-empty">Loading…</div></div></div>
+    </div>`;
+    const listEl = el.querySelector('#qb-list');
+    async function load() {
+        listEl.innerHTML = '<div class="card"><div class="card-empty">Loading…</div></div>';
+        try {
+            const items = await api.getQuestionBank({
+                subject_id: el.querySelector('#qb-f-subject').value,
+                curriculum: el.querySelector('#qb-f-curr').value,
+                type: el.querySelector('#qb-f-type').value,
+                q: el.querySelector('#qb-f-q').value,
+            });
+            if (!items.length) { listEl.innerHTML = '<div class="card"><div class="card-empty">No questions found.</div></div>'; return; }
+            listEl.innerHTML = items.map(i => {
+                const tags = [i.subject, i.grade, i.topic, i.curriculum === 'cbc' ? 'CBC' : 'Ordinary', i.component, qbTypeLabel(i.type), i.max_marks + ' mk'].filter(Boolean).join(' · ');
+                const snippet = quizEsc((i.question_text || '').slice(0, 140));
+                return `<div class="card"><div style="padding:10px 14px">
+                    <div style="font-size:0.84rem;font-weight:600">${snippet}${(i.question_text || '').length > 140 ? '…' : ''}</div>
+                    <div class="text-xs text-gray mt-2">${tags}${i.is_shared ? ' · shared' : ''}${i.mine ? '' : ' · (colleague)'}</div>
+                    ${i.mine ? `<div style="display:flex;gap:6px;margin-top:8px">
+                        <button class="btn btn-outline qb-edit" data-id="${i.id}" style="width:auto;padding:5px 11px;font-size:0.7rem">Edit</button>
+                        <button class="btn btn-outline qb-del" data-id="${i.id}" style="width:auto;padding:5px 11px;font-size:0.7rem;color:var(--red);border-color:var(--red)">Delete</button>
+                    </div>` : ''}
+                </div></div>`;
+            }).join('');
+            listEl.querySelectorAll('.qb-edit').forEach(b => b.addEventListener('click', async () => {
+                try { const item = await api.getBankItem(b.dataset.id); showBankItemEditor(api, el, meta, item); }
+                catch (e) { alert(e.message); }
+            }));
+            listEl.querySelectorAll('.qb-del').forEach(b => b.addEventListener('click', async () => {
+                if (!confirm('Delete this question from the bank?')) return;
+                b.disabled = true;
+                try { await api.deleteBankItem(b.dataset.id); load(); } catch (e) { alert(e.message); b.disabled = false; }
+            }));
+        } catch (err) { listEl.innerHTML = `<div class="card"><div class="card-empty">${err.message}</div></div>`; }
+    }
+    el.querySelector('#qb-new').addEventListener('click', () => showBankItemEditor(api, el, meta, null));
+    ['qb-f-subject', 'qb-f-curr', 'qb-f-type'].forEach(id => el.querySelector('#' + id).addEventListener('change', load));
+    let t; el.querySelector('#qb-f-q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(load, 350); });
+    load();
+}
+
+function showBankItemEditor(api, pageEl, meta, existing) {
+    const modal = document.createElement('div'); modal.className = 'modal-overlay'; document.body.appendChild(modal);
+    const close = () => modal.remove();
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    const editing = !!existing;
+
+    let type = existing?.type || 'mcq';
+    let curriculum = existing?.curriculum || 'ordinary';
+    let options = existing?.options?.length ? existing.options.map(o => ({ text: o.option_text, correct: o.is_correct })) : [{ text: '', correct: true }, { text: '', correct: false }];
+    let rubric = existing?.rubric?.length ? existing.rubric.map(r => ({ criterion: r.criterion, marks: r.max_marks })) : [{ criterion: '', marks: 1 }];
+
+    const subjOpts = meta.subjects.map(s => `<option value="${s.id}" ${existing && existing.subject_id == s.id ? 'selected' : ''}>${s.name || ''}</option>`).join('');
+    const gradeOpts = `<option value="">— grade —</option>` + meta.grades.map(g => `<option value="${g.id}" ${existing && existing.grade_id == g.id ? 'selected' : ''}>${g.name || ''}</option>`).join('');
+
+    modal.innerHTML = `<div class="modal" style="max-height:88vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div class="list-title" style="font-size:0.95rem">${editing ? 'Edit Question' : 'New Question'}</div>
+            <button id="qb-close" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text3)">&times;</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+            <div class="form-group" style="flex:1;margin:0"><label class="form-label">Curriculum</label>
+                <select id="qb-curr" class="form-input" style="padding:8px"><option value="ordinary" ${curriculum === 'ordinary' ? 'selected' : ''}>Ordinary</option><option value="cbc" ${curriculum === 'cbc' ? 'selected' : ''}>New (CBC)</option></select></div>
+            <div class="form-group" style="flex:1;margin:0"><label class="form-label">Type</label>
+                <select id="qb-type" class="form-input" style="padding:8px">
+                    <option value="mcq" ${type === 'mcq' ? 'selected' : ''}>Multiple choice</option>
+                    <option value="true_false" ${type === 'true_false' ? 'selected' : ''}>True / False</option>
+                    <option value="structured" ${type === 'structured' ? 'selected' : ''}>Structured</option>
+                    <option value="scenario" ${type === 'scenario' ? 'selected' : ''}>Scenario</option>
+                </select></div>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+            <div class="form-group" style="flex:1;margin:0"><label class="form-label">Subject</label><select id="qb-subject" class="form-input" style="padding:8px"><option value="">— subject —</option>${subjOpts}</select></div>
+            <div class="form-group" style="flex:1;margin:0"><label class="form-label">Grade/Form</label><select id="qb-grade" class="form-input" style="padding:8px">${gradeOpts}</select></div>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+            <div class="form-group" style="flex:1;margin:0"><label class="form-label">Topic</label><input id="qb-topic" class="form-input" style="padding:8px" value="${quizEscAttr(existing?.topic || '')}" placeholder="e.g. Migration"></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Component</label><select id="qb-component" class="form-input" style="padding:8px"><option value="">—</option><option value="theory" ${existing?.component === 'theory' ? 'selected' : ''}>Theory</option><option value="sba" ${existing?.component === 'sba' ? 'selected' : ''}>SBA</option></select></div>
+            <div class="form-group" style="margin:0"><label class="form-label">Difficulty</label><select id="qb-diff" class="form-input" style="padding:8px"><option value="">—</option><option value="easy" ${existing?.difficulty === 'easy' ? 'selected' : ''}>Easy</option><option value="medium" ${existing?.difficulty === 'medium' ? 'selected' : ''}>Medium</option><option value="hard" ${existing?.difficulty === 'hard' ? 'selected' : ''}>Hard</option></select></div>
+        </div>
+        <div class="form-group"><label class="form-label">Question / Scenario</label><textarea id="qb-text" class="form-input" rows="4" style="padding:8px;resize:vertical;font-family:inherit" placeholder="Type the question, or paste a real-life scenario...">${quizEsc(existing?.question_text || '')}</textarea></div>
+        <div id="qb-objective-mk" class="form-group" style="display:none"><label class="form-label">Marks</label><input id="qb-marks" type="number" min="1" class="form-input" style="padding:8px;width:90px" value="${(existing && (existing.type === 'mcq' || existing.type === 'true_false')) ? existing.max_marks : 1}"></div>
+        <div id="qb-dynamic"></div>
+        <div id="qb-model" class="form-group" style="display:none"><label class="form-label">Model answer / marking notes (optional)</label><textarea id="qb-model-a" class="form-input" rows="2" style="padding:8px;resize:vertical;font-family:inherit">${quizEsc(existing?.model_answer || '')}</textarea></div>
+        <label class="checkbox-wrap" style="display:flex;align-items:center;gap:8px;margin:6px 0"><input type="checkbox" id="qb-shared" ${existing?.is_shared ? 'checked' : ''}><span class="text-sm">Share with other teachers of this subject</span></label>
+        <div id="qb-err" class="form-error" style="display:none;margin:8px 0"></div>
+        <button id="qb-save" class="btn btn-primary" style="padding:11px">${editing ? 'Save Changes' : 'Add to Bank'}</button>
+    </div>`;
+
+    modal.querySelector('#qb-close').onclick = close;
+    const dyn = modal.querySelector('#qb-dynamic');
+    const currSel = modal.querySelector('#qb-curr');
+    const typeSel = modal.querySelector('#qb-type');
+    const isObjective = () => type === 'mcq' || type === 'true_false';
+
+    function syncDynamic() {
+        if (isObjective()) {
+            if (type !== 'true_false') dyn.querySelectorAll('.qb-opt').forEach(inp => { options[+inp.dataset.oi].text = inp.value; });
+            dyn.querySelectorAll('.qb-correct').forEach(r => { options[+r.dataset.oi].correct = r.checked; });
+        } else {
+            dyn.querySelectorAll('.qb-crit').forEach(inp => { rubric[+inp.dataset.ri].criterion = inp.value; });
+            dyn.querySelectorAll('.qb-crit-mk').forEach(inp => { rubric[+inp.dataset.ri].marks = parseInt(inp.value) || 1; });
+        }
+    }
+    function renderDynamic() {
+        modal.querySelector('#qb-objective-mk').style.display = isObjective() ? '' : 'none';
+        modal.querySelector('#qb-model').style.display = isObjective() ? 'none' : '';
+        if (isObjective()) {
+            dyn.innerHTML = `<div class="text-xs text-gray" style="margin-bottom:4px">Options (select the correct one):</div>` + options.map((o, oi) => {
+                const radio = `<input type="radio" name="qb-correct" class="qb-correct" data-oi="${oi}" ${o.correct ? 'checked' : ''}>`;
+                if (type === 'true_false') return `<label style="display:flex;align-items:center;gap:8px;padding:3px 0">${radio}<span class="text-sm">${o.text}</span></label>`;
+                return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">${radio}<input type="text" class="form-input qb-opt" data-oi="${oi}" value="${quizEscAttr(o.text)}" placeholder="Option ${oi + 1}" style="padding:7px 9px;font-size:0.8rem;flex:1">${options.length > 2 ? `<button class="qb-opt-del" data-oi="${oi}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem">&times;</button>` : ''}</div>`;
+            }).join('') + (type === 'mcq' && options.length < 6 ? `<button class="qb-opt-add btn btn-outline" style="margin-top:4px;width:auto;padding:5px 10px;font-size:0.7rem">+ Option</button>` : '');
+            dyn.querySelectorAll('.qb-opt-add').forEach(b => b.addEventListener('click', () => { syncDynamic(); options.push({ text: '', correct: false }); renderDynamic(); }));
+            dyn.querySelectorAll('.qb-opt-del').forEach(b => b.addEventListener('click', () => { syncDynamic(); options.splice(+b.dataset.oi, 1); if (!options.some(o => o.correct)) options[0].correct = true; renderDynamic(); }));
+        } else {
+            dyn.innerHTML = `<div class="text-xs text-gray" style="margin-bottom:4px">Marking rubric (criterion + marks):</div>` + rubric.map((c, ri) => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <input type="text" class="form-input qb-crit" data-ri="${ri}" value="${quizEscAttr(c.criterion)}" placeholder="e.g. Gives three valid reasons" style="padding:7px 9px;font-size:0.8rem;flex:1">
+                <input type="number" min="1" class="form-input qb-crit-mk" data-ri="${ri}" value="${c.marks}" title="Marks" style="padding:7px 9px;font-size:0.8rem;width:58px">
+                ${rubric.length > 1 ? `<button class="qb-crit-del" data-ri="${ri}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem">&times;</button>` : ''}</div>`).join('')
+                + `<button class="qb-crit-add btn btn-outline" style="margin-top:4px;width:auto;padding:5px 10px;font-size:0.7rem">+ Criterion</button>`;
+            dyn.querySelectorAll('.qb-crit-add').forEach(b => b.addEventListener('click', () => { syncDynamic(); rubric.push({ criterion: '', marks: 1 }); renderDynamic(); }));
+            dyn.querySelectorAll('.qb-crit-del').forEach(b => b.addEventListener('click', () => { syncDynamic(); rubric.splice(+b.dataset.ri, 1); renderDynamic(); }));
+        }
+    }
+    function applyCurriculumLock() {
+        if (curriculum === 'cbc') { type = 'scenario'; typeSel.value = 'scenario'; typeSel.disabled = true; }
+        else { typeSel.disabled = false; }
+    }
+    currSel.addEventListener('change', () => { syncDynamic(); curriculum = currSel.value; applyCurriculumLock(); type = typeSel.value; renderDynamic(); });
+    typeSel.addEventListener('change', () => {
+        syncDynamic(); type = typeSel.value;
+        if (type === 'true_false') options = [{ text: 'True', correct: true }, { text: 'False', correct: false }];
+        else if (isObjective() && options.every(o => o.text === 'True' || o.text === 'False')) options = [{ text: '', correct: true }, { text: '', correct: false }];
+        renderDynamic();
+    });
+
+    modal.querySelector('#qb-save').addEventListener('click', async () => {
+        syncDynamic();
+        const errEl = modal.querySelector('#qb-err'); const showErr = m => { errEl.textContent = m; errEl.style.display = ''; };
+        const question_text = modal.querySelector('#qb-text').value.trim();
+        if (!question_text) return showErr('Enter the question or scenario.');
+        const payload = {
+            curriculum, type,
+            subject_id: modal.querySelector('#qb-subject').value || null,
+            grade_id: modal.querySelector('#qb-grade').value || null,
+            topic: modal.querySelector('#qb-topic').value.trim() || null,
+            component: modal.querySelector('#qb-component').value || null,
+            difficulty: modal.querySelector('#qb-diff').value || null,
+            question_text,
+            model_answer: isObjective() ? null : (modal.querySelector('#qb-model-a').value.trim() || null),
+            is_shared: modal.querySelector('#qb-shared').checked,
+        };
+        if (isObjective()) {
+            if (options.some(o => !o.text.trim())) return showErr('Fill in all options.');
+            if (options.filter(o => o.correct).length !== 1) return showErr('Mark exactly one correct answer.');
+            payload.max_marks = parseInt(modal.querySelector('#qb-marks').value) || 1;
+            payload.options = options.map(o => ({ option_text: o.text.trim(), is_correct: !!o.correct }));
+        } else {
+            if (rubric.some(c => !c.criterion.trim())) return showErr('Fill in all rubric criteria.');
+            payload.rubric = rubric.map(c => ({ criterion: c.criterion.trim(), max_marks: c.marks }));
+        }
+        const btn = modal.querySelector('#qb-save'); btn.disabled = true; btn.innerHTML = '<div class="btn-spinner"></div> Saving...';
+        try {
+            if (editing) await api.updateBankItem(existing.id, payload); else await api.createBankItem(payload);
+            close(); renderQuestionBank(pageEl, api);
+        } catch (e) { showErr(e.message); btn.disabled = false; btn.textContent = editing ? 'Save Changes' : 'Add to Bank'; }
+    });
+
+    applyCurriculumLock();
+    renderDynamic();
 }

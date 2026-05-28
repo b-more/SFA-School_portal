@@ -96,6 +96,11 @@ class Api {
     getComplaints() { return this.get('/complaints'); }
     createComplaint(studentId, data) { return this.post(`/children/${studentId}/complaints`, data); }
     getSchoolCalendar() { return this.get('/school-calendar'); }
+    // Quizzes
+    getQuizzes(studentId) { return this.get(`/children/${studentId}/quizzes`); }
+    getQuiz(studentId, quizId) { return this.get(`/children/${studentId}/quizzes/${quizId}`); }
+    startQuiz(studentId, quizId) { return this.post(`/children/${studentId}/quizzes/${quizId}/start`, {}); }
+    submitQuiz(studentId, quizId, attemptId, answers) { return this.post(`/children/${studentId}/quizzes/${quizId}/submit`, { attempt_id: attemptId, answers }); }
     submitHomework(studentId, homeworkId, content, file) {
         if (file) {
             const formData = new FormData();

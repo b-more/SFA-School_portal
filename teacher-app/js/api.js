@@ -67,6 +67,26 @@ class Api {
     getHomeworkSubmissions(homeworkId) { return this.get(`/homework/${homeworkId}/submissions`); }
     gradeSubmission(submissionId, data) { return this.post(`/homework/submission/${submissionId}/grade`, data); }
 
+    // Quizzes
+    getMyQuizzes() { return this.get('/quizzes'); }
+    createQuiz(payload) { return this.post('/quizzes', payload); }
+    getQuiz(id) { return this.get(`/quizzes/${id}`); }
+    getQuizResults(id) { return this.get(`/quizzes/${id}/results`); }
+    closeQuiz(id) { return this.post(`/quizzes/${id}/close`, {}); }
+    deleteQuiz(id) { return this.request(`/quizzes/${id}`, { method: 'DELETE' }); }
+
+    // Question bank
+    getQuestionBankMeta() { return this.get('/question-bank/meta'); }
+    getQuestionBank(params) {
+        const clean = Object.fromEntries(Object.entries(params || {}).filter(([, v]) => v !== '' && v != null));
+        const qs = Object.keys(clean).length ? '?' + new URLSearchParams(clean).toString() : '';
+        return this.get(`/question-bank${qs}`);
+    }
+    getBankItem(id) { return this.get(`/question-bank/${id}`); }
+    createBankItem(payload) { return this.post('/question-bank', payload); }
+    updateBankItem(id, payload) { return this.request(`/question-bank/${id}`, { method: 'PUT', body: JSON.stringify(payload) }); }
+    deleteBankItem(id) { return this.request(`/question-bank/${id}`, { method: 'DELETE' }); }
+
     // Results
     enterResults(data) { return this.post('/results/enter', data); }
     getResults(classSectionId, subjectId) { return this.get(`/results/${classSectionId}/${subjectId}`); }

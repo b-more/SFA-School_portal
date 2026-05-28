@@ -72,6 +72,7 @@ export async function renderDashboard(container, api, settings) {
                     <a href="#/dashboard/events" class="drawer-link">${SVG.calendar}<span>Events</span></a>
                     <a href="#/dashboard/payments" class="drawer-link">${SVG.wallet}<span>Payments</span></a>
                     <a href="#/dashboard/homework" class="drawer-link">${SVG.homework}<span>Homework</span></a>
+                    <a href="#/dashboard/quiz" class="drawer-link">${SVG.check}<span>Quizzes</span></a>
                     <a href="#/dashboard/library" class="drawer-link">${SVG.book}<span>Library</span></a>
                     <a href="#/dashboard/timetable" class="drawer-link">${SVG.clock}<span>Timetable</span></a>
                     <a href="#/dashboard/report-cards" class="drawer-link">${SVG.download}<span>Report Cards</span></a>
@@ -132,6 +133,7 @@ export async function renderDashboard(container, api, settings) {
     else if (hash.includes('/news')) await renderNews(content, api);
     else if (hash.includes('/events')) await renderEvents(content, api, children);
     else if (hash.includes('/payments')) await renderPayments(content, api);
+    else if (hash.includes('/quiz')) await renderQuizzesPage(content, api, children);
     else if (hash.includes('/homework')) await renderHomeworkPage(content, api, children);
     else if (hash.includes('/library')) await renderLibraryPage(content, api, children);
     else if (hash.includes('/timetable')) await renderTimetablePage(content, api, children);
@@ -2295,4 +2297,175 @@ function showPaymentModal(api, childId, childName, balance) {
         document.getElementById('pay-submit').disabled = false;
         document.getElementById('pay-submit').innerHTML = `${SVG.wallet} Pay Now`;
     });
+}
+
+// ─── QUIZZES (parent/pupil) ───
+let _quizTimer = null;
+function clearQuizTimer() { if (_quizTimer) { clearInterval(_quizTimer); _quizTimer = null; } }
+function pquizEsc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+async function renderQuizzesPage(el, api, children) {
+    clearQuizTimer();
+    el.innerHTML = '<div class="dash-scroll"><div class="skeleton skeleton-card"></div></div>';
+    try {
+        const perChild = await Promise.all(children.map(c =>
+            api.getQuizzes(c.id).then(q => ({ child: c, quizzes: q })).catch(() => ({ child: c, quizzes: [] }))));
+        let html = '<div class="dash-scroll">';
+        html += `<div style="font-size:1.05rem;font-weight:700;margin-bottom:10px">Quizzes</div>`;
+        for (const { child, quizzes } of perChild) {
+            html += `<div class="text-xs bold text-gray" style="margin:12px 0 6px;text-transform:uppercase;letter-spacing:0.04em">${pquizEsc(child.name)}${child.class ? ' · ' + child.class : ''}</div>`;
+            if (!quizzes.length) {
+                html += `<div class="card"><div style="padding:14px;text-align:center;color:#9ca3af;font-size:0.85rem">No quizzes assigned.</div></div>`;
+                continue;
+            }
+            for (const q of quizzes) {
+                const done = q.best_percentage !== null && q.best_percentage !== undefined;
+                const timed = q.time_limit_minutes ? `${q.time_limit_minutes} min` : 'No time limit';
+                let badge;
+                if (q.closed) badge = `<span class="badge" style="background:#9ca3af;color:#fff">Closed</span>`;
+                else if (done) badge = `<span class="badge ${q.best_percentage >= 50 ? 'badge-green' : 'badge-red'}">Best ${q.best_percentage}%</span>`;
+                else badge = `<span class="badge badge-amber">Not done</span>`;
+                html += `<div class="card"><div style="padding:12px 14px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-weight:700;font-size:0.9rem">${pquizEsc(q.title)}</div>${badge}</div>
+                    <div class="text-xs text-gray" style="margin-top:4px">${q.subject || ''} · ${q.num_questions} questions · ${timed}</div>
+                    ${q.attempts ? `<div class="text-xs text-gray" style="margin-top:2px">${q.attempts} attempt${q.attempts > 1 ? 's' : ''}</div>` : ''}
+                    ${!q.closed ? `<button class="btn btn-primary btn-take-quiz" data-child="${child.id}" data-quiz="${q.id}" style="width:auto;padding:8px 16px;font-size:0.75rem;margin-top:8px">${done ? 'Retake' : 'Start'}</button>` : ''}
+                </div></div>`;
+            }
+        }
+        html += '</div>';
+        el.innerHTML = html;
+        el.querySelectorAll('.btn-take-quiz').forEach(b => b.addEventListener('click', () => {
+            const child = children.find(c => String(c.id) === b.dataset.child);
+            showQuizTake(el, api, children, child, b.dataset.quiz);
+        }));
+    } catch (err) {
+        el.innerHTML = `<div class="dash-scroll"><div class="card"><div style="padding:14px;text-align:center;color:#9ca3af">${err.message}</div></div></div>`;
+    }
+}
+
+async function showQuizTake(el, api, children, child, quizId) {
+    clearQuizTimer();
+    el.innerHTML = '<div class="dash-scroll"><div class="skeleton skeleton-card"></div></div>';
+    let quiz;
+    try { quiz = await api.getQuiz(child.id, quizId); }
+    catch (err) { el.innerHTML = `<div class="dash-scroll"><div class="card"><div style="padding:14px;text-align:center;color:#9ca3af">${err.message}</div></div></div>`; return; }
+
+    let attemptId = null, deadlineMs = null, submitting = false, submitted = false;
+
+    function renderIntro() {
+        clearQuizTimer();
+        const timed = quiz.time_limit_minutes ? `${quiz.time_limit_minutes} minute${quiz.time_limit_minutes > 1 ? 's' : ''}` : 'No time limit';
+        let h = '<div class="dash-scroll">';
+        h += `<button id="q-back" class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:0.72rem;margin-bottom:10px">← Back</button>`;
+        h += `<div class="card"><div style="padding:16px">
+            <div style="font-size:1.1rem;font-weight:700">${pquizEsc(quiz.title)}</div>
+            ${quiz.subject ? `<div class="text-xs text-gray" style="margin-top:4px">${quiz.subject}</div>` : ''}
+            ${quiz.description ? `<div class="text-sm" style="margin-top:8px;color:#4b5563">${pquizEsc(quiz.description)}</div>` : ''}
+            <div class="text-sm" style="margin-top:8px">${quiz.questions.length} question${quiz.questions.length > 1 ? 's' : ''} · ${quiz.total_points} point${quiz.total_points > 1 ? 's' : ''}</div>
+            <div class="text-sm">Time: ${timed}</div>
+            ${quiz.time_limit_minutes ? `<div class="text-xs text-gray" style="margin-top:8px">The timer starts when you tap Start. The quiz auto-submits when time runs out.</div>` : ''}
+            <button id="q-start" class="btn btn-primary" style="margin-top:12px">${quiz.in_progress_attempt ? 'Resume' : 'Start Quiz'}</button>
+        </div></div></div>`;
+        el.innerHTML = h;
+        document.getElementById('q-back').addEventListener('click', () => renderQuizzesPage(el, api, children));
+        document.getElementById('q-start').addEventListener('click', startAndRender);
+    }
+
+    async function startAndRender() {
+        try {
+            const s = await api.startQuiz(child.id, quizId);
+            attemptId = s.attempt_id;
+            deadlineMs = s.deadline ? new Date(s.deadline).getTime() : null;
+            renderQuestions(new Date(s.server_time).getTime());
+        } catch (err) { alert(err.message); }
+    }
+
+    function renderQuestions(serverNow) {
+        let h = '<div class="dash-scroll">';
+        if (deadlineMs) {
+            h += `<div style="position:sticky;top:0;z-index:5;background:#1e3a5f;color:#fff;text-align:center;padding:8px;border-radius:8px;font-weight:700;margin-bottom:10px">Time left: <span id="q-timer-val">--:--</span></div>`;
+        }
+        h += `<div style="font-size:1rem;font-weight:700;margin-bottom:10px">${pquizEsc(quiz.title)}</div>`;
+        quiz.questions.forEach((q, qi) => {
+            h += `<div class="card" style="margin-bottom:8px"><div style="padding:12px 14px">
+                <div style="font-weight:600;font-size:0.88rem">${qi + 1}. ${pquizEsc(q.question_text)} <span class="text-xs text-gray">(${q.points} pt${q.points > 1 ? 's' : ''})</span></div>
+                <div style="margin-top:8px">
+                ${q.options.map(o => `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer">
+                    <input type="radio" name="q-${q.id}" value="${o.id}"><span class="text-sm">${pquizEsc(o.option_text)}</span></label>`).join('')}
+                </div></div></div>`;
+        });
+        h += `<button id="q-submit" class="btn btn-primary" style="margin:10px 0 4px">Submit Quiz</button>`;
+        h += '</div>';
+        el.innerHTML = h;
+        document.getElementById('q-submit').addEventListener('click', () => doSubmit(false));
+        if (deadlineMs) startCountdown(serverNow);
+    }
+
+    function startCountdown(serverNow) {
+        clearQuizTimer();
+        const skew = Date.now() - serverNow;
+        const tick = () => {
+            const v = document.getElementById('q-timer-val');
+            if (!v) { clearQuizTimer(); return; }
+            const remaining = deadlineMs - (Date.now() - skew);
+            if (remaining <= 0) { v.textContent = '0:00'; clearQuizTimer(); doSubmit(true); return; }
+            const s = Math.floor(remaining / 1000);
+            v.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+        };
+        tick();
+        _quizTimer = setInterval(tick, 1000);
+    }
+
+    async function doSubmit(auto) {
+        if (submitting || submitted) return;
+        submitting = true;
+        clearQuizTimer();
+        const btn = document.getElementById('q-submit');
+        if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+        const answers = quiz.questions.map(q => {
+            const sel = el.querySelector(`input[name="q-${q.id}"]:checked`);
+            return { question_id: q.id, option_id: sel ? parseInt(sel.value) : null };
+        });
+        try {
+            const res = await api.submitQuiz(child.id, quizId, attemptId, answers);
+            submitted = true;
+            renderReview(res);
+        } catch (err) {
+            submitting = false;
+            if (btn) { btn.disabled = false; btn.textContent = 'Submit Quiz'; }
+            alert(err.message);
+        }
+    }
+
+    function renderReview(res) {
+        clearQuizTimer();
+        const pct = res.percentage;
+        const pass = pct >= 50;
+        let h = '<div class="dash-scroll">';
+        h += `<div class="card"><div style="padding:18px;text-align:center">
+            <div style="font-size:2rem;font-weight:800;color:${pass ? '#059669' : '#dc2626'}">${pct}%</div>
+            <div class="text-sm bold" style="margin-top:4px">You scored ${res.score} / ${res.total_points}</div>
+            ${res.auto_submitted ? `<div class="text-xs text-gray" style="margin-top:6px">Time ran out — your answers were auto-submitted.</div>` : ''}
+            ${(res.best_percentage !== null && res.best_percentage !== res.percentage) ? `<div class="text-xs text-gray" style="margin-top:6px">Your best so far: ${res.best_percentage}%</div>` : ''}
+        </div></div>`;
+        const byQ = {}; (res.review || []).forEach(r => { byQ[r.question_id] = r; });
+        quiz.questions.forEach((q, qi) => {
+            const r = byQ[q.id] || {};
+            const correct = !!r.is_correct;
+            const yourOpt = q.options.find(o => o.id === r.selected_option_id);
+            const correctOpt = q.options.find(o => o.id === r.correct_option_id);
+            h += `<div class="card" style="margin-bottom:8px"><div style="padding:12px 14px;border-left:4px solid ${correct ? '#059669' : '#dc2626'}">
+                <div style="font-weight:600;font-size:0.86rem">${correct ? '✓' : '✗'} ${qi + 1}. ${pquizEsc(q.question_text)}</div>
+                <div class="text-xs" style="margin-top:4px">Your answer: ${yourOpt ? pquizEsc(yourOpt.option_text) : '<span class="text-gray">No answer</span>'}</div>
+                ${!correct ? `<div class="text-xs" style="color:#059669;margin-top:2px">Correct: ${correctOpt ? pquizEsc(correctOpt.option_text) : '-'}</div>` : ''}
+            </div></div>`;
+        });
+        h += `<button id="q-done" class="btn btn-primary" style="margin:10px 0 4px">Back to Quizzes</button>`;
+        h += '</div>';
+        el.innerHTML = h;
+        document.getElementById('q-done').addEventListener('click', () => renderQuizzesPage(el, api, children));
+    }
+
+    renderIntro();
 }
