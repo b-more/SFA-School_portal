@@ -2,20 +2,44 @@ plugins {
     id 'com.android.application'
 }
 
+// Release signing reads from a gitignored signing.properties (next to this build.gradle),
+// or falls back to KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD env vars.
+// Both the keystore and the password are kept out of git.
+def signingProps = new Properties()
+def signingPropsFile = file('signing.properties')
+if (signingPropsFile.exists()) {
+    signingProps.load(new FileInputStream(signingPropsFile))
+}
+def hasReleaseSigning = signingPropsFile.exists() || System.getenv('KEYSTORE_FILE')
+
 android {
     namespace 'tech.stfrancisofassisi.teacher'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "tech.stfrancisofassisi.teacher"
         minSdk 24
-        targetSdk 34
+        targetSdk 35
         versionCode 1
         versionName "1.0.0"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(signingProps['storeFile'] ?: System.getenv('KEYSTORE_FILE'))
+                storePassword signingProps['storePassword'] ?: System.getenv('KEYSTORE_PASSWORD')
+                keyAlias signingProps['keyAlias'] ?: System.getenv('KEY_ALIAS')
+                keyPassword signingProps['keyPassword'] ?: System.getenv('KEY_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }

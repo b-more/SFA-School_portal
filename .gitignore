@@ -59,3 +59,17 @@ TRAINING_PORTAL_CREDENTIALS.md
 Thumbs.db
 *.swp
 *.swo
+
+# Android release signing (NEVER commit keystores or passwords)
+*.keystore
+*.jks
+signing.properties
+android-app/signing.properties
+teacher-android/signing.properties
+# Firebase / FCM config (contains project keys)
+google-services.json
+# Local build artifacts
+android-app/app/build/
+teacher-android/app/build/
+android-app/.gradle/
+teacher-android/.gradle/

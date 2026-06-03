@@ -1,0 +1,9 @@
+# Teacher app release signing configuration (Play upload key).
+# Copy this file to `signing.properties` (gitignored) and fill in real values.
+# DO NOT commit signing.properties or any *.keystore file.
+#
+# storeFile path is resolved relative to this file's directory (app/).
+storeFile=upload-teacher.keystore
+storePassword=CHANGE_ME
+keyAlias=upload
+keyPassword=CHANGE_ME
