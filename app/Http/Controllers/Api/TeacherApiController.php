@@ -363,6 +363,50 @@ class TeacherApiController extends Controller
             return response()->json(['message' => 'No active term or academic year configured.'], 400);
         }
 
+        // Ownership check — only skip for platform admins. A teacher may
+        // enter marks either because they have a SubjectTeaching row for
+        // (subject, class_section, active_year), or because they are the
+        // assigned class teacher of that class section (they often mark
+        // core subjects without a distinct teachings row).
+        $user = Auth::user();
+        if (! $user || (int) $user->role_id !== \App\Constants\RoleConstants::ADMIN) {
+            if (! $teacher) {
+                return response()->json(['message' => 'No teacher record for this user.'], 403);
+            }
+
+            $hasSubjectTeaching = SubjectTeaching::where('teacher_id', $teacher->id)
+                ->where('subject_id', $request->subject_id)
+                ->where('class_section_id', $request->class_section_id)
+                ->where('academic_year_id', $activeYear->id)
+                ->exists();
+
+            $isClassTeacher = $teacher->is_class_teacher
+                && (int) $teacher->class_section_id === (int) $request->class_section_id;
+
+            if (! $hasSubjectTeaching && ! $isClassTeacher) {
+                return response()->json([
+                    'message' => 'You are not assigned to teach this subject in this class.',
+                ], 403);
+            }
+        }
+
+        // Every submitted student_id must actually belong to the class
+        // section — prevents cross-class writes even if a teacher legitimately
+        // teaches the given subject somewhere.
+        $studentIds = collect($request->results)->pluck('student_id')->map(fn ($id) => (int) $id)->all();
+        $validIds = Student::whereIn('id', $studentIds)
+            ->where('class_section_id', $request->class_section_id)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $invalidIds = array_values(array_diff($studentIds, $validIds));
+        if (! empty($invalidIds)) {
+            return response()->json([
+                'message' => 'One or more students do not belong to this class section.',
+                'invalid_student_ids' => $invalidIds,
+            ], 422);
+        }
+
         $year = (int) substr((string) $activeYear->name, 0, 4) ?: (int) date('Y');
 
         // Delegate to ResultsService so the grade letter comes from the

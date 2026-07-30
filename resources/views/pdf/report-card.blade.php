@@ -450,7 +450,7 @@
                     <tr>
                         <td>{{ $index + 1 }}</td>
                         <td style="text-align: left;">{{ $subject['subject_name'] }}</td>
-                        <td><strong>{{ $subject['final'] !== null ? number_format($subject['final'], 0) : ($subject['combined'] !== null ? number_format($subject['combined'], 0) : '-') }}</strong></td>
+                        <td><strong>{{ $subject['combined'] !== null ? number_format($subject['combined'], 0) : '-' }}</strong></td>
                         <td>
                             @if(isset($subject['grade']) && $subject['grade'] !== 'N/A')
                                 <span class="grade-badge">{{ $subject['grade'] }}</span>

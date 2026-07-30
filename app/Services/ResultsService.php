@@ -7,6 +7,7 @@ use App\Models\Grade;
 use App\Models\GradingScale;
 use App\Models\GradingScaleItem;
 use App\Models\Result;
+use App\Models\SchoolSettings;
 use App\Models\Student;
 use App\Models\Subject;
 use Illuminate\Support\Collection;
@@ -122,98 +123,123 @@ class ResultsService
     }
 
     /**
-     * Calculate combined average for mid-term and final exams.
+     * Calculate the combined per-subject term mark for a student.
      *
-     * @param int $studentId
-     * @param int $termId
-     * @param int $year
-     * @return array ['mid_term' => [], 'final' => [], 'combined' => [], 'subjects' => []]
+     * When SchoolSettings.enable_continuous_assessment is true (Zambian
+     * default), each subject's final term mark is
+     *   CA_avg  = mean of { mid-term, quiz, assignment } marks
+     *   Exam    = end-of-term mark, falling back to legacy 'final'
+     *   Combined = CA_avg * ca_weight% + Exam * exam_weight%   (both present)
+     *            = whichever exists                             (only one present)
+     *
+     * When CA is disabled, the legacy behaviour is preserved: a simple
+     * mean of {mid-term, exam}, or whichever mark exists.
+     *
+     * The `subjects` array in the return payload always exposes `combined`
+     * as "the mark to display on the report card"; the blade uses that key.
+     *
+     * @return array {mid_term, final, combined, ca_enabled, ca_weight,
+     *                exam_weight, subjects[]}
      */
     public function calculateCombinedAverage(int $studentId, int $termId, int $year): array
     {
-        $midTermResults = Result::where('student_id', $studentId)
+        $settings = SchoolSettings::getInstance();
+        $useCA = (bool) ($settings->enable_continuous_assessment ?? false);
+        $caWeight = (float) ($settings->ca_weight_percentage ?? 40);
+        $examWeight = (float) ($settings->exam_weight_percentage ?? 60);
+        $totalWeight = $caWeight + $examWeight;
+
+        // Pull every result row for this student/term/year in one query,
+        // then bucket per subject and per exam-type category.
+        $all = Result::where('student_id', $studentId)
             ->where('term_id', $termId)
             ->where('year', $year)
-            ->where('exam_type', 'mid-term')
-            ->get()
-            ->keyBy('subject_id');
+            ->get();
 
-        $finalResults = Result::where('student_id', $studentId)
-            ->where('term_id', $termId)
-            ->where('year', $year)
-            ->whereIn('exam_type', ['final', 'end-of-term'])
-            ->get()
-            ->keyBy('subject_id');
-
-        // Get all unique subjects
-        $subjectIds = $midTermResults->keys()->merge($finalResults->keys())->unique();
+        $bySubject = $all->groupBy('subject_id');
+        $subjectIds = $bySubject->keys();
         $subjects = Subject::whereIn('id', $subjectIds)->get()->keyBy('id');
 
         $subjectDetails = [];
-        $totalMidTerm = 0;
-        $totalFinal = 0;
-        $totalCombined = 0;
-        $subjectsWithBoth = 0;
+        $totalMidTerm = 0;  $midTermCount = 0;
+        $totalFinal   = 0;  $finalCount   = 0;
+        $totalCombined = 0; $combinedCount = 0;
 
         foreach ($subjectIds as $subjectId) {
-            $midTerm = $midTermResults->get($subjectId);
-            $final = $finalResults->get($subjectId);
+            $rows = $bySubject->get($subjectId);
             $subject = $subjects->get($subjectId);
 
-            $midTermMarks = $midTerm ? $midTerm->marks : null;
-            $finalMarks = $final ? $final->marks : null;
+            $midTermMark = optional($rows->firstWhere('exam_type', 'mid-term'))->marks;
+            // Prefer the new 'end-of-term' code; legacy 'final' still counts.
+            $examMark = optional($rows->firstWhere('exam_type', 'end-of-term'))->marks
+                     ?? optional($rows->firstWhere('exam_type', 'final'))->marks;
 
-            // Calculate combined average for this subject
-            $combinedMarks = null;
-            if ($midTermMarks !== null && $finalMarks !== null) {
-                $combinedMarks = ($midTermMarks + $finalMarks) / 2;
-                $subjectsWithBoth++;
-            } elseif ($midTermMarks !== null) {
-                $combinedMarks = $midTermMarks;
-            } elseif ($finalMarks !== null) {
-                $combinedMarks = $finalMarks;
+            // CA in the Zambian sense = all continuous-assessment work aggregated
+            // (mid-term test + classroom quizzes + assignments).
+            $caContribs = $rows->whereIn('exam_type', ['mid-term', 'quiz', 'assignment'])
+                ->pluck('marks')
+                ->filter(fn ($m) => $m !== null);
+            $caMark = $caContribs->isNotEmpty() ? (float) $caContribs->avg() : null;
+
+            $combined = null;
+            $weighted = false;
+            if ($useCA && $totalWeight > 0) {
+                if ($caMark !== null && $examMark !== null) {
+                    $combined = ($caMark * $caWeight + $examMark * $examWeight) / $totalWeight;
+                    $weighted = true;
+                } elseif ($caMark !== null) {
+                    // Exam not sat yet → surface the CA mark on its own so
+                    // interim report cards still show meaningful numbers.
+                    $combined = $caMark;
+                } elseif ($examMark !== null) {
+                    $combined = $examMark;
+                }
+            } else {
+                // Legacy simple mean of mid-term + exam.
+                if ($midTermMark !== null && $examMark !== null) {
+                    $combined = ((float) $midTermMark + (float) $examMark) / 2;
+                } elseif ($midTermMark !== null) {
+                    $combined = (float) $midTermMark;
+                } elseif ($examMark !== null) {
+                    $combined = (float) $examMark;
+                }
             }
 
-            if ($midTermMarks !== null) {
-                $totalMidTerm += $midTermMarks;
-            }
-            if ($finalMarks !== null) {
-                $totalFinal += $finalMarks;
-            }
-            if ($combinedMarks !== null) {
-                $totalCombined += $combinedMarks;
-            }
+            if ($midTermMark !== null) { $totalMidTerm += (float) $midTermMark; $midTermCount++; }
+            if ($examMark   !== null)  { $totalFinal   += (float) $examMark;   $finalCount++; }
+            if ($combined   !== null)  { $totalCombined += $combined; $combinedCount++; }
 
             $subjectDetails[] = [
-                'subject_id' => $subjectId,
+                'subject_id'   => $subjectId,
                 'subject_name' => $subject ? $subject->name : 'Unknown',
-                'mid_term' => $midTermMarks,
-                'final' => $finalMarks,
-                'combined' => $combinedMarks ? round($combinedMarks, 2) : null,
+                'mid_term'     => $midTermMark !== null ? (float) $midTermMark : null,
+                'final'        => $examMark   !== null ? (float) $examMark   : null,
+                'ca'           => $caMark     !== null ? round($caMark, 2)  : null,
+                'combined'     => $combined   !== null ? round($combined, 2) : null,
+                'weighted'     => $weighted,
             ];
         }
-
-        $midTermCount = $midTermResults->count();
-        $finalCount = $finalResults->count();
-        $totalSubjects = $subjectIds->count();
 
         return [
             'mid_term' => [
                 'average' => $midTermCount > 0 ? round($totalMidTerm / $midTermCount, 2) : 0,
-                'total' => $totalMidTerm,
+                'total' => round($totalMidTerm, 2),
                 'subjects_count' => $midTermCount,
             ],
             'final' => [
                 'average' => $finalCount > 0 ? round($totalFinal / $finalCount, 2) : 0,
-                'total' => $totalFinal,
+                'total' => round($totalFinal, 2),
                 'subjects_count' => $finalCount,
             ],
             'combined' => [
-                'average' => $totalSubjects > 0 ? round($totalCombined / $totalSubjects, 2) : 0,
+                'average' => $combinedCount > 0 ? round($totalCombined / $combinedCount, 2) : 0,
                 'total' => round($totalCombined, 2),
-                'subjects_count' => $totalSubjects,
+                'subjects_count' => $combinedCount,
             ],
-            'subjects' => $subjectDetails,
+            'ca_enabled'  => $useCA,
+            'ca_weight'   => $useCA ? $caWeight : null,
+            'exam_weight' => $useCA ? $examWeight : null,
+            'subjects'    => $subjectDetails,
         ];
     }
 
