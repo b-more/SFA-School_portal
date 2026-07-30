@@ -29,6 +29,15 @@ class ReportCardComment extends Model
     ];
 
     /**
+     * Backward-compat alias: ParentApiController checks $comment->generated_at,
+     * but the column is last_generated_at. Map so both work.
+     */
+    public function getGeneratedAtAttribute()
+    {
+        return $this->last_generated_at;
+    }
+
+    /**
      * Get the student that owns this report card comment.
      */
     public function student(): BelongsTo

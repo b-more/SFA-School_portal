@@ -164,11 +164,11 @@ class EnterResults extends Page implements HasForms
                 Select::make('examType')
                     ->label('Exam Type')
                     ->options([
-                        'mid_term' => 'Mid-Term Exam',
+                        'mid-term' => 'Mid-Term Exam',
+                        'end-of-term' => 'End-of-Term Exam',
                         'final' => 'Final Exam',
                         'quiz' => 'Quiz',
                         'assignment' => 'Assignment',
-                        'test' => 'Test',
                     ])
                     ->required()
                     ->default('final')
@@ -353,9 +353,11 @@ class EnterResults extends Page implements HasForms
                 ->toArray();
         }
 
-        // Load existing results
+        // Load existing results — filter on term_id (canonical). The legacy
+        // `term` column is inconsistent across writers (numeric id vs term
+        // name) so it can't be relied on for aggregation.
         $existingResults = Result::where('subject_id', $this->subjectId)
-            ->where('term', $this->termId)
+            ->where('term_id', $this->termId)
             ->where('exam_type', $this->examType)
             ->where('year', $this->year)
             ->whereIn('student_id', collect($this->students)->pluck('id'))
@@ -460,7 +462,7 @@ class EnterResults extends Page implements HasForms
                 'exam_type' => $this->examType,
                 'marks' => $marks,
                 'grade' => $data['grade'] ?: null,
-                'term' => $this->termId,
+                'term_id' => $this->termId,
                 'year' => $this->year,
                 'comment' => $data['comment'] ?: null,
             ];

@@ -226,9 +226,9 @@ class GenerateReportCards extends Page implements HasForms
         foreach ($students as $student) {
             // Get results count
             $resultsCount = Result::where('student_id', $student->id)
-                ->where('term', $this->termId)
+                ->where('term_id', $this->termId)
                 ->where('year', $this->year)
-                ->whereIn('exam_type', ['mid-term', 'final'])
+                ->whereIn('exam_type', ['mid-term', 'final', 'end-of-term'])
                 ->count();
 
             // Calculate average
@@ -555,9 +555,9 @@ class GenerateReportCards extends Page implements HasForms
 
         // Get students with results and parent info
         $students = Student::with(['parentGuardian', 'results' => function ($query) {
-            $query->where('term', $this->termId)
+            $query->where('term_id', $this->termId)
                 ->where('year', $this->year)
-                ->whereIn('exam_type', ['mid-term', 'final'])
+                ->whereIn('exam_type', ['mid-term', 'final', 'end-of-term'])
                 ->with('subject');
         }])
             ->where('class_section_id', $this->classSectionId)

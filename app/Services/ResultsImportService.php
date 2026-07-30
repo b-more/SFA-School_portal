@@ -252,12 +252,13 @@ class ResultsImportService
             // Calculate grade
             $grade = $this->calculateGrade($mark);
 
-            // Create or update result
+            // Create or update result. term_id is the canonical column;
+            // Result::boot() backfills the legacy `term` name column.
             $result = Result::updateOrCreate(
                 [
                     'student_id' => $student->id,
                     'subject_id' => $subject->id,
-                    'term' => $termId,
+                    'term_id' => $termId,
                     'year' => $year,
                     'exam_type' => $examType,
                 ],
@@ -367,7 +368,7 @@ class ResultsImportService
 
         // Get all students with their results and parent info
         $students = Student::with(['parentGuardian', 'results' => function ($query) use ($termId, $year, $examType) {
-            $query->where('term', $termId)
+            $query->where('term_id', $termId)
                 ->where('year', $year)
                 ->where('exam_type', $examType)
                 ->with('subject');

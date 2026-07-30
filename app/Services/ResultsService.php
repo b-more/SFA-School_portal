@@ -91,7 +91,7 @@ class ResultsService
     public function calculateStudentAverage(int $studentId, int $termId, int $year, ?string $examType = null): array
     {
         $query = Result::where('student_id', $studentId)
-            ->where('term', $termId)
+            ->where('term_id', $termId)
             ->where('year', $year);
 
         if ($examType) {
@@ -132,16 +132,16 @@ class ResultsService
     public function calculateCombinedAverage(int $studentId, int $termId, int $year): array
     {
         $midTermResults = Result::where('student_id', $studentId)
-            ->where('term', $termId)
+            ->where('term_id', $termId)
             ->where('year', $year)
             ->where('exam_type', 'mid-term')
             ->get()
             ->keyBy('subject_id');
 
         $finalResults = Result::where('student_id', $studentId)
-            ->where('term', $termId)
+            ->where('term_id', $termId)
             ->where('year', $year)
-            ->where('exam_type', 'final')
+            ->whereIn('exam_type', ['final', 'end-of-term'])
             ->get()
             ->keyBy('subject_id');
 
@@ -337,9 +337,9 @@ class ResultsService
 
         return Result::whereIn('student_id', $students)
             ->where('subject_id', $subjectId)
-            ->where('term', $termId)
+            ->where('term_id', $termId)
             ->where('year', $year)
-            ->whereIn('exam_type', ['mid-term', 'final'])
+            ->whereIn('exam_type', ['mid-term', 'final', 'end-of-term'])
             ->select('student_id', DB::raw('AVG(marks) as average_marks'))
             ->groupBy('student_id')
             ->orderByDesc('average_marks')
@@ -370,9 +370,9 @@ class ResultsService
             ->pluck('id');
 
         return Result::whereIn('student_id', $students)
-            ->where('term', $termId)
+            ->where('term_id', $termId)
             ->where('year', $year)
-            ->whereIn('exam_type', ['mid-term', 'final'])
+            ->whereIn('exam_type', ['mid-term', 'final', 'end-of-term'])
             ->select('subject_id', DB::raw('AVG(marks) as average_marks'), DB::raw('COUNT(DISTINCT student_id) as student_count'))
             ->groupBy('subject_id')
             ->orderByDesc('average_marks')
@@ -403,9 +403,9 @@ class ResultsService
             ->pluck('id');
 
         return Result::whereIn('student_id', $students)
-            ->where('term', $termId)
+            ->where('term_id', $termId)
             ->where('year', $year)
-            ->whereIn('exam_type', ['mid-term', 'final'])
+            ->whereIn('exam_type', ['mid-term', 'final', 'end-of-term'])
             ->select('grade', DB::raw('COUNT(*) as count'))
             ->groupBy('grade')
             ->orderBy('grade')
@@ -445,11 +445,15 @@ class ResultsService
                     $data['grade'] = $gradeData['grade'];
                 }
 
+                // Canonical filter: term_id. Callers may still pass the
+                // legacy `term` key; if term_id is missing, fall back to it.
+                $termId = $data['term_id'] ?? $data['term'] ?? null;
+
                 // Check for existing result
                 $existingResult = Result::where('student_id', $data['student_id'])
                     ->where('subject_id', $data['subject_id'])
                     ->where('exam_type', $data['exam_type'] ?? 'final')
-                    ->where('term', $data['term'])
+                    ->where('term_id', $termId)
                     ->where('year', $data['year'])
                     ->first();
 
@@ -462,14 +466,15 @@ class ResultsService
                         'recorded_by' => $recordedById,
                     ]);
                 } else {
-                    // Create new
+                    // Create new — Result::boot() will backfill the legacy
+                    // `term` column with the active term's name.
                     Result::create([
                         'student_id' => $data['student_id'],
                         'subject_id' => $data['subject_id'],
                         'exam_type' => $data['exam_type'] ?? 'final',
                         'marks' => $data['marks'],
                         'grade' => $data['grade'],
-                        'term' => $data['term'],
+                        'term_id' => $termId,
                         'year' => $data['year'],
                         'comment' => $data['comment'] ?? null,
                         'recorded_by' => $recordedById,

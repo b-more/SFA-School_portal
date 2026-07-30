@@ -135,7 +135,7 @@ class ParentDashboard extends Page
                 ->with('subject');
 
             if ($activeTerm) {
-                $resultsQuery->where('term', $activeTerm->name ?? 'first');
+                $resultsQuery->where('term_id', $activeTerm->id);
             }
 
             $results = $resultsQuery->orderBy('created_at', 'desc')->get();

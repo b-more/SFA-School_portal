@@ -548,7 +548,7 @@ class Dashboard extends Page
             $currentTerm = Term::whereHas('academicYear', fn($q) => $q->where('is_active', true))
                 ->where('is_current', true)->first();
             $avgMarks = $currentTerm
-                ? Result::where('term', $currentTerm->id)->where('year', now()->year)->avg('marks')
+                ? Result::where('term_id', $currentTerm->id)->where('year', now()->year)->avg('marks')
                 : 0;
 
             // Events this week
@@ -784,7 +784,7 @@ class Dashboard extends Page
             return [];
         }
 
-        return Result::where('term', $currentTerm->id)
+        return Result::where('term_id', $currentTerm->id)
             ->where('year', now()->year)
             ->select('student_id', DB::raw('AVG(marks) as average'), DB::raw('COUNT(*) as subjects'))
             ->groupBy('student_id')
