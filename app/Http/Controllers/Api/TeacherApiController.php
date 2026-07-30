@@ -30,8 +30,10 @@ use App\Models\Teacher;
 use App\Models\Term;
 use App\Models\TimetableEntry;
 use App\Models\TimetablePeriod;
+use App\Services\ResultsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class TeacherApiController extends Controller
 {
@@ -347,7 +349,7 @@ class TeacherApiController extends Controller
         $request->validate([
             'subject_id' => 'required|integer',
             'class_section_id' => 'required|integer',
-            'exam_type' => 'required|string',
+            'exam_type' => ['required', Rule::in(['mid-term', 'end-of-term', 'final', 'quiz', 'assignment'])],
             'results' => 'required|array|min:1',
             'results.*.student_id' => 'required|integer',
             'results.*.marks' => 'required|numeric|min:0|max:100',
@@ -357,31 +359,31 @@ class TeacherApiController extends Controller
         $activeTerm = Term::where('is_active', true)->first();
         $activeYear = AcademicYear::where('is_active', true)->first();
 
-        $saved = 0;
-        foreach ($request->results as $r) {
-            $marks = $r['marks'];
-            $grade = $marks >= 80 ? 'A' : ($marks >= 70 ? 'B' : ($marks >= 60 ? 'C' : ($marks >= 50 ? 'D' : ($marks >= 40 ? 'E' : 'F'))));
-
-            Result::updateOrCreate(
-                [
-                    'student_id' => $r['student_id'],
-                    'subject_id' => $request->subject_id,
-                    'exam_type' => $request->exam_type,
-                    'term' => $activeTerm?->name,
-                    'term_id' => $activeTerm?->id,
-                    'year' => $activeYear?->name ? (int) substr($activeYear->name, 0, 4) : date('Y'),
-                ],
-                [
-                    'marks' => $marks,
-                    'academic_year_id' => $activeYear?->id,
-                    'grade' => $grade,
-                    'recorded_by' => $teacher?->id,
-                ]
-            );
-            $saved++;
+        if (! $activeTerm || ! $activeYear) {
+            return response()->json(['message' => 'No active term or academic year configured.'], 400);
         }
 
-        return response()->json(['message' => "Results saved for {$saved} students.", 'count' => $saved]);
+        $year = (int) substr((string) $activeYear->name, 0, 4) ?: (int) date('Y');
+
+        // Delegate to ResultsService so the grade letter comes from the
+        // configured GradingScale (respects primary vs secondary bands),
+        // term_id is canonical, and write logic matches the Filament page.
+        $rows = collect($request->results)->map(fn ($r) => [
+            'student_id' => (int) $r['student_id'],
+            'subject_id' => (int) $request->subject_id,
+            'exam_type'  => $request->exam_type,
+            'marks'      => $r['marks'],
+            'term_id'    => $activeTerm->id,
+            'year'       => $year,
+        ])->all();
+
+        $out = app(ResultsService::class)->saveBulkResults($rows, $teacher?->id);
+
+        return response()->json([
+            'message' => "Results saved for {$out['saved']} students.",
+            'count'   => $out['saved'],
+            'errors'  => $out['errors'],
+        ]);
     }
 
     public function getResults($classSectionId, $subjectId)

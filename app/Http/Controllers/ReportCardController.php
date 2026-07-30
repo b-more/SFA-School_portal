@@ -12,8 +12,8 @@ use App\Models\Term;
 use App\Services\ResultsService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use ZipArchive;
 
 class ReportCardController extends Controller
 {
@@ -111,11 +111,21 @@ class ReportCardController extends Controller
     }
 
     /**
-     * Generate report cards for all students in a class section (ZIP download).
+     * Generate report cards for all students in a class section as one merged PDF.
+     *
+     * We render a single Blade with page-breaks between students instead of N
+     * individual DomPDF runs — dramatically less wall-clock time — and drop the
+     * result in storage/app/public/exports/ so the browser downloads it over
+     * nginx directly rather than tying up a PHP-FPM worker for the full render.
      */
     public function bulkGenerate(Request $request, ClassSection $classSection, Term $term)
     {
-        $year = $request->get('year', now()->year);
+        // Long DomPDF renders (40+ students × letterhead per page) can breach
+        // php-fpm's default max_execution_time; disable it for this request.
+        @set_time_limit(0);
+        ignore_user_abort(true);
+
+        $year = (int) $request->get('year', now()->year);
 
         $allStudents = $classSection->students()
             ->where('enrollment_status', 'active')
@@ -146,57 +156,34 @@ class ReportCardController extends Controller
 
         $academicYear = AcademicYear::where('is_active', true)->first();
 
-        // Create a temporary directory
-        $tempDir = storage_path('app/temp/report-cards-' . time());
-        if (!file_exists($tempDir)) {
-            mkdir($tempDir, 0755, true);
-        }
+        // Build the report-data payload for each student. The bulk Blade
+        // iterates $reports and @includes pdf.report-card per student.
+        $reports = $students->map(function ($student) use ($term, $year, $academicYear) {
+            $data = $this->prepareReportCardData($student, $term, $year);
 
-        $generatedFiles = [];
-
-        foreach ($students as $student) {
-            $reportData = $this->prepareReportCardData($student, $term, $year);
-
-            $pdf = Pdf::loadView('pdf.report-card', $reportData);
-            $pdf->setPaper('A4', 'portrait');
-
-            $sanitizedId = str_replace('/', '-', $student->student_id_number);
-            $filename = $this->sanitizeFilename($student->name) . "-{$sanitizedId}.pdf";
-            $filepath = $tempDir . '/' . $filename;
-
-            $pdf->save($filepath);
-            $generatedFiles[] = $filepath;
-
-            // Mark as generated
             if ($academicYear) {
-                $comment = ReportCardComment::findOrCreateFor($student->id, $term->id, $academicYear->id);
-                $comment->markAsGenerated();
+                ReportCardComment::findOrCreateFor($student->id, $term->id, $academicYear->id)
+                    ->markAsGenerated();
             }
-        }
 
-        // Create ZIP file
+            return $data;
+        })->all();
+
+        $pdf = Pdf::loadView('pdf.report-cards-bulk', ['reports' => $reports]);
+        $pdf->setPaper('A4', 'portrait');
+
         $gradeName = $classSection->grade ? $classSection->grade->name : 'Unknown';
-        $zipFilename = "report-cards-{$gradeName}-{$classSection->name}-term{$term->id}-{$year}.zip";
-        $zipPath = storage_path('app/temp/' . $zipFilename);
+        $safeGrade = preg_replace('/[^A-Za-z0-9]+/', '-', trim($gradeName));
+        $safeSection = preg_replace('/[^A-Za-z0-9]+/', '-', trim((string) $classSection->name));
+        $stamp = now()->format('Ymd-His');
+        $filename = "report-cards-{$safeGrade}-{$safeSection}-term{$term->id}-{$year}-{$stamp}.pdf";
 
-        $zip = new ZipArchive();
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true) {
-            foreach ($generatedFiles as $file) {
-                $zip->addFile($file, basename($file));
-            }
-            $zip->close();
-        }
-
-        // Clean up individual PDF files
-        foreach ($generatedFiles as $file) {
-            if (file_exists($file)) {
-                unlink($file);
-            }
-        }
-        rmdir($tempDir);
+        // Save to the public exports/ dir. www-data owns the process,
+        // so file permissions are correct out of the box.
+        Storage::disk('public')->put("exports/{$filename}", $pdf->output());
 
         // Flash a notice listing which students were skipped due to arrears (if any).
-        if (! empty($blocked) && $blocked->count() > 0) {
+        if ($blocked->count() > 0) {
             $names = $blocked->take(6)->pluck('name')->join(', ');
             $more = $blocked->count() > 6 ? ' and ' . ($blocked->count() - 6) . ' more' : '';
             session()->flash('arrears_notice',
@@ -204,8 +191,17 @@ class ReportCardController extends Controller
             );
         }
 
-        // Download and delete ZIP
-        return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
+        Log::channel('single')->info('Bulk report cards generated', [
+            'class_section' => $classSection->id,
+            'term'          => $term->id,
+            'year'          => $year,
+            'student_count' => count($reports),
+            'skipped'       => $blocked->count(),
+            'filename'      => $filename,
+        ]);
+
+        // Redirect to the file's public URL — nginx serves the PDF directly.
+        return redirect()->to(Storage::disk('public')->url("exports/{$filename}"));
     }
 
     /**

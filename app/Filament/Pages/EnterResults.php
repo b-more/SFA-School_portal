@@ -539,11 +539,9 @@ class EnterResults extends Page implements HasForms
             return false;
         }
 
-        return in_array($user->role_id, [
-            RoleConstants::ADMIN,
-            RoleConstants::TEACHER,
-            RoleConstants::DEAN_OF_PRIMARY,
-            RoleConstants::DEAN_OF_SECONDARY,
-        ]);
+        // Any admin or teaching role (includes deans, head teachers,
+        // deputy heads) can enter marks — head teachers and deputies
+        // often teach classes themselves and were previously locked out.
+        return in_array($user->role_id, RoleConstants::teachingWithAdmin());
     }
 }

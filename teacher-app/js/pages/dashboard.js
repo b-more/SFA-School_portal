@@ -698,10 +698,11 @@ async function renderResults(el, api) {
                 ${classes.map(c => `<option value="${c.class_section_id}|${c.subject_id}" ${String(c.class_section_id) === selectedClass && String(c.subject_id) === selectedSubject ? 'selected' : ''}>${c.grade} ${c.class_section} - ${c.subject}</option>`).join('')}
             </select>
             <select id="res-type" class="form-input" style="width:auto;padding:8px 10px;font-size:0.75rem">
-                <option value="test">Test</option>
-                <option value="exam">Exam</option>
-                <option value="assignment">Assignment</option>
+                <option value="end-of-term">End-of-Term</option>
+                <option value="mid-term">Mid-Term</option>
+                <option value="final">Final</option>
                 <option value="quiz">Quiz</option>
+                <option value="assignment">Assignment</option>
             </select>
         </div></div>`;
 
