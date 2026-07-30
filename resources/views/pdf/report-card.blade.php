@@ -619,9 +619,14 @@
                         <div class="signature-title">Class Teacher</div>
                     </div>
                 </td>
+                @php
+                    $__isSecondary = $student->classSection && $student->classSection->grade
+                        && \App\Models\GradingScale::determineGradeLevelFromGrade($student->classSection->grade) === 'secondary';
+                    $__headTeacherName = $__isSecondary ? 'Happy Simutowe' : 'Sylvester Lupando';
+                @endphp
                 <td>
                     <div class="signature-line">
-                        <div class="signature-name">Sylvester Lupando</div>
+                        <div class="signature-name">{{ $__headTeacherName }}</div>
                         <div class="signature-title">Head Teacher</div>
                     </div>
                 </td>

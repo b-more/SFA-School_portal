@@ -63,23 +63,35 @@ class GradingScale extends Model
 
     /**
      * Determine grade level from a Grade model.
+     *
+     * Zambian mapping:
+     *   • Baby Class / Middle Class / Reception → primary (ECL)
+     *   • Grade 1–7 → primary
+     *   • Grade 8–12 → secondary
+     *   • Form 1 upward → secondary (this school still uses Form naming
+     *     for lower secondary alongside Grade 10–12 for upper secondary,
+     *     so any Form N is treated as secondary regardless of number).
      */
     public static function determineGradeLevelFromGrade(Grade $grade): string
     {
         $gradeName = $grade->name ?? '';
 
-        // Check for ECL/Primary grades
         if (in_array($gradeName, ['Baby Class', 'Middle Class', 'Reception'])) {
             return 'primary';
         }
 
-        // Check for Grade 1-7 (Primary)
+        if (preg_match('/Form\s*\d+/i', $gradeName)) {
+            return 'secondary';
+        }
+
         if (preg_match('/Grade\s*(\d+)/i', $gradeName, $matches)) {
             $gradeNumber = (int) $matches[1];
             return $gradeNumber <= 7 ? 'primary' : 'secondary';
         }
 
-        // Default to primary for unknown grades
+        // Unknown naming: fall back to primary (safer default for lower
+        // grades; a Form/Grade 8+ pupil would only end up here if the
+        // grade was renamed to something exotic, which is worth flagging).
         return 'primary';
     }
 
