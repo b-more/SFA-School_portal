@@ -5,338 +5,320 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Report Card - {{ $student->name }}</title>
     <style>
+        /* ============================================================
+           REPORT CARD — Corporate stationery style
+           Palette: midnight navy #0F2A44 · oxblood #8B1A1A · parchment #F5EFE0
+           Type: DejaVu Sans (single family) with disciplined weight +
+                 letter-spacing to create ceremonial hierarchy.
+           ============================================================ */
+
         @page {
             size: A4 portrait;
-            margin: 10mm 12mm;
+            margin: 12mm 14mm 10mm 14mm;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'DejaVu Sans', Arial, Helvetica, sans-serif;
-            font-size: 9.5px;
-            line-height: 1.3;
-            color: #1f2937;
-            background: #fff;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 186mm;
-            margin: 0 auto;
-        }
-
-        /* ========== HEADER ========== */
-        .header-wrapper {
-            border: 2px solid #1e3a5f;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .header-top {
-            display: table;
-            width: 100%;
-            background-color: #1e3a5f;
-        }
-
-        .header-logo-cell {
-            display: table-cell;
-            width: 80px;
-            vertical-align: middle;
-            text-align: center;
-            padding: 8px 5px 8px 10px;
-        }
-
-        .logo-ring {
-            width: 55px;
-            height: 55px;
-            border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.3);
-            padding: 2px;
-            display: inline-block;
-        }
-
-        .logo-img {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            object-fit: contain;
-            background: white;
-        }
-
-        .logo-placeholder {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: white;
-            line-height: 49px;
-            text-align: center;
-            font-size: 18px;
-            font-weight: bold;
-            color: #1e3a5f;
-        }
-
-        .header-text-cell {
-            display: table-cell;
-            vertical-align: middle;
-            text-align: center;
-            padding: 8px 80px 8px 5px;
-        }
-
-        .school-name {
-            font-size: 17px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: #ffffff;
-        }
-
-        .school-motto {
-            font-size: 8.5px;
-            font-style: italic;
-            color: rgba(255,255,255,0.7);
-            margin: 2px 0 3px;
-        }
-
-        .school-address {
-            font-size: 7.5px;
-            color: rgba(255,255,255,0.6);
+            font-size: 10px;
             line-height: 1.4;
+            color: #111827;
+            background: #ffffff;
         }
 
-        /* Red accent bar */
-        .accent-bar {
-            height: 3px;
-            background-color: #dc2626;
+        /* Faint school crest behind the whole page — the one bold move,
+           printed at ~6% opacity so it reads as institutional stationery
+           rather than decoration. */
+        .watermark {
+            position: absolute;
+            top: 105mm;
+            left: 40mm;
+            width: 110mm;
+            height: auto;
+            opacity: 0.035;
+            z-index: -1;
         }
 
-        /* Report title */
-        .report-title-bar {
-            display: table;
-            width: 100%;
-            background-color: #f8fafc;
-        }
-        .report-title-cell {
-            display: table-cell;
-            padding: 5px 12px;
-            text-align: center;
-            font-size: 11px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: #1e3a5f;
-        }
-
-        /* ========== STUDENT INFO ========== */
-        .student-info-table {
+        /* ================= HEADER ================= */
+        .header {
             width: 100%;
             border-collapse: collapse;
-            border-left: 2px solid #1e3a5f;
-            border-right: 2px solid #1e3a5f;
+            margin-bottom: 0;
         }
-
-        .student-info-table td {
-            border-bottom: 1px solid #cbd5e1;
-            padding: 4px 8px;
-            font-size: 9px;
+        .header td {
+            vertical-align: middle;
+            padding: 0;
         }
-
-        .student-info-table .label {
-            font-weight: bold;
-            font-size: 7.5px;
-            text-transform: uppercase;
-            color: #64748b;
-            letter-spacing: 0.3px;
-            width: 17%;
+        .header .logo-cell {
+            width: 30mm;
+            padding-right: 6mm;
         }
-
-        .student-info-table .value {
-            font-weight: 600;
-            color: #1f2937;
-            width: 33%;
+        .header .logo-img {
+            width: 26mm;
+            height: auto;
         }
-
-        /* ========== RESULTS TABLE ========== */
-        table.results {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        table.results th {
-            border: 2px solid #1e3a5f;
-            padding: 5px 6px;
-            text-align: center;
-            font-size: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            font-weight: bold;
-            color: #ffffff;
-            background-color: #1e3a5f;
-        }
-
-        table.results th:first-child {
+        .header .text-cell {
             text-align: left;
-            padding-left: 8px;
         }
-
-        table.results td {
-            border: 1px solid #cbd5e1;
-            border-left: 2px solid #1e3a5f;
-            border-right: 2px solid #1e3a5f;
-            padding: 4px 6px;
-            text-align: center;
+        .school-name {
+            font-size: 22px;
+            font-weight: bold;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #0F2A44;
+            line-height: 1.1;
+        }
+        .school-motto {
             font-size: 9.5px;
-            color: #1f2937;
+            font-style: italic;
+            color: #8B1A1A;
+            margin-top: 3px;
+            letter-spacing: 0.5px;
+        }
+        .school-meta {
+            font-size: 8.5px;
+            color: #4B5563;
+            margin-top: 5px;
+            line-height: 1.55;
         }
 
-        table.results td:first-child {
-            text-align: left;
-            padding-left: 8px;
-            font-weight: 500;
+        /* Double rule under header — oxblood over navy — a heritage
+           stationery tell that costs almost nothing visually. */
+        .double-rule {
+            border-top: 2.5px solid #8B1A1A;
+            border-bottom: 0.75px solid #0F2A44;
+            height: 3px;
+            margin: 8px 0 0;
+            font-size: 0;
+            line-height: 0;
         }
 
-        table.results tbody tr:nth-child(even) td {
-            background-color: #f8fafc;
-        }
-
-        table.results tbody tr:last-child td {
-            border-bottom: 2px solid #1e3a5f;
-        }
-
-        .grade-badge {
+        /* ================= REPORT TITLE ================= */
+        .report-title {
+            text-align: center;
+            padding: 9px 0 8px;
+            margin-top: 6px;
+            background: #F5EFE0;
+            font-size: 11.5px;
             font-weight: bold;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #0F2A44;
+            border-top: 0.5px solid #C9B98E;
+            border-bottom: 0.5px solid #C9B98E;
+        }
+
+        /* ================= STUDENT INFO ================= */
+        .student-info {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .student-info td {
+            padding: 6px 10px 6px 0;
+            vertical-align: bottom;
             font-size: 10px;
         }
+        .info-label {
+            display: block;
+            font-size: 7.5px;
+            font-weight: bold;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: #6B7280;
+            margin-bottom: 2px;
+        }
+        .info-value {
+            display: block;
+            font-size: 11px;
+            font-weight: bold;
+            color: #0F2A44;
+            border-bottom: 0.75px solid #0F2A44;
+            padding-bottom: 3px;
+            padding-right: 12px;
+            min-height: 14px;
+        }
 
-        /* ========== SUMMARY BAR ========== */
-        .summary-table {
+        /* ================= RESULTS TABLE ================= */
+        .results {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 12px;
         }
-
-        .summary-table td {
-            border: 2px solid #1e3a5f;
-            border-top: none;
-            padding: 5px 6px;
-            text-align: center;
-        }
-
-        .summary-value {
-            font-size: 13px;
-            font-weight: bold;
-            color: #1e3a5f;
-        }
-
-        .summary-label {
-            font-size: 7px;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #64748b;
-            letter-spacing: 0.3px;
-            margin-top: 1px;
-        }
-
-        /* ========== GRADING SCALE ========== */
-        .grading-scale {
-            border: 2px solid #1e3a5f;
-            border-top: none;
-            padding: 3px 8px;
-            font-size: 7.5px;
-            color: #475569;
-            background-color: #f8fafc;
-        }
-
-        .grading-scale-title {
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #1e3a5f;
-        }
-
-        .scale-item {
-            color: #475569;
-        }
-
-        /* ========== COMMENTS ========== */
-        .comment-box {
-            border: 2px solid #1e3a5f;
-            border-top: none;
-            padding: 5px 8px;
-            min-height: 38px;
-        }
-
-        .comment-label {
-            font-weight: bold;
-            font-size: 7.5px;
-            text-transform: uppercase;
-            color: #1e3a5f;
-            letter-spacing: 0.3px;
-            border-bottom: 1px solid #cbd5e1;
-            padding-bottom: 2px;
-            margin-bottom: 3px;
-        }
-
-        .comment-text {
-            font-size: 8.5px;
-            color: #374151;
-            line-height: 1.4;
-        }
-
-        /* ========== SIGNATURES ========== */
-        .signatures-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .signatures-table td {
-            border: 2px solid #1e3a5f;
-            border-top: none;
-            padding: 5px 8px;
-            text-align: center;
-            width: 33.33%;
-            vertical-align: bottom;
-            height: 45px;
-        }
-
-        .signature-line {
-            border-top: 1px solid #1e3a5f;
-            margin-top: 18px;
-            padding-top: 3px;
-        }
-
-        .signature-name {
+        .results thead th {
+            background: #0F2A44;
+            color: #ffffff;
             font-size: 8.5px;
             font-weight: bold;
-            color: #1f2937;
-        }
-
-        .signature-title {
-            font-size: 7px;
-            color: #64748b;
+            letter-spacing: 1.2px;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-
-        /* ========== FOOTER ========== */
-        .footer-bar {
-            display: table;
-            width: 100%;
-            margin-top: 4px;
-        }
-        .footer-cell {
-            display: table-cell;
+            padding: 8px 8px;
             text-align: center;
-            vertical-align: middle;
-            padding: 3px 0;
+            border: 0.5px solid #0F2A44;
         }
-        .footer-text {
-            font-size: 7px;
-            color: #94a3b8;
+        .results thead th.subj { text-align: left; padding-left: 12px; }
+        .results tbody td {
+            padding: 9px 8px;
+            font-size: 10px;
+            border: 0.5px solid #D6D3D1;
+            color: #111827;
+            text-align: center;
         }
-        .footer-tagline {
-            font-size: 7.5px;
-            color: #1e3a5f;
-            font-weight: 600;
+        .results tbody td.subj {
+            text-align: left;
+            padding-left: 12px;
+            font-weight: bold;
+            color: #0F2A44;
+        }
+        .results tbody td.no {
+            font-family: 'DejaVu Sans', sans-serif;
+            font-weight: normal;
+            color: #6B7280;
+            width: 8%;
+        }
+        .results tbody tr:nth-child(even) td { background: #FBF7EC; }
+        .results .marks { font-weight: bold; font-size: 11px; }
+        .results .grade { font-weight: bold; font-size: 11px; color: #0F2A44; }
+        .empty-row td {
+            padding: 26px 12px !important;
+            text-align: center !important;
+            color: #9CA3AF;
             font-style: italic;
+            background: #ffffff !important;
+        }
+
+        /* ================= SUMMARY ================= */
+        .summary {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .summary td {
+            width: 25%;
+            padding: 12px 6px;
+            text-align: center;
+            border: 0.5px solid #0F2A44;
+            background: #ffffff;
+        }
+        .summary .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #0F2A44;
+            letter-spacing: 0.5px;
+            line-height: 1;
+        }
+        .summary .value .unit {
+            font-size: 10px;
+            color: #6B7280;
+            font-weight: normal;
+            letter-spacing: 0;
+        }
+        .summary .label {
+            font-size: 7.5px;
+            font-weight: bold;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            color: #6B7280;
+            margin-top: 6px;
+        }
+
+        /* ================= GRADING LEGEND ================= */
+        .legend {
+            padding: 6px 10px;
+            margin-top: 8px;
+            background: #F5EFE0;
+            border-left: 3px solid #8B1A1A;
+            font-size: 8.5px;
+            color: #4B5563;
+            line-height: 1.5;
+        }
+        .legend .head {
+            font-weight: bold;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: #0F2A44;
+            margin-right: 4px;
+        }
+
+        /* ================= COMMENTS ================= */
+        .comments {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .comments td {
+            padding: 12px 14px 18px;
+            border: 0.5px solid #0F2A44;
+            vertical-align: top;
+            background: #ffffff;
+            height: 30mm;
+        }
+        .comment-eyebrow {
+            font-size: 7.5px;
+            font-weight: bold;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            color: #8B1A1A;
+            border-bottom: 0.5px solid #E5D9BE;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+        }
+        .comment-body {
+            font-size: 10px;
+            color: #1F2937;
+            line-height: 1.55;
+        }
+
+        /* ================= SIGNATURES ================= */
+        .signatures {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+        }
+        .signatures td {
+            width: 33.33%;
+            padding: 0 8px;
+            vertical-align: bottom;
+            height: 30mm;
+        }
+        .sig-line {
+            border-top: 0.75px solid #0F2A44;
+            padding-top: 6px;
+        }
+        .sig-name {
+            font-size: 10.5px;
+            font-weight: bold;
+            color: #0F2A44;
+            letter-spacing: 0.3px;
+        }
+        .sig-title {
+            font-size: 8px;
+            font-weight: bold;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            color: #6B7280;
+            margin-top: 2px;
+        }
+
+        /* ================= FOOTER ================= */
+        .footer {
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 0.5px solid #D6D3D1;
+            text-align: center;
+        }
+        .footer .tagline {
+            font-size: 9px;
+            font-style: italic;
+            color: #8B1A1A;
+            letter-spacing: 0.5px;
+        }
+        .footer .fine {
+            font-size: 7.5px;
+            color: #9CA3AF;
+            margin-top: 3px;
+            letter-spacing: 0.3px;
         }
 
         @media print {
@@ -345,90 +327,102 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    @php
+        $isPreview = $isPreview ?? false;
+        $logoPath = null;
+        if ($schoolSettings && $schoolSettings->school_logo && file_exists(public_path('storage/' . $schoolSettings->school_logo))) {
+            $logoPath = $isPreview ? asset('storage/' . $schoolSettings->school_logo) : public_path('storage/' . $schoolSettings->school_logo);
+        } elseif (file_exists(public_path('images/logo.png'))) {
+            $logoPath = $isPreview ? asset('images/logo.png') : public_path('images/logo.png');
+        }
+    @endphp
 
-        <!-- ===== HEADER ===== -->
-        <div class="header-wrapper">
-            <div class="header-top">
-                <div class="header-logo-cell">
-                    <div class="logo-ring">
-                        @php
-                            $isPreview = $isPreview ?? false;
-                        @endphp
-                        @if($schoolSettings && $schoolSettings->school_logo && file_exists(public_path('storage/' . $schoolSettings->school_logo)))
-                            <img src="{{ $isPreview ? asset('storage/' . $schoolSettings->school_logo) : public_path('storage/' . $schoolSettings->school_logo) }}" class="logo-img" alt="Logo">
-                        @elseif(file_exists(public_path('images/logo.png')))
-                            <img src="{{ $isPreview ? asset('images/logo.png') : public_path('images/logo.png') }}" class="logo-img" alt="Logo">
-                        @else
-                            <div class="logo-placeholder">SFA</div>
-                        @endif
-                    </div>
-                </div>
-                <div class="header-text-cell">
-                    <div class="school-name">{{ $schoolSettings->school_name ?? 'St. Francis of Assisi Private School' }}</div>
-                    @if($schoolSettings && $schoolSettings->school_motto)
-                        <div class="school-motto">"{{ $schoolSettings->school_motto }}"</div>
+    {{-- Faint centred crest — heritage stationery watermark. --}}
+    @if($logoPath)
+        <img src="{{ $logoPath }}" class="watermark" alt="">
+    @endif
+
+    {{-- ===== HEADER: logo (natural aspect) + school info ===== --}}
+    <table class="header">
+        <tr>
+            <td class="logo-cell">
+                @if($logoPath)
+                    <img src="{{ $logoPath }}" class="logo-img" alt="School crest">
+                @endif
+            </td>
+            <td class="text-cell">
+                <div class="school-name">{{ $schoolSettings->school_name ?? 'St. Francis of Assisi Private School' }}</div>
+                @if($schoolSettings && $schoolSettings->school_motto)
+                    <div class="school-motto">{{ $schoolSettings->school_motto }}</div>
+                @endif
+                <div class="school-meta">
+                    @php
+                        $addressParts = array_filter([
+                            $schoolSettings->address ?? null,
+                            $schoolSettings->city ?? null,
+                            $schoolSettings->state_province ?? null,
+                            $schoolSettings->country ?? null,
+                        ]);
+                        $contactParts = array_filter([
+                            ($schoolSettings->phone ?? null) ? 'Tel ' . $schoolSettings->phone : null,
+                            ($schoolSettings->email ?? null) ? $schoolSettings->email : null,
+                            ($schoolSettings->website ?? null) ? $schoolSettings->website : null,
+                        ]);
+                    @endphp
+                    @if(!empty($addressParts))
+                        {{ implode(', ', $addressParts) }}@if(!empty($schoolSettings->postal_code)) &middot; P.O. Box {{ $schoolSettings->postal_code }}@endif<br>
                     @endif
-                    <div class="school-address">
-                        @php
-                            $addressParts = array_filter([
-                                $schoolSettings->address ?? null,
-                                $schoolSettings->city ?? null,
-                                $schoolSettings->state_province ?? null,
-                                $schoolSettings->country ?? null,
-                            ]);
-                            $contactParts = array_filter([
-                                ($schoolSettings->phone ?? null) ? 'Tel: ' . $schoolSettings->phone : null,
-                                ($schoolSettings->email ?? null) ? 'Email: ' . $schoolSettings->email : null,
-                                ($schoolSettings->website ?? null) ? 'Web: ' . $schoolSettings->website : null,
-                            ]);
-                        @endphp
-                        @if(!empty($addressParts))
-                            {{ implode(', ', $addressParts) }}
-                            @if($schoolSettings->postal_code) &middot; P.O. Box {{ $schoolSettings->postal_code }}@endif
-                            <br>
-                        @endif
-                        @if(!empty($contactParts))
-                            {{ implode('  |  ', $contactParts) }}
-                        @endif
-                    </div>
+                    @if(!empty($contactParts))
+                        {{ implode('  ·  ', $contactParts) }}
+                    @endif
                 </div>
-            </div>
-            <div class="accent-bar"></div>
-            <div class="report-title-bar">
-                <div class="report-title-cell">
-                    Student Report Card &mdash; {{ $term->name ?? 'Term' }}, {{ $year }}
-                </div>
-            </div>
-        </div>
+            </td>
+        </tr>
+    </table>
+    <div class="double-rule"></div>
 
-        <!-- ===== STUDENT INFORMATION ===== -->
-        <table class="student-info-table">
-            <tr>
-                <td class="label">Student Name</td>
-                <td class="value" style="width: 33%;">{{ $student->name }}</td>
-                <td class="label">Student ID</td>
-                <td class="value" style="width: 17%;">{{ $student->student_id_number ?? 'N/A' }}</td>
-            </tr>
-            <tr>
-                <td class="label">Class</td>
-                <td class="value">
+    {{-- ===== REPORT TITLE ===== --}}
+    <div class="report-title">
+        End of {{ $term->name ?? 'Term' }} Report &mdash; {{ $academicYear->name ?? $year }}
+    </div>
+
+    {{-- ===== STUDENT INFORMATION ===== --}}
+    <table class="student-info">
+        <tr>
+            <td colspan="2" style="width:52%">
+                <span class="info-label">Pupil</span>
+                <span class="info-value">{{ $student->name }}</span>
+            </td>
+            <td>
+                <span class="info-label">Pupil ID</span>
+                <span class="info-value">{{ $student->student_id_number ?? '—' }}</span>
+            </td>
+            <td>
+                <span class="info-label">Sex</span>
+                <span class="info-value">{{ ucfirst($student->gender ?? '—') }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <span class="info-label">Class</span>
+                <span class="info-value">
                     @if($student->classSection && $student->classSection->grade)
-                        {{ $student->classSection->grade->name }} - {{ $student->classSection->name }}
+                        {{ $student->classSection->grade->name }} &mdash; {{ $student->classSection->name }}
                     @else
-                        N/A
+                        —
                     @endif
-                </td>
-                <td class="label">Gender</td>
-                <td class="value">{{ ucfirst($student->gender ?? 'N/A') }}</td>
-            </tr>
-            <tr>
-                <td class="label">Academic Year</td>
-                <td class="value">{{ $academicYear->name ?? $year }}</td>
-                <td class="label">Class Teacher</td>
-                <td class="value">{{ $classTeacherName ?? 'N/A' }}</td>
-            </tr>
-        </table>
+                </span>
+            </td>
+            <td>
+                <span class="info-label">Class Teacher</span>
+                <span class="info-value">{{ $classTeacherName ?? '—' }}</span>
+            </td>
+            <td>
+                <span class="info-label">Issued</span>
+                <span class="info-value">{{ $generatedAt->format('d M Y') }}</span>
+            </td>
+        </tr>
+    </table>
 
         <!-- ===== RESULTS TABLE ===== -->
         @php
@@ -438,31 +432,23 @@
         <table class="results">
             <thead>
                 <tr>
-                    <th style="width: 7%;">No.</th>
-                    <th style="width: 38%; text-align: left;">Subject</th>
-                    <th style="width: 18%;">Marks (%)</th>
-                    <th style="width: 15%;">Grade</th>
-                    <th style="width: 22%;">Remark</th>
+                    <th class="subj" style="width: 44%;">Subject</th>
+                    <th style="width: 12%;">Marks</th>
+                    <th style="width: 12%;">Grade</th>
+                    <th style="width: 32%;">Remark</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($subjects as $index => $subject)
                     <tr>
-                        <td>{{ $index + 1 }}</td>
-                        <td style="text-align: left;">{{ $subject['subject_name'] }}</td>
-                        <td><strong>{{ $subject['combined'] !== null ? number_format($subject['combined'], 0) : '-' }}</strong></td>
-                        <td>
-                            @if(isset($subject['grade']) && $subject['grade'] !== 'N/A')
-                                <span class="grade-badge">{{ $subject['grade'] }}</span>
-                            @else
-                                -
-                            @endif
-                        </td>
-                        <td>{{ $subject['remark'] ?? '-' }}</td>
+                        <td class="subj">{{ $subject['subject_name'] }}</td>
+                        <td class="marks">{{ $subject['combined'] !== null ? number_format($subject['combined'], 0) : '—' }}</td>
+                        <td class="grade">{{ (isset($subject['grade']) && $subject['grade'] !== 'N/A') ? $subject['grade'] : '—' }}</td>
+                        <td>{{ $subject['remark'] ?? '—' }}</td>
                     </tr>
                 @empty
-                    <tr>
-                        <td colspan="5" style="text-align: center; color: #94a3b8; padding: 15px;">No results available for this term</td>
+                    <tr class="empty-row">
+                        <td colspan="4">No results have been recorded for this term.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -549,107 +535,100 @@
             $autoHeadTeacherComment = $headTeacherComments[$category][array_rand($headTeacherComments[$category])];
         @endphp
 
-        <table class="summary-table">
+        <table class="summary">
             <tr>
-                <td style="width: 25%;">
-                    <div class="summary-value">{{ number_format($average, 1) }}%</div>
-                    <div class="summary-label">Average</div>
+                <td>
+                    <div class="value">{{ number_format($average, 1) }}<span class="unit">%</span></div>
+                    <div class="label">Average</div>
                 </td>
-                <td style="width: 25%;">
-                    <div class="summary-value">{{ number_format($combined['total'], 0) }}/{{ $combined['subjects_count'] * 100 }}</div>
-                    <div class="summary-label">Total Marks</div>
+                <td>
+                    <div class="value">{{ number_format($combined['total'], 0) }}<span class="unit"> / {{ $combined['subjects_count'] * 100 }}</span></div>
+                    <div class="label">Total Marks</div>
                 </td>
-                <td style="width: 25%;">
-                    <div class="summary-value">
+                <td>
+                    <div class="value">
                         @if($position['position'])
-                            {{ $position['position'] }} / {{ $position['total'] }}
+                            {{ $position['position'] }}<span class="unit"> / {{ $position['total'] }}</span>
                         @else
-                            N/A
+                            —
                         @endif
                     </div>
-                    <div class="summary-label">Class Position</div>
+                    <div class="label">Class Position</div>
                 </td>
-                <td style="width: 25%;">
-                    <div class="summary-value">
-                        @if($overallGrade)
-                            {{ $overallGrade['grade'] }}
-                        @else
-                            N/A
-                        @endif
+                <td>
+                    <div class="value">
+                        {{ $overallGrade ? $overallGrade['grade'] : '—' }}
                     </div>
-                    <div class="summary-label">Overall Grade</div>
+                    <div class="label">Overall Grade</div>
                 </td>
             </tr>
         </table>
 
-        <!-- ===== GRADING SCALE ===== -->
+        {{-- ===== GRADING LEGEND ===== --}}
         @if($gradingScale)
-            <div class="grading-scale">
-                <span class="grading-scale-title">Grading Scale:</span>
+            <div class="legend">
+                <span class="head">Grading Scale</span>
                 @foreach($gradingScale->items as $item)
-                    <span class="scale-item">
-                        <strong>{{ $item->grade }}</strong> ({{ $item->min_marks }}-{{ $item->max_marks }}%)
-                    </span>
-                    @if(!$loop->last) &nbsp;|&nbsp; @endif
+                    <strong>{{ $item->grade }}</strong> {{ $item->min_marks }}&ndash;{{ $item->max_marks }}%@if(!$loop->last) &nbsp;·&nbsp; @endif
                 @endforeach
             </div>
         @endif
 
-        <!-- ===== COMMENTS ===== -->
-        <div class="comment-box">
-            <div class="comment-label">Class Teacher's Comment</div>
-            <div class="comment-text">
-                {{ ($comments && $comments->class_teacher_comment) ? $comments->class_teacher_comment : $autoClassTeacherComment }}
-            </div>
-        </div>
-
-        <div class="comment-box">
-            <div class="comment-label">Head Teacher's Comment</div>
-            <div class="comment-text">
-                {{ ($comments && $comments->head_teacher_comment) ? $comments->head_teacher_comment : $autoHeadTeacherComment }}
-            </div>
-        </div>
-
-        <!-- ===== SIGNATURES ===== -->
-        <table class="signatures-table">
+        {{-- ===== COMMENTS ===== --}}
+        <table class="comments">
             <tr>
                 <td>
-                    <div class="signature-line">
-                        <div class="signature-name">{{ $classTeacherName ?? '________________' }}</div>
-                        <div class="signature-title">Class Teacher</div>
+                    <div class="comment-eyebrow">Class Teacher's Remarks</div>
+                    <div class="comment-body">
+                        {{ ($comments && $comments->class_teacher_comment) ? $comments->class_teacher_comment : $autoClassTeacherComment }}
                     </div>
                 </td>
-                @php
-                    $__isSecondary = $student->classSection && $student->classSection->grade
-                        && \App\Models\GradingScale::determineGradeLevelFromGrade($student->classSection->grade) === 'secondary';
-                    $__headTeacherName = $__isSecondary ? 'Happy Simutowe' : 'Sylvester Lupando';
-                @endphp
+            </tr>
+            <tr>
                 <td>
-                    <div class="signature-line">
-                        <div class="signature-name">{{ $__headTeacherName }}</div>
-                        <div class="signature-title">Head Teacher</div>
-                    </div>
-                </td>
-                <td>
-                    <div class="signature-line">
-                        <div class="signature-name">Blessmore Mulenga</div>
-                        <div class="signature-title">School Principal</div>
+                    <div class="comment-eyebrow">Head Teacher's Remarks</div>
+                    <div class="comment-body">
+                        {{ ($comments && $comments->head_teacher_comment) ? $comments->head_teacher_comment : $autoHeadTeacherComment }}
                     </div>
                 </td>
             </tr>
         </table>
 
-        <!-- ===== FOOTER ===== -->
-        <div class="footer-bar">
-            <div class="footer-cell">
-                <div class="footer-tagline">Nurturing Excellence, Inspiring the Future!</div>
-                <div class="footer-text">
-                    Date Issued: {{ $generatedAt->format('d F Y') }}
-                    &nbsp;&middot;&nbsp; This is a computer-generated document.
-                </div>
+        {{-- ===== SIGNATURES ===== --}}
+        @php
+            $__isSecondary = $student->classSection && $student->classSection->grade
+                && \App\Models\GradingScale::determineGradeLevelFromGrade($student->classSection->grade) === 'secondary';
+            $__headTeacherName = $__isSecondary ? 'Happy Simutowe' : 'Sylvester Lupando';
+        @endphp
+        <table class="signatures">
+            <tr>
+                <td>
+                    <div class="sig-line">
+                        <div class="sig-name">{{ $classTeacherName ?? '—' }}</div>
+                        <div class="sig-title">Class Teacher</div>
+                    </div>
+                </td>
+                <td>
+                    <div class="sig-line">
+                        <div class="sig-name">{{ $__headTeacherName }}</div>
+                        <div class="sig-title">Head Teacher</div>
+                    </div>
+                </td>
+                <td>
+                    <div class="sig-line">
+                        <div class="sig-name">Blessmore Mulenga</div>
+                        <div class="sig-title">School Principal</div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        {{-- ===== FOOTER ===== --}}
+        <div class="footer">
+            <div class="tagline">Nurturing Excellence, Inspiring the Future.</div>
+            <div class="fine">
+                Issued {{ $generatedAt->format('d F Y') }} &middot; This is a computer-generated document; a facsimile signature is not required for authenticity.
             </div>
         </div>
-
-    </div>
 </body>
 </html>
