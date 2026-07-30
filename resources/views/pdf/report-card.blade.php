@@ -627,8 +627,8 @@
                 </td>
                 <td>
                     <div class="signature-line">
-                        <div class="signature-name">Francis Mulenga</div>
-                        <div class="signature-title">Executive Director</div>
+                        <div class="signature-name">Blessmore Mulenga</div>
+                        <div class="signature-title">School Principal</div>
                     </div>
                 </td>
             </tr>
