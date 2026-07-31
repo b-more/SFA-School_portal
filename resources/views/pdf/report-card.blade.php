@@ -311,10 +311,10 @@
            15mm of empty padding above the printed line for a
            handwritten pen signature. vertical-align: bottom keeps the
            printed name + title anchored below the line. */
-        .signatures { width: 100%; margin-top: 2mm; }
+        .signatures { width: 100%; margin-top: 0.5mm; }
         .signatures td {
             width: 33.33%;
-            padding: 15mm 8pt 0;
+            padding: 7mm 8pt 0;
             vertical-align: bottom;
         }
         .sig-line {
