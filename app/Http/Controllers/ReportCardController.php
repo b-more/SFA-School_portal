@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AcademicYear;
+use App\Models\Attendance;
 use App\Models\ClassSection;
 use App\Models\GradingScale;
 use App\Models\ReportCardComment;
@@ -12,6 +13,7 @@ use App\Models\Term;
 use App\Services\ResultsService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -243,6 +245,38 @@ class ReportCardController extends Controller
             $classTeacherName = $student->classSection->classTeacher->name;
         }
 
+        // Attendance summary for the term. Late counts as present (they
+        // came to school); sick + excused are broken out. Rate is
+        // present / (present + absent + sick + excused).
+        $counts = Attendance::where('student_id', $student->id)
+            ->where('term_id', $term->id)
+            ->select('status', DB::raw('COUNT(*) as c'))
+            ->groupBy('status')
+            ->pluck('c', 'status')
+            ->toArray();
+        $present = (int) (($counts['present'] ?? 0) + ($counts['late'] ?? 0));
+        $absent  = (int) ($counts['absent']  ?? 0);
+        $sick    = (int) ($counts['sick']    ?? 0);
+        $excused = (int) ($counts['excused'] ?? 0);
+        $marked  = $present + $absent + $sick + $excused;
+        $attendance = [
+            'present' => $present,
+            'absent'  => $absent,
+            'sick'    => $sick,
+            'excused' => $excused,
+            'total'   => $marked,
+            'rate'    => $marked > 0 ? round(($present / $marked) * 100, 1) : null,
+        ];
+
+        // Document reference number — feels institutional and helps the
+        // office file / retrieve a physical copy.
+        $reportRef = sprintf(
+            'SFA/RC/%d/T%d/%s',
+            $year,
+            $term->id,
+            $student->student_id_number ?? $student->id
+        );
+
         return [
             'student' => $student,
             'term' => $term,
@@ -253,6 +287,8 @@ class ReportCardController extends Controller
             'gradingScale' => $gradingScale,
             'comments' => $comments,
             'classTeacherName' => $classTeacherName,
+            'attendance' => $attendance,
+            'reportRef' => $reportRef,
             'generatedAt' => now(),
         ];
     }

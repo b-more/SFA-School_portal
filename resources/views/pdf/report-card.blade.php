@@ -12,9 +12,12 @@
                  letter-spacing to create ceremonial hierarchy.
            ============================================================ */
 
+        /* Margins sized for a hole-punched, filed document.
+           Left 22mm reserves the standard European filing edge; other
+           sides get a generous 15mm so nothing crowds the paper edge. */
         @page {
             size: A4 portrait;
-            margin: 12mm 14mm 10mm 14mm;
+            margin: 15mm 15mm 15mm 22mm;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,8 +35,8 @@
            rather than decoration. */
         .watermark {
             position: absolute;
-            top: 105mm;
-            left: 40mm;
+            top: 100mm;
+            left: 30mm;
             width: 110mm;
             height: auto;
             opacity: 0.035;
@@ -95,18 +98,34 @@
         }
 
         /* ================= REPORT TITLE ================= */
-        .report-title {
-            text-align: center;
-            padding: 9px 0 8px;
+        .title-bar {
+            width: 100%;
+            border-collapse: collapse;
             margin-top: 6px;
             background: #F5EFE0;
-            font-size: 11.5px;
-            font-weight: bold;
-            letter-spacing: 4px;
-            text-transform: uppercase;
-            color: #0F2A44;
             border-top: 0.5px solid #C9B98E;
             border-bottom: 0.5px solid #C9B98E;
+        }
+        .title-bar td {
+            padding: 9px 12px 8px;
+            font-size: 8px;
+            font-weight: bold;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: #6B7280;
+            vertical-align: middle;
+        }
+        .title-bar .title {
+            text-align: center;
+            font-size: 11.5px;
+            letter-spacing: 4px;
+            color: #0F2A44;
+        }
+        .title-bar .ref {
+            text-align: right;
+            color: #8B1A1A;
+            font-size: 7.5px;
+            letter-spacing: 0.8px;
         }
 
         /* ================= STUDENT INFO ================= */
@@ -223,6 +242,55 @@
             margin-top: 6px;
         }
 
+        /* ================= ATTENDANCE STRIP ================= */
+        .attendance {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .attendance .head-cell {
+            width: 24mm;
+            padding: 10px 10px;
+            background: #0F2A44;
+            color: #ffffff;
+            font-size: 7.5px;
+            font-weight: bold;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            text-align: center;
+            border: 0.5px solid #0F2A44;
+            vertical-align: middle;
+        }
+        .attendance td {
+            padding: 10px 6px;
+            text-align: center;
+            border: 0.5px solid #0F2A44;
+            background: #ffffff;
+        }
+        .attendance .att-value {
+            font-size: 15px;
+            font-weight: bold;
+            color: #0F2A44;
+            line-height: 1;
+        }
+        .attendance .att-value .unit {
+            font-size: 8.5px;
+            color: #6B7280;
+            font-weight: normal;
+        }
+        .attendance .att-label {
+            font-size: 7.5px;
+            font-weight: bold;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            color: #6B7280;
+            margin-top: 5px;
+        }
+        .attendance .att-rate {
+            background: #F5EFE0;
+        }
+        .attendance .att-rate .att-value { color: #8B1A1A; }
+
         /* ================= GRADING LEGEND ================= */
         .legend {
             padding: 6px 10px;
@@ -252,7 +320,7 @@
             border: 0.5px solid #0F2A44;
             vertical-align: top;
             background: #ffffff;
-            height: 30mm;
+            height: 22mm;
         }
         .comment-eyebrow {
             font-size: 7.5px;
@@ -280,7 +348,7 @@
             width: 33.33%;
             padding: 0 8px;
             vertical-align: bottom;
-            height: 30mm;
+            height: 26mm;
         }
         .sig-line {
             border-top: 0.75px solid #0F2A44;
@@ -382,9 +450,13 @@
     <div class="double-rule"></div>
 
     {{-- ===== REPORT TITLE ===== --}}
-    <div class="report-title">
-        End of {{ $term->name ?? 'Term' }} Report &mdash; {{ $academicYear->name ?? $year }}
-    </div>
+    <table class="title-bar">
+        <tr>
+            <td style="width:35%">Confidential</td>
+            <td class="title">End of {{ $term->name ?? 'Term' }} Report &mdash; {{ $academicYear->name ?? $year }}</td>
+            <td class="ref" style="width:35%">Ref&nbsp; {{ $reportRef ?? '—' }}</td>
+        </tr>
+    </table>
 
     {{-- ===== STUDENT INFORMATION ===== --}}
     <table class="student-info">
@@ -564,6 +636,31 @@
             </tr>
         </table>
 
+        {{-- ===== ATTENDANCE ===== --}}
+        @if(!empty($attendance) && ($attendance['total'] ?? 0) > 0)
+            <table class="attendance">
+                <tr>
+                    <td class="head-cell">Attendance<br>this Term</td>
+                    <td>
+                        <div class="att-value">{{ $attendance['present'] }}<span class="unit"> / {{ $attendance['total'] }}</span></div>
+                        <div class="att-label">Days Present</div>
+                    </td>
+                    <td>
+                        <div class="att-value">{{ $attendance['absent'] }}</div>
+                        <div class="att-label">Days Absent</div>
+                    </td>
+                    <td>
+                        <div class="att-value">{{ $attendance['sick'] + $attendance['excused'] }}</div>
+                        <div class="att-label">Sick / Excused</div>
+                    </td>
+                    <td class="att-rate">
+                        <div class="att-value">{{ number_format($attendance['rate'] ?? 0, 1) }}<span class="unit">%</span></div>
+                        <div class="att-label">Attendance Rate</div>
+                    </td>
+                </tr>
+            </table>
+        @endif
+
         {{-- ===== GRADING LEGEND ===== --}}
         @if($gradingScale)
             <div class="legend">
@@ -627,7 +724,7 @@
         <div class="footer">
             <div class="tagline">Nurturing Excellence, Inspiring the Future.</div>
             <div class="fine">
-                Issued {{ $generatedAt->format('d F Y') }} &middot; This is a computer-generated document; a facsimile signature is not required for authenticity.
+                Ref {{ $reportRef ?? '—' }} &middot; Issued {{ $generatedAt->format('d F Y') }} &middot; Computer-generated document; a facsimile signature is not required for authenticity.
             </div>
         </div>
 </body>
