@@ -84,7 +84,7 @@
             font-size: 8.5pt;
             color: #4B5563;
             margin-top: 3pt;
-            line-height: 1.35;
+            line-height: 1.3;
         }
 
         /* Double rule under header — heritage stationery cue. */
@@ -106,7 +106,7 @@
             margin: 4mm 0 0 0;
         }
         .title-bar td {
-            padding: 7pt 10pt 6pt;
+            padding: 5pt 10pt 4pt;
             vertical-align: middle;
         }
         .title-bar .tag {
@@ -170,12 +170,12 @@
         }
         .results thead th.subj { text-align: left; padding-left: 10pt; }
         .results tbody td {
-            padding: 1pt 8pt;
+            padding: 0.5pt 8pt;
             font-size: 10pt;
             border: 0.5pt solid #D6D3D1;
             text-align: center;
             color: #111827;
-            line-height: 1.2;
+            line-height: 1.15;
         }
         .results tbody td.subj {
             text-align: left;
@@ -195,10 +195,10 @@
         }
 
         /* ================= SUMMARY ================= */
-        .summary { width: 100%; margin-top: 2mm; }
+        .summary { width: 100%; margin-top: 1.5mm; }
         .summary td {
             width: 25%;
-            padding: 3.5pt 4pt;
+            padding: 3pt 4pt;
             text-align: center;
             border: 0.5pt solid #0F2A44;
         }
@@ -226,10 +226,10 @@
         }
 
         /* ================= ATTENDANCE ================= */
-        .attendance { width: 100%; margin-top: 2mm; }
+        .attendance { width: 100%; margin-top: 1.5mm; }
         .attendance .head-cell {
             width: 26mm;
-            padding: 3.5pt 4pt;
+            padding: 3pt 4pt;
             background: #0F2A44;
             color: #ffffff;
             font-size: 8pt;
@@ -241,7 +241,7 @@
             vertical-align: middle;
         }
         .attendance td {
-            padding: 3.5pt 4pt;
+            padding: 3pt 4pt;
             text-align: center;
             border: 0.5pt solid #0F2A44;
         }
@@ -290,9 +290,9 @@
         /* ================= COMMENTS ================= */
         /* Comments size to their content — no fixed height. Padding
            gives them presence; content dictates fill. */
-        .comments { width: 100%; margin-top: 1.5mm; }
+        .comments { width: 100%; margin-top: 1mm; }
         .comments td {
-            padding: 2pt 10pt 3pt;
+            padding: 1.5pt 10pt 2.5pt;
             border: 0.5pt solid #0F2A44;
             vertical-align: top;
         }
@@ -312,13 +312,15 @@
             line-height: 1.45;
         }
 
-        /* ================= SIGNATURES ================= */
-        .signatures { width: 100%; margin-top: 1mm; }
+        /* ================= SIGNATURES =================
+           15mm of empty padding above the printed line for a
+           handwritten pen signature. vertical-align: bottom keeps the
+           printed name + title anchored below the line. */
+        .signatures { width: 100%; margin-top: 2mm; }
         .signatures td {
             width: 33.33%;
-            padding: 6pt 8pt 0;
+            padding: 15mm 8pt 0;
             vertical-align: bottom;
-            height: 8mm;
         }
         .sig-line {
             border-top: 0.5pt solid #0F2A44;
@@ -564,7 +566,7 @@
                         —
                     @endif
                 </div>
-                <div class="label">Class Position</div>
+                <div class="label">Position in Class</div>
             </td>
             <td>
                 <div class="value">{{ $overallGrade ? $overallGrade['grade'] : '—' }}</div>
