@@ -45,7 +45,12 @@
             z-index: 0;
         }
 
-        /* ================= HEADER ================= */
+        /* ================= HEADER =================
+           Classic school-letterhead lockup: crest (seal) at left,
+           printed school name + motto + postal details stack to right.
+           The crest's baked-in text is redundant with the printed
+           name — that's intentional and traditional for stationery,
+           it earns the printed lockup its role as the reading anchor. */
         .header {
             width: 100%;
             margin: 0;
@@ -55,31 +60,40 @@
             padding: 0;
         }
         .header .logo-cell {
-            width: 34mm;
+            width: 30mm;
             padding-right: 6mm;
         }
         .header .logo {
             display: block;
-            height: 26mm;
-            width: 32mm; /* native 2304×1856 = 1.241 aspect → 32×26 */
+            height: 24mm;
+            width: 30mm; /* native 2304×1856 = 1.241 aspect → 30×24 */
         }
-        /* The crest already carries the school name and "For God And
-           Country" motto — no need to reprint them beside it. The
-           header text cell only holds the school's postal + contact
-           details, vertically centred against the crest. */
-        .school-meta {
-            font-size: 9.5pt;
-            color: #4B5563;
-            line-height: 1.55;
-            letter-spacing: 0.15pt;
-        }
-        .school-meta .street {
+        .school-name {
             font-family: 'DejaVu Serif', serif;
-            font-size: 11pt;
+            font-size: 15.5pt;
             font-weight: bold;
             color: #0F2A44;
+            letter-spacing: 0.6pt;
+            line-height: 1.15;
+            white-space: nowrap;
+        }
+        .school-motto {
+            font-family: 'DejaVu Serif', serif;
+            font-size: 9.5pt;
+            font-style: italic;
+            color: #8B1A1A;
             letter-spacing: 0.4pt;
-            margin-bottom: 3pt;
+            margin: 3pt 0 5pt;
+        }
+        .school-meta {
+            font-size: 8.5pt;
+            color: #4B5563;
+            line-height: 1.45;
+            letter-spacing: 0.1pt;
+        }
+        .school-meta .street {
+            color: #1F2937;
+            font-weight: bold;
         }
 
         /* Double rule under header — heritage stationery cue. */
@@ -361,12 +375,14 @@
 
     {{-- ===== HEADER ===== --}}
     @php
-        $streetLine = trim(($schoolSettings->address ?? '') . (!empty($schoolSettings->postal_code) ? ' · P.O. Box ' . $schoolSettings->postal_code : ''));
-        $cityLine   = implode(', ', array_filter([
+        $addressLine = trim(implode(', ', array_filter([
+            $schoolSettings->address ?? null,
             $schoolSettings->city ?? null,
-            $schoolSettings->state_province ?? null,
             $schoolSettings->country ?? null,
-        ]));
+        ])));
+        if (!empty($schoolSettings->postal_code)) {
+            $addressLine .= ' · P.O. Box ' . $schoolSettings->postal_code;
+        }
         $contactLine = implode('  ·  ', array_filter([
             ($schoolSettings->phone ?? null) ? 'Tel ' . $schoolSettings->phone : null,
             ($schoolSettings->email ?? null) ? $schoolSettings->email : null,
@@ -377,16 +393,15 @@
         <tr>
             <td class="logo-cell">
                 @if($logoPath)
-                    <img src="{{ $logoPath }}" class="logo" width="121" height="98" alt="School crest">
+                    <img src="{{ $logoPath }}" class="logo" width="113" height="91" alt="School crest">
                 @endif
             </td>
             <td>
+                <div class="school-name">{{ $schoolSettings->school_name ?? 'St. Francis of Assisi Private School' }}</div>
+                <div class="school-motto">&ldquo;{{ $schoolSettings->school_motto ?? 'For God and Country' }}&rdquo;</div>
                 <div class="school-meta">
-                    @if($streetLine !== '')
-                        <div class="street">{{ $streetLine }}</div>
-                    @endif
-                    @if($cityLine !== '')
-                        {{ $cityLine }}<br>
+                    @if($addressLine !== '')
+                        <span class="street">{{ $addressLine }}</span><br>
                     @endif
                     @if($contactLine !== '')
                         {{ $contactLine }}
