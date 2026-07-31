@@ -55,13 +55,13 @@
             padding: 0;
         }
         .header .logo-cell {
-            width: 45mm;
+            width: 34mm;
             padding-right: 6mm;
         }
         .header .logo {
             display: block;
-            height: 22mm;
-            width: 39mm; /* explicit — native 1845×1038 = 1.777 aspect */
+            height: 26mm;
+            width: 32mm; /* native 2304×1856 = 1.241 aspect → 32×26 */
         }
         .school-name {
             font-family: 'DejaVu Serif', serif;
@@ -369,7 +369,7 @@
         <tr>
             <td class="logo-cell">
                 @if($logoPath)
-                    <img src="{{ $logoPath }}" class="logo" width="147" height="83" alt="School crest">
+                    <img src="{{ $logoPath }}" class="logo" width="121" height="98" alt="School crest">
                 @endif
             </td>
             <td>
