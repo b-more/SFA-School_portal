@@ -63,28 +63,23 @@
             height: 26mm;
             width: 32mm; /* native 2304×1856 = 1.241 aspect → 32×26 */
         }
-        .school-name {
-            font-family: 'DejaVu Serif', serif;
-            font-size: 17pt;
-            font-weight: bold;
-            letter-spacing: 0.2pt;
-            color: #0F2A44;
-            line-height: 1.05;
-            white-space: nowrap;
-        }
-        .school-motto {
-            font-family: 'DejaVu Serif', serif;
-            font-size: 9pt;
-            font-style: italic;
-            color: #8B1A1A;
-            margin-top: 3pt;
-            letter-spacing: 0.5pt;
-        }
+        /* The crest already carries the school name and "For God And
+           Country" motto — no need to reprint them beside it. The
+           header text cell only holds the school's postal + contact
+           details, vertically centred against the crest. */
         .school-meta {
-            font-size: 8.5pt;
+            font-size: 9.5pt;
             color: #4B5563;
-            margin-top: 3pt;
-            line-height: 1.3;
+            line-height: 1.55;
+            letter-spacing: 0.15pt;
+        }
+        .school-meta .street {
+            font-family: 'DejaVu Serif', serif;
+            font-size: 11pt;
+            font-weight: bold;
+            color: #0F2A44;
+            letter-spacing: 0.4pt;
+            margin-bottom: 3pt;
         }
 
         /* Double rule under header — heritage stationery cue. */
@@ -365,6 +360,19 @@
     @endif
 
     {{-- ===== HEADER ===== --}}
+    @php
+        $streetLine = trim(($schoolSettings->address ?? '') . (!empty($schoolSettings->postal_code) ? ' · P.O. Box ' . $schoolSettings->postal_code : ''));
+        $cityLine   = implode(', ', array_filter([
+            $schoolSettings->city ?? null,
+            $schoolSettings->state_province ?? null,
+            $schoolSettings->country ?? null,
+        ]));
+        $contactLine = implode('  ·  ', array_filter([
+            ($schoolSettings->phone ?? null) ? 'Tel ' . $schoolSettings->phone : null,
+            ($schoolSettings->email ?? null) ? $schoolSettings->email : null,
+            ($schoolSettings->website ?? null) ? $schoolSettings->website : null,
+        ]));
+    @endphp
     <table class="header">
         <tr>
             <td class="logo-cell">
@@ -373,29 +381,15 @@
                 @endif
             </td>
             <td>
-                <div class="school-name">{{ $schoolSettings->school_name ?? 'St. Francis of Assisi Private School' }}</div>
-                @if($schoolSettings && $schoolSettings->school_motto)
-                    <div class="school-motto">{{ $schoolSettings->school_motto }}</div>
-                @endif
                 <div class="school-meta">
-                    @php
-                        $addressParts = array_filter([
-                            $schoolSettings->address ?? null,
-                            $schoolSettings->city ?? null,
-                            $schoolSettings->state_province ?? null,
-                            $schoolSettings->country ?? null,
-                        ]);
-                        $contactParts = array_filter([
-                            ($schoolSettings->phone ?? null) ? 'Tel ' . $schoolSettings->phone : null,
-                            ($schoolSettings->email ?? null) ? $schoolSettings->email : null,
-                            ($schoolSettings->website ?? null) ? $schoolSettings->website : null,
-                        ]);
-                    @endphp
-                    @if(!empty($addressParts))
-                        {{ implode(', ', $addressParts) }}@if(!empty($schoolSettings->postal_code)) &middot; P.O. Box {{ $schoolSettings->postal_code }}@endif<br>
+                    @if($streetLine !== '')
+                        <div class="street">{{ $streetLine }}</div>
                     @endif
-                    @if(!empty($contactParts))
-                        {{ implode('  ·  ', $contactParts) }}
+                    @if($cityLine !== '')
+                        {{ $cityLine }}<br>
+                    @endif
+                    @if($contactLine !== '')
+                        {{ $contactLine }}
                     @endif
                 </div>
             </td>
