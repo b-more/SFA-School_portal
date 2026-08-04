@@ -169,13 +169,14 @@
         .results thead th {
             background: #0F2A44;
             color: #ffffff;
-            font-size: 9pt;
+            font-size: 8.5pt;
             font-weight: bold;
-            letter-spacing: 1pt;
+            letter-spacing: 0.7pt;
             text-transform: uppercase;
-            padding: 5pt 8pt;
+            padding: 4pt 5pt;
             border: 0.5pt solid #0F2A44;
             text-align: center;
+            line-height: 1.15;
         }
         .results thead th.subj { text-align: left; padding-left: 10pt; }
         .results tbody td {
@@ -299,9 +300,9 @@
         /* ================= COMMENTS ================= */
         /* Comments size to their content — no fixed height. Padding
            gives them presence; content dictates fill. */
-        .comments { width: 100%; margin-top: 1mm; }
+        .comments { width: 100%; margin-top: 0.5mm; }
         .comments td {
-            padding: 1.5pt 10pt 2.5pt;
+            padding: 1pt 10pt 2pt;
             border: 0.5pt solid #0F2A44;
             vertical-align: top;
         }
@@ -325,10 +326,10 @@
            15mm of empty padding above the printed line for a
            handwritten pen signature. vertical-align: bottom keeps the
            printed name + title anchored below the line. */
-        .signatures { width: 100%; margin-top: 0.5mm; }
+        .signatures { width: 100%; margin-top: 0; }
         .signatures td {
             width: 33.33%;
-            padding: 7mm 8pt 0;
+            padding: 3.5mm 8pt 0;
             vertical-align: bottom;
         }
         .sig-line {
@@ -463,30 +464,68 @@
     @php
         $subjects = $resultsData['subjects'] ?? [];
     @endphp
-    <table class="results">
-        <thead>
-            <tr>
-                <th class="subj" width="44%">Subject</th>
-                <th width="12%">Marks</th>
-                <th width="12%">Grade</th>
-                <th width="32%">Remark</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($subjects as $index => $subject)
+    @php
+        // Secondary section pupils (Form 1+, Grade 8+) get a wider results
+        // table showing Mid-Term and End-of-Term marks separately, plus the
+        // weighted final. Primary section keeps the single-mark layout.
+        $isSecondaryReport = $student->classSection && $student->classSection->grade
+            && \App\Models\GradingScale::determineGradeLevelFromGrade($student->classSection->grade) === 'secondary';
+    @endphp
+    @if($isSecondaryReport)
+        <table class="results">
+            <thead>
                 <tr>
-                    <td class="subj">{{ $subject['subject_name'] }}</td>
-                    <td class="marks">{{ $subject['combined'] !== null ? number_format($subject['combined'], 0) : '—' }}</td>
-                    <td class="grade">{{ (isset($subject['grade']) && $subject['grade'] !== 'N/A') ? $subject['grade'] : '—' }}</td>
-                    <td>{{ $subject['remark'] ?? '—' }}</td>
+                    <th class="subj" width="30%">Subject</th>
+                    <th width="13%">Mid-Term</th>
+                    <th width="15%">End-of-Term</th>
+                    <th width="12%">Final</th>
+                    <th width="10%">Grade</th>
+                    <th width="20%">Remark</th>
                 </tr>
-            @empty
-                <tr class="empty-row">
-                    <td colspan="4">No results have been recorded for this term.</td>
+            </thead>
+            <tbody>
+                @forelse($subjects as $index => $subject)
+                    <tr>
+                        <td class="subj">{{ $subject['subject_name'] }}</td>
+                        <td>{{ $subject['mid_term'] !== null ? number_format($subject['mid_term'], 0) : '—' }}</td>
+                        <td>{{ $subject['final']    !== null ? number_format($subject['final'], 0)    : '—' }}</td>
+                        <td class="marks">{{ $subject['combined'] !== null ? number_format($subject['combined'], 0) : '—' }}</td>
+                        <td class="grade">{{ (isset($subject['grade']) && $subject['grade'] !== 'N/A') ? $subject['grade'] : '—' }}</td>
+                        <td>{{ $subject['remark'] ?? '—' }}</td>
+                    </tr>
+                @empty
+                    <tr class="empty-row">
+                        <td colspan="6">No results have been recorded for this term.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    @else
+        <table class="results">
+            <thead>
+                <tr>
+                    <th class="subj" width="44%">Subject</th>
+                    <th width="12%">Marks</th>
+                    <th width="12%">Grade</th>
+                    <th width="32%">Remark</th>
                 </tr>
-            @endforelse
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @forelse($subjects as $index => $subject)
+                    <tr>
+                        <td class="subj">{{ $subject['subject_name'] }}</td>
+                        <td class="marks">{{ $subject['combined'] !== null ? number_format($subject['combined'], 0) : '—' }}</td>
+                        <td class="grade">{{ (isset($subject['grade']) && $subject['grade'] !== 'N/A') ? $subject['grade'] : '—' }}</td>
+                        <td>{{ $subject['remark'] ?? '—' }}</td>
+                    </tr>
+                @empty
+                    <tr class="empty-row">
+                        <td colspan="4">No results have been recorded for this term.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    @endif
 
     {{-- ===== SUMMARY ===== --}}
     @php
