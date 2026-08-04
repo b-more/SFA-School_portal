@@ -55,7 +55,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(\App\Filament\Pages\Auth\Login::class)
             ->passwordReset()
             ->colors([
                 'primary' => [
@@ -167,6 +167,7 @@ class AdminPanelProvider extends PanelProvider
                 // Results and Report Cards
                 EnterResults::class,
                 GenerateReportCards::class,
+                \App\Filament\Pages\ClassResultsStatus::class,
                 // Timetable Management
                 MasterTimetable::class,
                 ManageTimetable::class,
@@ -175,6 +176,7 @@ class AdminPanelProvider extends PanelProvider
                 // Accounts & Finance
                 AccountsDashboard::class,
                 FinancialReports::class,
+                \App\Filament\Pages\GenerateFees::class,
                 // Website Management
                 ManageLandingPage::class,
                 // Profile
