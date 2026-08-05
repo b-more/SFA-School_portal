@@ -628,7 +628,7 @@
         <div class="legend">
             <span class="head">Grading Scale</span>
             @foreach($gradingScale->items as $item)
-                <strong>{{ $item->grade }}</strong> {{ $item->min_marks }}&ndash;{{ $item->max_marks }}%@if(!$loop->last) &nbsp;·&nbsp; @endif
+                <strong>{{ $item->grade }}</strong> {{ (int) $item->min_marks }}&ndash;{{ (int) $item->max_marks }}%@if(!$loop->last) &nbsp;·&nbsp; @endif
             @endforeach
         </div>
     @endif
