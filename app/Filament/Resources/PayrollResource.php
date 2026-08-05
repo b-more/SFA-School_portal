@@ -437,22 +437,48 @@ class PayrollResource extends Resource
                         ->label('Mark as Paid')
                         ->icon('heroicon-o-check-badge')
                         ->color('success')
-                        ->requiresConfirmation()
                         ->modalHeading('Mark Selected Payrolls as Paid')
-                        ->modalDescription('Are you sure you want to mark all selected payrolls as paid?')
-                        ->action(function ($records) {
-                            $count = $records->count();
-                            foreach ($records as $record) {
-                                $record->update([
-                                    'payment_status' => 'paid',
-                                    'payment_date' => now(),
-                                ]);
-                            }
-
+                        ->modalDescription('Pick the date the bank transfer actually settled. All selected rows will be flipped to Paid with this date.')
+                        ->modalSubmitActionLabel('Mark as Paid')
+                        ->form([
+                            Forms\Components\DatePicker::make('payment_date')
+                                ->label('Payment Date')
+                                ->default(now())
+                                ->maxDate(now())
+                                ->required()
+                                ->native(false)
+                                ->helperText('Defaults to today. Backdate if the money went out earlier.'),
+                        ])
+                        ->action(function ($records, array $data) {
+                            $ids = $records->pluck('id')->all();
+                            $count = Payroll::whereIn('id', $ids)->update([
+                                'payment_status' => 'paid',
+                                'payment_date'   => $data['payment_date'],
+                            ]);
                             Notification::make()
-                                ->title('Payrolls Updated')
-                                ->body("Successfully marked {$count} payroll(s) as paid")
+                                ->title('Marked as Paid')
+                                ->body("{$count} payroll(s) settled on " . \Illuminate\Support\Carbon::parse($data['payment_date'])->format('d M Y'))
                                 ->success()
+                                ->send();
+                        }),
+
+                    Tables\Actions\BulkAction::make('mark_pending')
+                        ->label('Revert to Pending')
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Revert Selected Payrolls to Pending')
+                        ->modalDescription('Clears payment_status back to Pending and removes the payment date. Use if a bulk mark was applied by mistake.')
+                        ->action(function ($records) {
+                            $ids = $records->pluck('id')->all();
+                            $count = Payroll::whereIn('id', $ids)->update([
+                                'payment_status' => 'pending',
+                                'payment_date'   => null,
+                            ]);
+                            Notification::make()
+                                ->title('Reverted to Pending')
+                                ->body("{$count} payroll(s) marked as pending again.")
+                                ->warning()
                                 ->send();
                         }),
                 ]),
