@@ -178,44 +178,59 @@ Route::prefix('fee-statements')->middleware(['auth'])->group(function () {
     Route::post('/summary', [FeeStatementsController::class, 'summary'])->name('fee-statements.summary');
 });
 
-// Student Fees Routes
-Route::middleware(['auth'])->group(function () {
+// Student Fees Routes — receipt downloads (mobile-app ?token= auth + admin session)
+Route::middleware([\App\Http\Middleware\TokenFromQuery::class, \App\Http\Middleware\EnsureStudentResourceAccess::class])->group(function () {
     // Existing PDF receipt route (keep unchanged)
     Route::get('/student-fees/{studentFee}/receipt', [StudentFeeController::class, 'generateReceipt'])->name('student-fees.receipt');
 
-    // NEW: HTML receipt view route
+    // HTML receipt view route
     Route::get('/student-fees/{studentFee}/receipt/view', [StudentFeeController::class, 'showReceipt'])->name('student-fees.receipt.view');
 
-    // NEW: Explicit PDF download route
+    // Explicit PDF download route
     Route::get('/student-fees/{studentFee}/receipt/pdf', [StudentFeeController::class, 'generateReceipt'])->name('student-fees.receipt.pdf');
 
-    // NEW: Individual transaction receipt
+    // Individual transaction receipt
     Route::get('/student-fees/{fee}/transaction/{transaction}/receipt', [StudentFeeController::class, 'generateTransactionReceipt'])->name('student-fees.transaction-receipt');
 
-    // NEW: Complete payment history
+    // Complete payment history
     Route::get('/student-fees/{studentFee}/full-history', [StudentFeeController::class, 'generateFullHistory'])->name('student-fees.full-history');
+});
 
-    // NEW: Export unpaid fees report
+// Student Fees Routes — admin/staff only (session auth)
+Route::middleware(['auth'])->group(function () {
+    // Export unpaid fees report
     Route::get('/student-fees/export-unpaid', [StudentFeeController::class, 'exportUnpaid'])->name('student-fees.export-unpaid');
 
     // Existing bulk receipts route (keep unchanged)
     Route::post('/student-fees/bulk-receipts', [StudentFeeController::class, 'generateBulkReceipts'])->name('student-fees.bulk-receipts');
 
-    // NEW: Debug route (only for development - remove in production)
+    // Debug route (only for development - remove in production)
     Route::get('/debug/student-fee/{studentFee}', [StudentFeeController::class, 'debugFeeStructure'])->name('debug.student-fee');
 });
 
-// Enhanced Homework and Submission Routes
-Route::middleware([\App\Http\Middleware\TokenFromQuery::class])->group(function () {
-    // Primary homework routes
+// Homework — staff/teacher only (registered first so literal segments like
+// "stats" or "grade/{id}" aren't captured by /homework/{homework})
+Route::middleware([\App\Http\Middleware\TokenFromQuery::class, \App\Http\Middleware\EnsureStaff::class])->group(function () {
+    // Admin/teacher APIs
+    Route::get('/homework/stats', [HomeworkController::class, 'getHomeworkStats'])
+        ->name('homework.stats');
+
+    Route::get('/homework/grade/{gradeId}', [HomeworkController::class, 'getHomeworkByGrade'])
+        ->name('homework.by-grade');
+
+    // Bulk download of every submission for a homework — teachers only
+    Route::get('/homework/{homework}/download-all-submissions', [HomeworkController::class, 'downloadAllSubmissions'])
+        ->name('homework.download-all-submissions');
+});
+
+// Homework — parent-accessible (assignment access by grade match; own child's submission only)
+Route::middleware([\App\Http\Middleware\TokenFromQuery::class, \App\Http\Middleware\EnsureStudentResourceAccess::class])->group(function () {
+    // Primary homework routes (assignment content for the parent's child's grade)
     Route::get('/homework/{homework}/download', [HomeworkController::class, 'download'])
         ->name('homework.download');
 
     Route::get('/homework/{homework}/view', [HomeworkController::class, 'view'])
         ->name('homework.view');
-
-    Route::get('/homework/{homework}', [HomeworkController::class, 'show'])
-        ->name('homework.show');
 
     // Alternative download routes (for backward compatibility)
     Route::get('/homework/{homework}/download-file', [HomeworkController::class, 'downloadHomeworkFile'])
@@ -224,31 +239,24 @@ Route::middleware([\App\Http\Middleware\TokenFromQuery::class])->group(function 
     Route::get('/homework/{homework}/download-resources', [HomeworkController::class, 'downloadResources'])
         ->name('homework.download-resources');
 
-    // Teacher-specific routes
-    Route::get('/homework/{homework}/download-all-submissions', [HomeworkController::class, 'downloadAllSubmissions'])
-        ->name('homework.download-all-submissions');
+    // Student-friendly view of one homework
+    Route::get('/homework/{homework}/details', [HomeworkController::class, 'details'])
+        ->name('homework.details');
 
-    // Submission routes
+    // Generic show route registered AFTER the more specific subpath routes above
+    Route::get('/homework/{homework}', [HomeworkController::class, 'show'])
+        ->name('homework.show');
+
+    // Submission routes — middleware restricts parents to their own child's submission
     Route::get('/homework-submissions/{submission}/download', [HomeworkController::class, 'downloadSubmission'])
         ->name('homework-submissions.download');
 
     Route::get('/filament/resources/homework-submissions/{record}/download', [HomeworkController::class, 'downloadSubmission'])
         ->name('filament.resources.homework-submissions.download');
-
-    // API routes for homework
-    Route::get('/homework/grade/{gradeId}', [HomeworkController::class, 'getHomeworkByGrade'])
-        ->name('homework.by-grade');
-
-    Route::get('/homework/stats', [HomeworkController::class, 'getHomeworkStats'])
-        ->name('homework.stats');
-
-    // Get homework details page (student-friendly view)
-    Route::get('/homework/{homework}/details', [HomeworkController::class, 'details'])
-        ->name('homework.details');
 });
 
 // Payment Statement Routes
-Route::middleware([\App\Http\Middleware\TokenFromQuery::class])->group(function () {
+Route::middleware([\App\Http\Middleware\TokenFromQuery::class, \App\Http\Middleware\EnsureStudentResourceAccess::class])->group(function () {
     // Generate payment statement for a student
     Route::get('/payment-statement/student/{student}', [PaymentStatementController::class, 'generateStatement'])
         ->name('payment-statement.generate');
@@ -270,21 +278,19 @@ Route::middleware([\App\Http\Middleware\TokenFromQuery::class])->group(function 
         ->name('payment-statements.bulk');
 });
 
-// Payslip Routes
-Route::middleware(['auth'])->group(function () {
-    // View payslip in browser (HTML)
+// Payslip Routes — TokenFromQuery lets the mobile teacher-app hit these
+// with ?token=<sanctum>. EnsureStaff blocks parents. Ownership is enforced
+// inside the controller (assertCanAccess).
+Route::middleware([\App\Http\Middleware\TokenFromQuery::class, \App\Http\Middleware\EnsureStaff::class])->group(function () {
     Route::get('/payslips/{payroll}', [PayslipController::class, 'view'])
         ->name('payslips.view');
 
-    // Stream payslip PDF in browser
     Route::get('/payslips/{payroll}/pdf', [PayslipController::class, 'stream'])
         ->name('payslips.stream');
 
-    // Print payslip (streams PDF)
     Route::get('/payslips/{payroll}/print', [PayslipController::class, 'print'])
         ->name('payslips.print');
 
-    // Download payslip as PDF
     Route::get('/payslips/{payroll}/download', [PayslipController::class, 'download'])
         ->name('payslips.download');
 });
@@ -329,13 +335,13 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // Mobile-app-friendly download routes (accept ?token= query param for auth)
-Route::middleware([\App\Http\Middleware\TokenFromQuery::class])->group(function () {
+Route::middleware([\App\Http\Middleware\TokenFromQuery::class, \App\Http\Middleware\EnsureStudentResourceAccess::class])->group(function () {
     Route::get('/attendance/student/{student}/download', [\App\Http\Controllers\StudentAttendanceController::class, 'download'])
         ->name('attendance.student.download');
 });
 
 // Report Card Routes (supports mobile app token auth)
-Route::middleware([\App\Http\Middleware\TokenFromQuery::class])->group(function () {
+Route::middleware([\App\Http\Middleware\TokenFromQuery::class, \App\Http\Middleware\EnsureStudentResourceAccess::class])->group(function () {
     // Generate single student report card PDF
     Route::get('/report-cards/{student}/{term}', [ReportCardController::class, 'generate'])
         ->name('report-cards.generate');
