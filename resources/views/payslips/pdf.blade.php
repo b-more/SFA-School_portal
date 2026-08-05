@@ -359,27 +359,31 @@
             'accumulation' => $accumulatedBasic,
         ];
 
-        // Add allowances
+        // Add allowances — payroll JSON may have `type` OR `name` depending
+        // on where the row was authored; fall back so imported rows don't
+        // trip the null-array-key warning that appeared in earlier runs.
         foreach ($allowances as $allowance) {
+            $label = $allowance['type'] ?? $allowance['name'] ?? 'Allowance';
             $allItems[] = [
-                'code' => $allowanceCodes[$allowance['type']] ?? '2099',
-                'description' => $allowance['type'],
+                'code' => $allowanceCodes[$label] ?? '2099',
+                'description' => $label,
                 'period' => '999',
-                'payment' => $allowance['amount'],
+                'payment' => $allowance['amount'] ?? 0,
                 'deduction' => 0,
-                'accumulation' => $allowance['amount'],
+                'accumulation' => $allowance['amount'] ?? 0,
             ];
         }
 
         // Add deductions
         foreach ($deductions as $deduction) {
+            $label = $deduction['type'] ?? $deduction['name'] ?? 'Deduction';
             $allItems[] = [
-                'code' => $deductionCodes[$deduction['type']] ?? 'D099',
-                'description' => $deduction['type'],
+                'code' => $deductionCodes[$label] ?? 'D099',
+                'description' => $label,
                 'period' => '999',
                 'payment' => 0,
-                'deduction' => $deduction['amount'],
-                'accumulation' => $deduction['amount'],
+                'deduction' => $deduction['amount'] ?? 0,
+                'accumulation' => $deduction['amount'] ?? 0,
             ];
         }
     @endphp
