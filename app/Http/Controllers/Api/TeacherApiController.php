@@ -380,8 +380,21 @@ class TeacherApiController extends Controller
                 ->where('academic_year_id', $activeYear->id)
                 ->exists();
 
-            $isClassTeacher = $teacher->is_class_teacher
-                && (int) $teacher->class_section_id === (int) $request->class_section_id;
+            // Class-teacher check must read BOTH sources of truth:
+            //   (a) Teacher.is_class_teacher + Teacher.class_section_id (legacy)
+            //   (b) ClassSection.class_teacher_id pointing at the teacher —
+            //       this is the authoritative field the report card and the
+            //       Filament page use. Missing this branch was locking real
+            //       class teachers out of covering colleagues on the PWA.
+            $classSection = \App\Models\ClassSection::find($request->class_section_id);
+            $isClassTeacher = (
+                    $teacher->is_class_teacher
+                    && (int) $teacher->class_section_id === (int) $request->class_section_id
+                )
+                || (
+                    $classSection
+                    && (int) ($classSection->class_teacher_id ?? 0) === (int) $teacher->id
+                );
 
             if (! $hasSubjectTeaching && ! $isClassTeacher) {
                 return response()->json([
