@@ -598,8 +598,12 @@ class TeacherApiController extends Controller
             'deductions' => $p->deductions,
             'status' => $p->payment_status,
             'payment_date' => $p->payment_date?->format('d M Y'),
-            'download_url' => '/payslips/' . $p->id . '/download',
-            'view_url' => '/payslips/' . $p->id,
+            // Mobile app is served from teacher.stfrancisofassisizm.com; its
+            // nginx proxies /portal/* → main portal. Prefix so the download
+            // actually reaches Laravel instead of falling into the SPA
+            // fallback (which just re-renders the payslip list).
+            'download_url' => '/portal/payslips/' . $p->id . '/download',
+            'view_url'     => '/portal/payslips/' . $p->id,
         ]));
     }
 
