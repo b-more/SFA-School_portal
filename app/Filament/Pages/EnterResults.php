@@ -103,15 +103,18 @@ class EnterResults extends Page implements HasForms
         $user = Auth::user();
         $teacher = null;
         $isAdmin = $user->role_id === RoleConstants::ADMIN;
-        $isClassTeacher = false;
 
         if (in_array($user->role_id, RoleConstants::teaching())) {
             $teacher = Teacher::where('user_id', $user->id)->first();
-            $isClassTeacher = $teacher && $teacher->is_class_teacher && $teacher->class_section_id;
         }
 
         // Get class section options based on role
         $classSectionOptions = $this->getClassSectionOptions($teacher, $isAdmin);
+
+        // Lock the dropdown only if the teacher has exactly one option — no
+        // point in a picker with a single choice. A class teacher who also
+        // teaches subjects in other classes needs a usable dropdown.
+        $lockClassSelect = ! $isAdmin && count($classSectionOptions) === 1;
 
         // Get terms
         $termOptions = Term::whereHas('academicYear', function ($q) {
@@ -125,7 +128,7 @@ class EnterResults extends Page implements HasForms
                     ->options($classSectionOptions)
                     ->required()
                     ->reactive()
-                    ->disabled($isClassTeacher)
+                    ->disabled($lockClassSelect)
                     ->dehydrated()
                     ->default($this->classSectionId)
                     ->afterStateUpdated(function ($state) {
@@ -235,27 +238,49 @@ class EnterResults extends Page implements HasForms
         }
 
         if ($teacher) {
-            // Class teacher: only their assigned class
+            $activeYear = AcademicYear::where('is_active', true)->first();
+
+            // Merge every class-section this teacher is attached to:
+            //   (a) legacy Teacher.class_section_id (if is_class_teacher flag set)
+            //   (b) ClassSection.class_teacher_id pointing at them (authoritative;
+            //       what the report card uses)
+            //   (c) SubjectTeaching rows for the active year
+            $classSectionIds = collect();
             if ($teacher->is_class_teacher && $teacher->class_section_id) {
-                $section = ClassSection::with('grade')->find($teacher->class_section_id);
-                if ($section) {
-                    $gradeName = $section->grade ? $section->grade->name : 'Unknown';
-                    return [$section->id => "{$gradeName} - {$section->name}"];
-                }
+                $classSectionIds->push($teacher->class_section_id);
+            }
+            $classSectionIds = $classSectionIds->merge(
+                ClassSection::where('class_teacher_id', $teacher->id)->pluck('id')
+            );
+            if ($activeYear) {
+                $classSectionIds = $classSectionIds->merge(
+                    SubjectTeaching::where('teacher_id', $teacher->id)
+                        ->where('academic_year_id', $activeYear->id)
+                        ->pluck('class_section_id')
+                );
             }
 
-            // Non-class teachers: get from subject teachings (any year as fallback)
-            $classSectionIds = SubjectTeaching::where('teacher_id', $teacher->id)
-                ->pluck('class_section_id')
-                ->unique();
+            // Precompute which sections have this teacher as class teacher so
+            // we can annotate the dropdown label.
+            $classTeacherSectionIds = ClassSection::where('class_teacher_id', $teacher->id)
+                ->pluck('id')
+                ->push($teacher->is_class_teacher ? $teacher->class_section_id : null)
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->all();
 
             return ClassSection::with('grade')
-                ->whereIn('id', $classSectionIds)
+                ->whereIn('id', $classSectionIds->unique()->all())
                 ->where('is_active', true)
                 ->get()
-                ->mapWithKeys(function ($section) {
+                ->sortBy(fn ($cs) => ($cs->grade->name ?? '') . ' ' . $cs->name)
+                ->mapWithKeys(function ($section) use ($classTeacherSectionIds) {
                     $gradeName = $section->grade ? $section->grade->name : 'Unknown';
-                    return [$section->id => "{$gradeName} - {$section->name}"];
+                    $label = "{$gradeName} - {$section->name}";
+                    if (in_array((int) $section->id, $classTeacherSectionIds, true)) {
+                        $label .= '  (your class)';
+                    }
+                    return [$section->id => $label];
                 })
                 ->toArray();
         }
@@ -269,30 +294,72 @@ class EnterResults extends Page implements HasForms
             return [];
         }
 
-        // Get subjects assigned to this grade with mandatory flag
         $classSection = ClassSection::with('grade')->find($this->classSectionId);
-        if ($classSection && $classSection->grade) {
-            $gradeSubjects = GradeSubject::where('grade_id', $classSection->grade_id)
-                ->with('subject')
+        $activeYear = AcademicYear::where('is_active', true)->first();
+        // The class teacher for a section can live either on Teacher.is_class_teacher
+        // (legacy) or on ClassSection.class_teacher_id (authoritative — this is
+        // what the report card uses). Either match counts.
+        $isClassTeacherOfThis = $teacher && $classSection && (
+            ((int) ($classSection->class_teacher_id ?? 0) === (int) $teacher->id)
+            || ($teacher->is_class_teacher && (int) $teacher->class_section_id === (int) $this->classSectionId)
+        );
+
+        // Load ALL teachings for this class section this year — used both to
+        // filter (subject teachers) and to annotate labels (class teachers).
+        $classTeachings = collect();
+        if ($activeYear) {
+            $classTeachings = SubjectTeaching::with('teacher')
+                ->where('class_section_id', $this->classSectionId)
+                ->where('academic_year_id', $activeYear->id)
                 ->get();
-
-            return $gradeSubjects->sortBy('subject.name')
-                ->mapWithKeys(function ($gs) {
-                    $label = $gs->subject->name;
-                    if (!$gs->is_mandatory) {
-                        $label .= ' (Optional)';
-                    }
-                    return [$gs->subject_id => $label];
-                })
-                ->toArray();
         }
+        $teacherBySubject = $classTeachings->keyBy('subject_id');
+        $myTeachingSubjectIds = $teacher
+            ? $classTeachings->where('teacher_id', $teacher->id)->pluck('subject_id')->all()
+            : [];
 
-        // Fallback to all subjects (admin only)
-        if ($isAdmin) {
-            return Subject::orderBy('name')->pluck('name', 'id')->toArray();
-        }
+        // Subjects officially assigned to this grade (mandatory + optional).
+        $gradeSubjects = ($classSection && $classSection->grade)
+            ? GradeSubject::where('grade_id', $classSection->grade_id)->with('subject')->get()
+            : collect();
 
-        return [];
+        // For an admin OR the class teacher of this class, show everything so
+        // they can pick up subjects nobody else has been assigned. Subject
+        // teachers see only their own assigned subjects (secondary workflow).
+        $candidateSubjects = ($isAdmin || $isClassTeacherOfThis)
+            ? $gradeSubjects
+            : $gradeSubjects->filter(fn ($gs) => in_array($gs->subject_id, $myTeachingSubjectIds, true));
+
+        // Label each subject with either "(you)" if you teach it, the assigned
+        // teacher's surname if someone else does, or "(unassigned)" if nobody
+        // has a SubjectTeaching row. Subject teachers only see their own so
+        // the label just marks (you); the extra hint helps the class teacher.
+        $formatLabel = function ($subjectName, $subjectId, $isOptional) use ($teacher, $teacherBySubject, $isClassTeacherOfThis, $isAdmin) {
+            $label = $subjectName;
+            if ($isOptional) {
+                $label .= ' (Optional)';
+            }
+            if (! ($isClassTeacherOfThis || $isAdmin)) {
+                return $label;
+            }
+            $assigned = $teacherBySubject->get($subjectId);
+            if (! $assigned || ! $assigned->teacher) {
+                $label .= '  — unassigned';
+            } elseif ($teacher && (int) $assigned->teacher_id === (int) $teacher->id) {
+                $label .= '  (you)';
+            } else {
+                $surname = trim(preg_replace('/^\S+\s+/', '', $assigned->teacher->name)) ?: $assigned->teacher->name;
+                $label .= "  — {$surname}";
+            }
+            return $label;
+        };
+
+        return $candidateSubjects
+            ->sortBy(fn ($gs) => $gs->subject->name)
+            ->mapWithKeys(fn ($gs) => [
+                $gs->subject_id => $formatLabel($gs->subject->name, $gs->subject_id, ! $gs->is_mandatory),
+            ])
+            ->toArray();
     }
 
     protected function loadGradingScale(): void
