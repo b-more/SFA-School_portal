@@ -123,21 +123,62 @@ class TeacherApiController extends Controller
 
         $yearId = AcademicYear::where('is_active', true)->first()?->id;
 
-        $teachings = SubjectTeaching::where('teacher_id', $teacher->id)
+        $relations = ['subject', 'classSection.grade', 'classSection.students', 'teacher'];
+
+        // (a) Rows this teacher personally teaches this year.
+        $own = SubjectTeaching::where('teacher_id', $teacher->id)
             ->when($yearId, fn($q) => $q->where('academic_year_id', $yearId))
-            ->with(['subject', 'classSection.grade', 'classSection.students'])
+            ->with($relations)
             ->get();
 
-        return response()->json($teachings->map(fn($t) => [
-            'id' => $t->id,
-            'class_section_id' => $t->class_section_id,
-            'subject_id' => $t->subject_id,
-            'grade_id' => $t->classSection?->grade_id,
-            'subject' => $t->subject?->name,
-            'grade' => $t->classSection?->grade?->name,
-            'class_section' => $t->classSection?->name,
-            'student_count' => $t->classSection?->students?->where('enrollment_status', 'active')->count() ?? 0,
-        ]));
+        // (b) If this teacher is a class teacher, every subject taught in
+        // their class(es) — so they can enter marks when a colleague is
+        // absent. Class-teachership reads BOTH sources of truth:
+        // ClassSection.class_teacher_id (authoritative — what the report card
+        // and the Filament EnterResults page use) and the legacy
+        // Teacher.is_class_teacher + Teacher.class_section_id pair, which is
+        // stale for many teachers.
+        $homeroomIds = ClassSection::where('class_teacher_id', $teacher->id)->pluck('id');
+        if ($teacher->is_class_teacher && $teacher->class_section_id) {
+            $homeroomIds->push((int) $teacher->class_section_id);
+        }
+        $homeroomIds = $homeroomIds->unique()->values();
+
+        $covered = $homeroomIds->isEmpty()
+            ? collect()
+            : SubjectTeaching::whereIn('class_section_id', $homeroomIds)
+                ->when($yearId, fn($q) => $q->where('academic_year_id', $yearId))
+                ->with($relations)
+                ->get();
+
+        // Union, deduplicated on (class_section_id, subject_id). Own rows are
+        // concatenated first so a subject the class teacher personally teaches
+        // in their own class keeps assignment === 'you'.
+        $teachings = $own->concat($covered)
+            ->unique(fn($t) => $t->class_section_id . '|' . $t->subject_id)
+            ->values();
+
+        return response()->json($teachings->map(function ($t) use ($teacher) {
+            $isMine = (int) $t->teacher_id === (int) $teacher->id;
+            $assignedName = null;
+            if (!$isMine && $t->teacher) {
+                // Surname preferred — same convention as the Filament page.
+                $assignedName = trim(preg_replace('/^\S+\s+/', '', $t->teacher->name)) ?: $t->teacher->name;
+            }
+
+            return [
+                'id' => $t->id,
+                'class_section_id' => $t->class_section_id,
+                'subject_id' => $t->subject_id,
+                'grade_id' => $t->classSection?->grade_id,
+                'subject' => $t->subject?->name,
+                'grade' => $t->classSection?->grade?->name,
+                'class_section' => $t->classSection?->name,
+                'student_count' => $t->classSection?->students?->where('enrollment_status', 'active')->count() ?? 0,
+                'assignment' => $isMine ? 'you' : ($t->teacher ? 'colleague' : 'unassigned'),
+                'assigned_teacher_name' => $assignedName,
+            ];
+        })->values());
     }
 
     public function classStudents($classSectionId)

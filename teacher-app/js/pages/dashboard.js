@@ -689,13 +689,29 @@ async function renderResults(el, api) {
         const selectedClass = params.get('class') || '';
         const selectedSubject = params.get('subject') || '';
 
+        // Own teaching rows first, then subjects covered for colleagues
+        // (class-teacher privilege), then anything else; within each group
+        // sort by grade, class, subject.
+        const assignmentRank = c => c.assignment === 'you' ? 0 : (c.assignment === 'colleague' ? 1 : 2);
+        const sortedClasses = [...classes].sort((a, b) =>
+            assignmentRank(a) - assignmentRank(b)
+            || String(a.grade || '').localeCompare(String(b.grade || ''))
+            || String(a.class_section || '').localeCompare(String(b.class_section || ''))
+            || String(a.subject || '').localeCompare(String(b.subject || '')));
+        const optionLabel = c => {
+            const base = `${c.grade} ${c.class_section} - ${c.subject}`;
+            if (c.assignment === 'you') return `${base}  (you)`;
+            if (c.assignment === 'colleague') return c.assigned_teacher_name ? `${base}  · covering for ${c.assigned_teacher_name}` : `${base}  · covering`;
+            return base;
+        };
+
         let html = '<div class="dash-scroll">';
         html += '<div style="font-size:1rem;font-weight:700;margin-bottom:12px">Enter Results</div>';
 
         html += `<div class="card" style="overflow:visible"><div style="padding:12px 14px;display:flex;gap:8px;flex-wrap:wrap">
             <select id="res-class" class="form-input" style="flex:1;padding:8px 10px;font-size:0.75rem">
                 <option value="">Select Class & Subject</option>
-                ${classes.map(c => `<option value="${c.class_section_id}|${c.subject_id}" ${String(c.class_section_id) === selectedClass && String(c.subject_id) === selectedSubject ? 'selected' : ''}>${c.grade} ${c.class_section} - ${c.subject}</option>`).join('')}
+                ${sortedClasses.map(c => `<option value="${c.class_section_id}|${c.subject_id}" ${String(c.class_section_id) === selectedClass && String(c.subject_id) === selectedSubject ? 'selected' : ''}>${optionLabel(c)}</option>`).join('')}
             </select>
             <select id="res-type" class="form-input" style="width:auto;padding:8px 10px;font-size:0.75rem">
                 <option value="end-of-term">End-of-Term</option>
