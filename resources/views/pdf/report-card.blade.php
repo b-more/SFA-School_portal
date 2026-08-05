@@ -326,10 +326,12 @@
            15mm of empty padding above the printed line for a
            handwritten pen signature. vertical-align: bottom keeps the
            printed name + title anchored below the line. */
-        .signatures { width: 100%; margin-top: 0; }
+        /* Generous signing space above each printed name — the
+           reclaimed real estate from dropping the attendance strip. */
+        .signatures { width: 100%; margin-top: 3mm; }
         .signatures td {
             width: 33.33%;
-            padding: 3.5mm 8pt 0;
+            padding: 15mm 8pt 0;
             vertical-align: bottom;
         }
         .sig-line {
@@ -475,27 +477,25 @@
         <table class="results">
             <thead>
                 <tr>
-                    <th class="subj" width="30%">Subject</th>
-                    <th width="13%">Mid-Term</th>
-                    <th width="15%">End-of-Term</th>
-                    <th width="12%">Final</th>
+                    <th class="subj" width="32%">Subject</th>
+                    <th width="15%">Mid-Term</th>
+                    <th width="17%">End-of-Term</th>
                     <th width="10%">Grade</th>
-                    <th width="20%">Remark</th>
+                    <th width="26%">Remark</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($subjects as $index => $subject)
                     <tr>
                         <td class="subj">{{ $subject['subject_name'] }}</td>
-                        <td>{{ $subject['mid_term'] !== null ? number_format($subject['mid_term'], 0) : '—' }}</td>
-                        <td>{{ $subject['final']    !== null ? number_format($subject['final'], 0)    : '—' }}</td>
-                        <td class="marks">{{ $subject['combined'] !== null ? number_format($subject['combined'], 0) : '—' }}</td>
+                        <td class="marks">{{ $subject['mid_term'] !== null ? number_format($subject['mid_term'], 0) : '—' }}</td>
+                        <td class="marks">{{ $subject['final']    !== null ? number_format($subject['final'], 0)    : '—' }}</td>
                         <td class="grade">{{ (isset($subject['grade']) && $subject['grade'] !== 'N/A') ? $subject['grade'] : '—' }}</td>
                         <td>{{ $subject['remark'] ?? '—' }}</td>
                     </tr>
                 @empty
                     <tr class="empty-row">
-                        <td colspan="6">No results have been recorded for this term.</td>
+                        <td colspan="5">No results have been recorded for this term.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -622,31 +622,6 @@
             </td>
         </tr>
     </table>
-
-    {{-- ===== ATTENDANCE ===== --}}
-    @if(!empty($attendance) && ($attendance['total'] ?? 0) > 0)
-        <table class="attendance">
-            <tr>
-                <td class="head-cell">Attendance<br>this Term</td>
-                <td>
-                    <div class="att-value">{{ $attendance['present'] }}<span class="unit"> / {{ $attendance['total'] }}</span></div>
-                    <div class="att-label">Days Present</div>
-                </td>
-                <td>
-                    <div class="att-value">{{ $attendance['absent'] }}</div>
-                    <div class="att-label">Days Absent</div>
-                </td>
-                <td>
-                    <div class="att-value">{{ $attendance['sick'] + $attendance['excused'] }}</div>
-                    <div class="att-label">Sick / Excused</div>
-                </td>
-                <td class="att-rate">
-                    <div class="att-value">{{ number_format($attendance['rate'] ?? 0, 1) }}<span class="unit">%</span></div>
-                    <div class="att-label">Attendance Rate</div>
-                </td>
-            </tr>
-        </table>
-    @endif
 
     {{-- ===== LEGEND ===== --}}
     @if($gradingScale)
