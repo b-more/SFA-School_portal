@@ -323,6 +323,26 @@ class EnterResults extends Page implements HasForms
             ? GradeSubject::where('grade_id', $classSection->grade_id)->with('subject')->get()
             : collect();
 
+        // A subject teacher may have a SubjectTeaching row for a subject that
+        // isn't in the grade's GradeSubject curriculum (data drift). Fold
+        // those in as synthetic pseudo-GradeSubject rows so the teacher still
+        // sees what they've been assigned.
+        $curriculumIds = $gradeSubjects->pluck('subject_id')->all();
+        $extraSubjectIds = array_diff($myTeachingSubjectIds, $curriculumIds);
+        if (! empty($extraSubjectIds)) {
+            $extraSubjects = Subject::whereIn('id', $extraSubjectIds)->get();
+            foreach ($extraSubjects as $s) {
+                // Fabricate a minimal GradeSubject-like object; treated as
+                // mandatory (no "(Optional)" tag) since curriculum status is
+                // unknown here.
+                $gradeSubjects->push((object) [
+                    'subject_id' => $s->id,
+                    'is_mandatory' => true,
+                    'subject' => $s,
+                ]);
+            }
+        }
+
         // For an admin OR the class teacher of this class, show everything so
         // they can pick up subjects nobody else has been assigned. Subject
         // teachers see only their own assigned subjects (secondary workflow).
