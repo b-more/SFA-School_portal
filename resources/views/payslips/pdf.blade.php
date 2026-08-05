@@ -200,15 +200,22 @@
 </head>
 <body>
     <!-- Watermark -->
-    @if(file_exists(public_path('images/logo.png')))
-        <img src="{{ public_path('images/logo.png') }}" alt="" class="watermark">
+    @php
+        // Use the compressed variant when available — 49-page bulk exports
+        // otherwise embed 4.3MB × 49 = ~210MB of duplicated crest.
+        $payslipLogo = file_exists(public_path('images/logo-small.png'))
+            ? public_path('images/logo-small.png')
+            : public_path('images/logo.png');
+    @endphp
+    @if(file_exists($payslipLogo))
+        <img src="{{ $payslipLogo }}" alt="" class="watermark">
     @endif
 
     <!-- Header -->
     <div class="header">
         <div class="logo-container">
-            @if(file_exists(public_path('images/logo.png')))
-                <img src="{{ public_path('images/logo.png') }}" alt="School Logo" class="logo">
+            @if(file_exists($payslipLogo))
+                <img src="{{ $payslipLogo }}" alt="School Logo" class="logo">
             @endif
         </div>
         <div class="school-name">St. Francis of Assisi Private School</div>
