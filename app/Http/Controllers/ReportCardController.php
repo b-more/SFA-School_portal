@@ -182,7 +182,18 @@ class ReportCardController extends Controller
 
         // Save to the public exports/ dir. www-data owns the process,
         // so file permissions are correct out of the box.
-        Storage::disk('public')->put("exports/{$filename}", $pdf->output());
+        // Check the return so a silent write failure (e.g. directory not
+        // writable) can't leave us redirecting to a 404/403 file URL.
+        $written = Storage::disk('public')->put("exports/{$filename}", $pdf->output());
+        if (! $written || ! Storage::disk('public')->exists("exports/{$filename}")) {
+            \Log::error('Report card bulk export write failed', [
+                'filename' => $filename,
+                'exports_writable' => is_writable(storage_path('app/public/exports')),
+            ]);
+            return back()->with('error',
+                'Could not save the merged report card PDF. The exports directory may not be writable — contact the administrator.'
+            );
+        }
 
         // Flash a notice listing which students were skipped due to arrears (if any).
         if ($blocked->count() > 0) {
