@@ -612,11 +612,24 @@
                 "We are concerned about this performance. A parent-teacher meeting is recommended to discuss {$student->name}'s progress.",
             ],
         ];
-        if ($average >= 80)       { $category = 'excellent'; }
-        elseif ($average >= 65)   { $category = 'very_good'; }
-        elseif ($average >= 50)   { $category = 'good'; }
-        elseif ($average >= 40)   { $category = 'average'; }
-        else                      { $category = 'below_average'; }
+        // Secondary pupils are judged by their ECZ basket, not the raw average
+        // of every subject on record. Pick the comment category from the
+        // aggregate + certificate story so the words match the numbers below.
+        $eczForCategory = $isSecondaryReport ? ($resultsData['ecz'] ?? null) : null;
+        if ($eczForCategory && $eczForCategory['basket_size'] >= 6) {
+            $agg = (int) $eczForCategory['aggregate_points'];
+            if     ($agg <= 12)  { $category = 'excellent'; }      // avg ≤2 pts — mostly distinctions
+            elseif ($agg <= 20)  { $category = 'very_good'; }      // avg ≤3.3 pts
+            elseif ($agg <= 30)  { $category = 'good'; }           // full certificate territory
+            elseif ($eczForCategory['certificate'] === 'Statement') { $category = 'average'; }
+            else                 { $category = 'below_average'; }
+        } else {
+            if     ($average >= 80) { $category = 'excellent'; }
+            elseif ($average >= 65) { $category = 'very_good'; }
+            elseif ($average >= 50) { $category = 'good'; }
+            elseif ($average >= 40) { $category = 'average'; }
+            else                    { $category = 'below_average'; }
+        }
         $autoClassTeacherComment = $classTeacherComments[$category][array_rand($classTeacherComments[$category])];
         $autoHeadTeacherComment  = $headTeacherComments[$category][array_rand($headTeacherComments[$category])];
     @endphp
