@@ -605,41 +605,40 @@ class ResultsService
     }
 
     /**
-     * Build the ECZ points aggregate for a secondary pupil.
+     * Build the secondary-report summary strip from the same graded subjects
+     * that the results table prints.
      *
-     * Rules from the school:
-     *   • Physics + Chemistry averaged into a single "Science" mark
-     *     (if only one of the two exists, use that one alone).
-     *   • Biology stays as a standalone subject.
-     *   • Aggregate basket = English + Math + Combined Science + best 3
-     *     of the remaining subjects (by points; lower is better).
-     *   • Pass = grade points 1-6 (mark ≥ 50).
-     *   • Certificate status by number of passes in the basket:
-     *       6 passes → Full Certificate
-     *       4-5      → Statement
-     *       ≤3       → Fail
+     * Visible subjects = every graded subject on record, EXCEPT Physics and
+     * Chemistry (which are folded into a synthetic "Science" row, avg of the
+     * two; a standalone Science DB subject is dropped when the synthetic
+     * exists so the row doesn't duplicate).
+     *
+     * From that visible set the summary strip reads:
+     *   • Aggregate (best 6) = sum of the 6 lowest grade-points; fewer than
+     *     6 subjects → sum them all.
+     *   • Passed x / y      = x = subjects with grade 1-6, y = total.
+     *   • Certificate       = ≥6 passes Full · 4-5 Statement · ≤3 Fail.
+     *
+     * Everything is derived here from the printed grades, so the tiles can
+     * never disagree with the table above them.
      */
     protected function buildEczAggregate(array $subjectsWithGrades, ?GradingScale $scale, ?Grade $grade): array
     {
         $names = fn ($s) => strtolower(trim($s['subject_name'] ?? ''));
 
+        // Split off Physics + Chemistry — they get combined below.
         $physicsRow = null; $chemistryRow = null;
-        $englishRow = null; $mathRow = null;
-        $others = [];
-
+        $rest = [];
         foreach ($subjectsWithGrades as $s) {
             $n = $names($s);
-            if ($n === 'physics') { $physicsRow = $s; continue; }
+            if ($n === 'physics')   { $physicsRow   = $s; continue; }
             if ($n === 'chemistry') { $chemistryRow = $s; continue; }
-            if ($n === 'english' || $n === 'english language') { $englishRow = $s; continue; }
-            if ($n === 'mathematics') { $mathRow = $s; continue; }
-            $others[] = $s;
+            $rest[] = $s;
         }
 
-        // Combined Science — average of Physics + Chemistry (or whichever
-        // exists if only one). If neither, no Science row. Mid-term and
-        // end-of-term are averaged the same way so the row reads like a
-        // normal subject; the grading scale is applied to the combined mark.
+        // Combined Science — avg of Physics + Chemistry (or the one that
+        // exists). Same averaging for mid-term / end-of-term so the row
+        // reads like a normal subject; the grade comes off the combined.
         $scienceRow = null;
         $pMark = $physicsRow['combined'] ?? null;
         $cMark = $chemistryRow['combined'] ?? null;
@@ -662,47 +661,41 @@ class ResultsService
             $scienceRow = $this->buildSyntheticSubject('Science', (float) $cMark, $scale, $grade, $midAvg, $endAvg);
         }
 
-        // Basket assembly
-        $required = array_values(array_filter([$englishRow, $mathRow, $scienceRow]));
-
-        // Best 3 others (lowest points wins; treat null points as worst)
-        usort($others, function ($a, $b) {
-            $pa = $a['points'] ?? 999;
-            $pb = $b['points'] ?? 999;
-            return $pa <=> $pb;
-        });
-        $bestOthers = array_slice($others, 0, 3);
-
-        $basket = array_merge($required, $bestOthers);
-
-        // Sum points, count passes
-        $aggregatePoints = 0;
-        $passCount = 0;
-        $hasHoles = false;
-        foreach ($basket as $s) {
-            $pts = $s['points'] ?? null;
-            if ($pts === null) { $hasHoles = true; continue; }
-            $aggregatePoints += (int) $pts;
-            if ((int) $pts <= 6) $passCount++;
+        // Visible = the exact set the results table prints, so aggregate /
+        // passed / total can never diverge from what the parent reads.
+        $visible = $rest;
+        if ($scienceRow) {
+            // Drop any standalone "Science" DB row — the synthetic replaces it.
+            $visible = array_values(array_filter($visible, fn ($s) => $names($s) !== 'science'));
+            $visible[] = $scienceRow;
         }
 
+        // Recompute aggregate / passed / total straight off the printed grades.
+        $pointsList = [];
+        $passCount  = 0;
+        $hasHoles   = false;
+        foreach ($visible as $s) {
+            $pts = $s['points'] ?? null;
+            if ($pts === null) { $hasHoles = true; continue; }
+            $pointsList[] = (int) $pts;
+            if ((int) $pts <= 6) $passCount++;
+        }
+        $total = count($pointsList);
+
+        sort($pointsList); // ascending — lowest (best) first
+        $aggregatePoints = array_sum(array_slice($pointsList, 0, 6));
+
         $certificate = 'Fail';
-        if ($passCount >= 6) $certificate = 'Full Certificate';
-        elseif ($passCount >= 4) $certificate = 'Statement';
+        if ($passCount >= 6)      $certificate = 'Full Certificate';
+        elseif ($passCount >= 4)  $certificate = 'Statement';
 
         return [
-            'physics'         => $physicsRow,
-            'chemistry'       => $chemistryRow,
+            'physics'          => $physicsRow,
+            'chemistry'        => $chemistryRow,
             'combined_science' => $scienceRow,
-            'basket'          => array_map(fn ($s) => [
-                'subject_name' => $s['subject_name'] ?? '?',
-                'mark'         => $s['combined'] ?? null,
-                'grade'        => $s['grade'] ?? '—',
-                'points'       => $s['points'] ?? null,
-            ], $basket),
-            'basket_size'      => count($basket),
             'aggregate_points' => $aggregatePoints,
             'pass_count'       => $passCount,
+            'basket_size'      => $total,   // total subjects on the report
             'certificate'      => $certificate,
             'has_holes'        => $hasHoles,
         ];
