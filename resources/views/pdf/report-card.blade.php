@@ -478,12 +478,11 @@
         <table class="results">
             <thead>
                 <tr>
-                    <th class="subj" width="30%">Subject</th>
-                    <th width="14%">Mid-Term</th>
-                    <th width="16%">End-of-Term</th>
-                    <th width="10%">Grade</th>
-                    <th width="8%">Pts</th>
-                    <th width="22%">Remark</th>
+                    <th class="subj" width="32%">Subject</th>
+                    <th width="15%">Mid-Term</th>
+                    <th width="17%">End-of-Term</th>
+                    <th width="11%">Grade</th>
+                    <th width="25%">Remark</th>
                 </tr>
             </thead>
             <tbody>
@@ -493,12 +492,11 @@
                         <td class="marks">{{ $subject['mid_term'] !== null ? number_format($subject['mid_term'], 0) : '—' }}</td>
                         <td class="marks">{{ $subject['final']    !== null ? number_format($subject['final'], 0)    : '—' }}</td>
                         <td class="grade">{{ (isset($subject['grade']) && $subject['grade'] !== 'N/A') ? $subject['grade'] : '—' }}</td>
-                        <td class="grade">{{ $subject['points'] !== null ? (int) $subject['points'] : '—' }}</td>
                         <td>{{ $subject['remark'] ?? '—' }}</td>
                     </tr>
                 @empty
                     <tr class="empty-row">
-                        <td colspan="6">No results have been recorded for this term.</td>
+                        <td colspan="5">No results have been recorded for this term.</td>
                     </tr>
                 @endforelse
 
@@ -509,7 +507,6 @@
                         <td class="marks">—</td>
                         <td class="marks">{{ number_format($sc['combined'], 0) }}</td>
                         <td class="grade">{{ $sc['grade'] }}</td>
-                        <td class="grade">{{ (int) $sc['points'] }}</td>
                         <td style="font-size:8.5pt; color:#4B5563; font-style:italic;">Average of Physics + Chemistry — counts for aggregate</td>
                     </tr>
                 @endif
@@ -630,8 +627,8 @@
             </td>
             @if($ecz)
                 <td>
-                    <div class="value">{{ $ecz['aggregate_points'] }}<span class="unit"> / 54</span></div>
-                    <div class="label">Aggregate</div>
+                    <div class="value">{{ $ecz['aggregate_points'] }}<span class="unit"> pts</span></div>
+                    <div class="label">Aggregate (best 6)</div>
                 </td>
                 <td>
                     <div class="value">{{ $ecz['pass_count'] }}<span class="unit"> / {{ $ecz['basket_size'] }}</span></div>
