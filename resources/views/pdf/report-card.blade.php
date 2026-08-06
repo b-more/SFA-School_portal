@@ -623,16 +623,6 @@
     @php $ecz = $isSecondaryReport ? ($resultsData['ecz'] ?? null) : null; @endphp
     <table class="summary">
         <tr>
-            <td>
-                <div class="value">
-                    @if($position['position'])
-                        {{ $position['position'] }}<span class="unit"> / {{ $position['total'] }}</span>
-                    @else
-                        —
-                    @endif
-                </div>
-                <div class="label">Position in Class</div>
-            </td>
             @if($ecz)
                 <td>
                     <div class="value">{{ $ecz['aggregate_points'] }}<span class="unit"> pts</span></div>
