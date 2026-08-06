@@ -344,10 +344,10 @@
            The wrapper's negative bottom margin overlaps the printed line. */
         .sig-image-wrap {
             text-align: center;
-            margin-bottom: -4mm;
+            margin-bottom: -3mm;
         }
         .sig-image {
-            width: 24mm;
+            width: 50mm;
             height: auto;
         }
         .sig-name {
