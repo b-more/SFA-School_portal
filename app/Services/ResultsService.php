@@ -637,17 +637,23 @@ class ResultsService
         }
 
         // Combined Science — average of Physics + Chemistry (or whichever
-        // exists if only one). If neither, no Science row.
+        // exists if only one). If neither, no Science row. Mid-term is
+        // averaged the same way so the row reads like a normal subject.
         $scienceRow = null;
         $pMark = $physicsRow['combined'] ?? null;
         $cMark = $chemistryRow['combined'] ?? null;
+        $pMid  = $physicsRow['mid_term'] ?? null;
+        $cMid  = $chemistryRow['mid_term'] ?? null;
+        $midAvg = ($pMid !== null && $cMid !== null)
+            ? round(((float) $pMid + (float) $cMid) / 2, 2)
+            : ($pMid ?? $cMid);
         if ($pMark !== null && $cMark !== null) {
             $avg = round(((float) $pMark + (float) $cMark) / 2, 2);
-            $scienceRow = $this->buildSyntheticSubject('Science (Physics + Chemistry)', $avg, $scale, $grade);
+            $scienceRow = $this->buildSyntheticSubject('Science', $avg, $scale, $grade, $midAvg);
         } elseif ($pMark !== null) {
-            $scienceRow = $this->buildSyntheticSubject('Science (Physics only)', (float) $pMark, $scale, $grade);
+            $scienceRow = $this->buildSyntheticSubject('Science', (float) $pMark, $scale, $grade, $midAvg);
         } elseif ($cMark !== null) {
-            $scienceRow = $this->buildSyntheticSubject('Science (Chemistry only)', (float) $cMark, $scale, $grade);
+            $scienceRow = $this->buildSyntheticSubject('Science', (float) $cMark, $scale, $grade, $midAvg);
         }
 
         // Basket assembly
@@ -700,14 +706,14 @@ class ResultsService
      * Build a subject-shaped array for a synthetic (computed) subject
      * like Combined Science, running its mark through the grading scale.
      */
-    protected function buildSyntheticSubject(string $name, float $mark, ?GradingScale $scale, ?Grade $grade): array
+    protected function buildSyntheticSubject(string $name, float $mark, ?GradingScale $scale, ?Grade $grade, ?float $midTerm = null): array
     {
         $gradeData = $this->calculateGradeFromMarks($mark, $grade);
         return [
             'subject_name' => $name,
             'combined'     => round($mark, 2),
-            'mid_term'     => null,
-            'final'        => null,
+            'mid_term'     => $midTerm !== null ? round($midTerm, 2) : null,
+            'final'        => round($mark, 2),
             'grade'        => $gradeData['grade'],
             'remark'       => $gradeData['remark'],
             'points'       => $gradeData['grade_points'],

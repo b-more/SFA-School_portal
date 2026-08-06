@@ -474,7 +474,19 @@
             && \App\Models\GradingScale::determineGradeLevelFromGrade($student->classSection->grade) === 'secondary';
     @endphp
     @if($isSecondaryReport)
-        @php $ecz = $resultsData['ecz'] ?? null; @endphp
+        @php
+            $ecz = $resultsData['ecz'] ?? null;
+            // Physics + Chemistry are folded into the synthetic Science row
+            // below. Also suppress any standalone "Science" DB subject so we
+            // don't render two rows with the same name.
+            $hasSyntheticScience = $ecz && !empty($ecz['combined_science']);
+            $visibleSubjects = collect($subjects)->reject(function ($s) use ($hasSyntheticScience) {
+                $n = strtolower(trim($s['subject_name'] ?? ''));
+                if ($n === 'physics' || $n === 'chemistry') return true;
+                if ($hasSyntheticScience && $n === 'science') return true;
+                return false;
+            })->values();
+        @endphp
         <table class="results">
             <thead>
                 <tr>
@@ -486,7 +498,7 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse($subjects as $index => $subject)
+                @forelse($visibleSubjects as $index => $subject)
                     <tr>
                         <td class="subj">{{ $subject['subject_name'] }}</td>
                         <td class="marks">{{ $subject['mid_term'] !== null ? number_format($subject['mid_term'], 0) : '—' }}</td>
@@ -502,12 +514,12 @@
 
                 @if($ecz && !empty($ecz['combined_science']))
                     @php $sc = $ecz['combined_science']; @endphp
-                    <tr style="background:#F5EFE0;">
-                        <td class="subj" style="font-style:italic;">{{ $sc['subject_name'] }}</td>
-                        <td class="marks">—</td>
+                    <tr>
+                        <td class="subj">{{ $sc['subject_name'] }}</td>
+                        <td class="marks">{{ $sc['mid_term'] !== null ? number_format($sc['mid_term'], 0) : '—' }}</td>
                         <td class="marks">{{ number_format($sc['combined'], 0) }}</td>
                         <td class="grade">{{ $sc['grade'] }}</td>
-                        <td style="font-size:8.5pt; color:#4B5563; font-style:italic;">Average of Physics + Chemistry — counts for aggregate</td>
+                        <td>{{ $sc['remark'] ?? '—' }}</td>
                     </tr>
                 @endif
             </tbody>
