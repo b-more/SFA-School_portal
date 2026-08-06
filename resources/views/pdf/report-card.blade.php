@@ -338,6 +338,18 @@
             border-top: 0.5pt solid #0F2A44;
             padding-top: 2pt;
         }
+        /* Real signature image dropped just above the principal's line so
+           the ink appears to sit on it. Kept modest at 24mm wide — big
+           enough to read, small enough not to shove the printed name aside.
+           The wrapper's negative bottom margin overlaps the printed line. */
+        .sig-image-wrap {
+            text-align: center;
+            margin-bottom: -4mm;
+        }
+        .sig-image {
+            width: 24mm;
+            height: auto;
+        }
         .sig-name {
             font-family: 'DejaVu Serif', serif;
             font-size: 9.5pt;
@@ -711,6 +723,10 @@
         $__isSecondary = $student->classSection && $student->classSection->grade
             && \App\Models\GradingScale::determineGradeLevelFromGrade($student->classSection->grade) === 'secondary';
         $__headTeacherName = $__isSecondary ? 'Happy Simutowe' : 'Sylvester Lupando';
+        $__principalSigPath = public_path('images/Blessmore_signature.png');
+        $__principalSigData = file_exists($__principalSigPath)
+            ? 'data:image/png;base64,' . base64_encode(file_get_contents($__principalSigPath))
+            : null;
     @endphp
     <table class="signatures">
         <tr>
@@ -727,6 +743,11 @@
                 </div>
             </td>
             <td>
+                @if($__principalSigData)
+                    <div class="sig-image-wrap">
+                        <img src="{{ $__principalSigData }}" class="sig-image" alt="">
+                    </div>
+                @endif
                 <div class="sig-line">
                     <div class="sig-name">Blessmore Mulenga</div>
                     <div class="sig-title">School Principal</div>
