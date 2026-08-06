@@ -612,10 +612,6 @@
     <table class="summary">
         <tr>
             <td>
-                <div class="value">{{ number_format($average, 1) }}<span class="unit">%</span></div>
-                <div class="label">Average</div>
-            </td>
-            <td>
                 <div class="value">
                     @if($position['position'])
                         {{ $position['position'] }}<span class="unit"> / {{ $position['total'] }}</span>
