@@ -195,14 +195,18 @@ class ReportCardController extends Controller
 
         // Audit line — never let a logfile permission hiccup 500 the whole
         // bulk-generate response. The PDF is already on disk at this point.
-        try { Log::channel('single')->info('Bulk report cards generated', [
-            'class_section' => $classSection->id,
-            'term'          => $term->id,
-            'year'          => $year,
-            'student_count' => count($reports),
-            'skipped'       => $blocked->count(),
-            'filename'      => $filename,
-        ]); } catch (\Throwable $e) { /* best-effort audit log */ }
+        try {
+            Log::channel('single')->info('Bulk report cards generated', [
+                'class_section' => $classSection->id,
+                'term'          => $term->id,
+                'year'          => $year,
+                'student_count' => count($reports),
+                'skipped'       => $blocked->count(),
+                'filename'      => $filename,
+            ]);
+        } catch (\Throwable $e) {
+            // best-effort; swallow
+        }
 
         // Redirect to the file's public URL — nginx serves the PDF directly.
         return redirect()->to(Storage::disk('public')->url("exports/{$filename}"));
