@@ -637,23 +637,29 @@ class ResultsService
         }
 
         // Combined Science — average of Physics + Chemistry (or whichever
-        // exists if only one). If neither, no Science row. Mid-term is
-        // averaged the same way so the row reads like a normal subject.
+        // exists if only one). If neither, no Science row. Mid-term and
+        // end-of-term are averaged the same way so the row reads like a
+        // normal subject; the grading scale is applied to the combined mark.
         $scienceRow = null;
         $pMark = $physicsRow['combined'] ?? null;
         $cMark = $chemistryRow['combined'] ?? null;
         $pMid  = $physicsRow['mid_term'] ?? null;
         $cMid  = $chemistryRow['mid_term'] ?? null;
-        $midAvg = ($pMid !== null && $cMid !== null)
-            ? round(((float) $pMid + (float) $cMid) / 2, 2)
-            : ($pMid ?? $cMid);
+        $pEnd  = $physicsRow['final']    ?? null;
+        $cEnd  = $chemistryRow['final']  ?? null;
+        $avgOfPair = function ($a, $b) {
+            if ($a !== null && $b !== null) return round(((float) $a + (float) $b) / 2, 2);
+            return $a ?? $b;
+        };
+        $midAvg = $avgOfPair($pMid, $cMid);
+        $endAvg = $avgOfPair($pEnd, $cEnd);
         if ($pMark !== null && $cMark !== null) {
             $avg = round(((float) $pMark + (float) $cMark) / 2, 2);
-            $scienceRow = $this->buildSyntheticSubject('Science', $avg, $scale, $grade, $midAvg);
+            $scienceRow = $this->buildSyntheticSubject('Science', $avg, $scale, $grade, $midAvg, $endAvg);
         } elseif ($pMark !== null) {
-            $scienceRow = $this->buildSyntheticSubject('Science', (float) $pMark, $scale, $grade, $midAvg);
+            $scienceRow = $this->buildSyntheticSubject('Science', (float) $pMark, $scale, $grade, $midAvg, $endAvg);
         } elseif ($cMark !== null) {
-            $scienceRow = $this->buildSyntheticSubject('Science', (float) $cMark, $scale, $grade, $midAvg);
+            $scienceRow = $this->buildSyntheticSubject('Science', (float) $cMark, $scale, $grade, $midAvg, $endAvg);
         }
 
         // Basket assembly
@@ -706,14 +712,14 @@ class ResultsService
      * Build a subject-shaped array for a synthetic (computed) subject
      * like Combined Science, running its mark through the grading scale.
      */
-    protected function buildSyntheticSubject(string $name, float $mark, ?GradingScale $scale, ?Grade $grade, ?float $midTerm = null): array
+    protected function buildSyntheticSubject(string $name, float $mark, ?GradingScale $scale, ?Grade $grade, ?float $midTerm = null, ?float $endOfTerm = null): array
     {
         $gradeData = $this->calculateGradeFromMarks($mark, $grade);
         return [
             'subject_name' => $name,
             'combined'     => round($mark, 2),
-            'mid_term'     => $midTerm !== null ? round($midTerm, 2) : null,
-            'final'        => round($mark, 2),
+            'mid_term'     => $midTerm   !== null ? round($midTerm,   2) : null,
+            'final'        => $endOfTerm !== null ? round($endOfTerm, 2) : round($mark, 2),
             'grade'        => $gradeData['grade'],
             'remark'       => $gradeData['remark'],
             'points'       => $gradeData['grade_points'],

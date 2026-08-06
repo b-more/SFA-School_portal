@@ -517,7 +517,7 @@
                     <tr>
                         <td class="subj">{{ $sc['subject_name'] }}</td>
                         <td class="marks">{{ $sc['mid_term'] !== null ? number_format($sc['mid_term'], 0) : '—' }}</td>
-                        <td class="marks">{{ number_format($sc['combined'], 0) }}</td>
+                        <td class="marks">{{ $sc['final']    !== null ? number_format($sc['final'], 0)    : '—' }}</td>
                         <td class="grade">{{ $sc['grade'] }}</td>
                         <td>{{ $sc['remark'] ?? '—' }}</td>
                     </tr>
