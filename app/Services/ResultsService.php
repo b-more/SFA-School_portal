@@ -569,18 +569,27 @@ class ResultsService
             );
         }
 
-        // Add grades to each subject
+        // Add grades to each subject — include grade_points for ECZ points math.
         $subjectsWithGrades = collect($combinedData['subjects'])->map(function ($subject) use ($gradingScale, $student) {
             if ($subject['combined'] !== null && $gradingScale) {
                 $gradeData = $this->calculateGradeFromMarks($subject['combined'], $student->classSection->grade ?? null);
                 $subject['grade'] = $gradeData['grade'];
                 $subject['remark'] = $gradeData['remark'];
+                $subject['points'] = $gradeData['grade_points'];
             } else {
                 $subject['grade'] = 'N/A';
                 $subject['remark'] = '';
+                $subject['points'] = null;
             }
             return $subject;
         })->toArray();
+
+        // ECZ aggregate — secondary only
+        $ecz = null;
+        if ($student->classSection && $student->classSection->grade
+            && GradingScale::determineGradeLevelFromGrade($student->classSection->grade) === 'secondary') {
+            $ecz = $this->buildEczAggregate($subjectsWithGrades, $gradingScale, $student->classSection->grade);
+        }
 
         return [
             'student' => $student,
@@ -591,6 +600,118 @@ class ResultsService
             'overall_grade' => $overallGrade,
             'position' => $position,
             'grading_scale' => $gradingScale,
+            'ecz' => $ecz,
+        ];
+    }
+
+    /**
+     * Build the ECZ points aggregate for a secondary pupil.
+     *
+     * Rules from the school:
+     *   • Physics + Chemistry averaged into a single "Science" mark
+     *     (if only one of the two exists, use that one alone).
+     *   • Biology stays as a standalone subject.
+     *   • Aggregate basket = English + Math + Combined Science + best 3
+     *     of the remaining subjects (by points; lower is better).
+     *   • Pass = grade points 1-6 (mark ≥ 50).
+     *   • Certificate status by number of passes in the basket:
+     *       6 passes → Full Certificate
+     *       4-5      → Statement
+     *       ≤3       → Fail
+     */
+    protected function buildEczAggregate(array $subjectsWithGrades, ?GradingScale $scale, ?Grade $grade): array
+    {
+        $names = fn ($s) => strtolower(trim($s['subject_name'] ?? ''));
+
+        $physicsRow = null; $chemistryRow = null;
+        $englishRow = null; $mathRow = null;
+        $others = [];
+
+        foreach ($subjectsWithGrades as $s) {
+            $n = $names($s);
+            if ($n === 'physics') { $physicsRow = $s; continue; }
+            if ($n === 'chemistry') { $chemistryRow = $s; continue; }
+            if ($n === 'english' || $n === 'english language') { $englishRow = $s; continue; }
+            if ($n === 'mathematics') { $mathRow = $s; continue; }
+            $others[] = $s;
+        }
+
+        // Combined Science — average of Physics + Chemistry (or whichever
+        // exists if only one). If neither, no Science row.
+        $scienceRow = null;
+        $pMark = $physicsRow['combined'] ?? null;
+        $cMark = $chemistryRow['combined'] ?? null;
+        if ($pMark !== null && $cMark !== null) {
+            $avg = round(((float) $pMark + (float) $cMark) / 2, 2);
+            $scienceRow = $this->buildSyntheticSubject('Science (Physics + Chemistry)', $avg, $scale, $grade);
+        } elseif ($pMark !== null) {
+            $scienceRow = $this->buildSyntheticSubject('Science (Physics only)', (float) $pMark, $scale, $grade);
+        } elseif ($cMark !== null) {
+            $scienceRow = $this->buildSyntheticSubject('Science (Chemistry only)', (float) $cMark, $scale, $grade);
+        }
+
+        // Basket assembly
+        $required = array_values(array_filter([$englishRow, $mathRow, $scienceRow]));
+
+        // Best 3 others (lowest points wins; treat null points as worst)
+        usort($others, function ($a, $b) {
+            $pa = $a['points'] ?? 999;
+            $pb = $b['points'] ?? 999;
+            return $pa <=> $pb;
+        });
+        $bestOthers = array_slice($others, 0, 3);
+
+        $basket = array_merge($required, $bestOthers);
+
+        // Sum points, count passes
+        $aggregatePoints = 0;
+        $passCount = 0;
+        $hasHoles = false;
+        foreach ($basket as $s) {
+            $pts = $s['points'] ?? null;
+            if ($pts === null) { $hasHoles = true; continue; }
+            $aggregatePoints += (int) $pts;
+            if ((int) $pts <= 6) $passCount++;
+        }
+
+        $certificate = 'Fail';
+        if ($passCount >= 6) $certificate = 'Full Certificate';
+        elseif ($passCount >= 4) $certificate = 'Statement';
+
+        return [
+            'physics'         => $physicsRow,
+            'chemistry'       => $chemistryRow,
+            'combined_science' => $scienceRow,
+            'basket'          => array_map(fn ($s) => [
+                'subject_name' => $s['subject_name'] ?? '?',
+                'mark'         => $s['combined'] ?? null,
+                'grade'        => $s['grade'] ?? '—',
+                'points'       => $s['points'] ?? null,
+            ], $basket),
+            'basket_size'      => count($basket),
+            'aggregate_points' => $aggregatePoints,
+            'pass_count'       => $passCount,
+            'certificate'      => $certificate,
+            'has_holes'        => $hasHoles,
+        ];
+    }
+
+    /**
+     * Build a subject-shaped array for a synthetic (computed) subject
+     * like Combined Science, running its mark through the grading scale.
+     */
+    protected function buildSyntheticSubject(string $name, float $mark, ?GradingScale $scale, ?Grade $grade): array
+    {
+        $gradeData = $this->calculateGradeFromMarks($mark, $grade);
+        return [
+            'subject_name' => $name,
+            'combined'     => round($mark, 2),
+            'mid_term'     => null,
+            'final'        => null,
+            'grade'        => $gradeData['grade'],
+            'remark'       => $gradeData['remark'],
+            'points'       => $gradeData['grade_points'],
+            'synthetic'    => true,
         ];
     }
 }

@@ -180,12 +180,12 @@
         }
         .results thead th.subj { text-align: left; padding-left: 10pt; }
         .results tbody td {
-            padding: 0.5pt 8pt;
-            font-size: 10pt;
+            padding: 0.5pt 6pt;
+            font-size: 9pt;
             border: 0.5pt solid #D6D3D1;
             text-align: center;
             color: #111827;
-            line-height: 1.15;
+            line-height: 1.1;
         }
         .results tbody td.subj {
             text-align: left;
@@ -205,10 +205,10 @@
         }
 
         /* ================= SUMMARY ================= */
-        .summary { width: 100%; margin-top: 1.5mm; }
+        .summary { width: 100%; margin-top: 1mm; }
         .summary td {
             width: 25%;
-            padding: 3pt 4pt;
+            padding: 2pt 4pt;
             text-align: center;
             border: 0.5pt solid #0F2A44;
         }
@@ -302,7 +302,7 @@
            gives them presence; content dictates fill. */
         .comments { width: 100%; margin-top: 0.5mm; }
         .comments td {
-            padding: 1pt 10pt 2pt;
+            padding: 0.5pt 8pt 1pt;
             border: 0.5pt solid #0F2A44;
             vertical-align: top;
         }
@@ -328,10 +328,10 @@
            printed name + title anchored below the line. */
         /* Generous signing space above each printed name — the
            reclaimed real estate from dropping the attendance strip. */
-        .signatures { width: 100%; margin-top: 3mm; }
+        .signatures { width: 100%; margin-top: 1mm; }
         .signatures td {
             width: 33.33%;
-            padding: 15mm 8pt 0;
+            padding: 8mm 8pt 0;
             vertical-align: bottom;
         }
         .sig-line {
@@ -474,14 +474,16 @@
             && \App\Models\GradingScale::determineGradeLevelFromGrade($student->classSection->grade) === 'secondary';
     @endphp
     @if($isSecondaryReport)
+        @php $ecz = $resultsData['ecz'] ?? null; @endphp
         <table class="results">
             <thead>
                 <tr>
-                    <th class="subj" width="32%">Subject</th>
-                    <th width="15%">Mid-Term</th>
-                    <th width="17%">End-of-Term</th>
+                    <th class="subj" width="30%">Subject</th>
+                    <th width="14%">Mid-Term</th>
+                    <th width="16%">End-of-Term</th>
                     <th width="10%">Grade</th>
-                    <th width="26%">Remark</th>
+                    <th width="8%">Pts</th>
+                    <th width="22%">Remark</th>
                 </tr>
             </thead>
             <tbody>
@@ -491,13 +493,26 @@
                         <td class="marks">{{ $subject['mid_term'] !== null ? number_format($subject['mid_term'], 0) : '—' }}</td>
                         <td class="marks">{{ $subject['final']    !== null ? number_format($subject['final'], 0)    : '—' }}</td>
                         <td class="grade">{{ (isset($subject['grade']) && $subject['grade'] !== 'N/A') ? $subject['grade'] : '—' }}</td>
+                        <td class="grade">{{ $subject['points'] !== null ? (int) $subject['points'] : '—' }}</td>
                         <td>{{ $subject['remark'] ?? '—' }}</td>
                     </tr>
                 @empty
                     <tr class="empty-row">
-                        <td colspan="5">No results have been recorded for this term.</td>
+                        <td colspan="6">No results have been recorded for this term.</td>
                     </tr>
                 @endforelse
+
+                @if($ecz && !empty($ecz['combined_science']))
+                    @php $sc = $ecz['combined_science']; @endphp
+                    <tr style="background:#F5EFE0;">
+                        <td class="subj" style="font-style:italic;">{{ $sc['subject_name'] }}</td>
+                        <td class="marks">—</td>
+                        <td class="marks">{{ number_format($sc['combined'], 0) }}</td>
+                        <td class="grade">{{ $sc['grade'] }}</td>
+                        <td class="grade">{{ (int) $sc['points'] }}</td>
+                        <td style="font-size:8.5pt; color:#4B5563; font-style:italic;">Average of Physics + Chemistry — counts for aggregate</td>
+                    </tr>
+                @endif
             </tbody>
         </table>
     @else
@@ -596,15 +611,12 @@
         $autoClassTeacherComment = $classTeacherComments[$category][array_rand($classTeacherComments[$category])];
         $autoHeadTeacherComment  = $headTeacherComments[$category][array_rand($headTeacherComments[$category])];
     @endphp
+    @php $ecz = $isSecondaryReport ? ($resultsData['ecz'] ?? null) : null; @endphp
     <table class="summary">
         <tr>
             <td>
                 <div class="value">{{ number_format($average, 1) }}<span class="unit">%</span></div>
                 <div class="label">Average</div>
-            </td>
-            <td>
-                <div class="value">{{ number_format($combined['total'], 0) }}<span class="unit"> / {{ $combined['subjects_count'] * 100 }}</span></div>
-                <div class="label">Total Marks</div>
             </td>
             <td>
                 <div class="value">
@@ -616,10 +628,41 @@
                 </div>
                 <div class="label">Position in Class</div>
             </td>
-            <td>
-                <div class="value">{{ $overallGrade ? $overallGrade['grade'] : '—' }}</div>
-                <div class="label">Overall Grade</div>
-            </td>
+            @if($ecz)
+                <td>
+                    <div class="value">{{ $ecz['aggregate_points'] }}<span class="unit"> / 54</span></div>
+                    <div class="label">Aggregate</div>
+                </td>
+                <td>
+                    <div class="value">{{ $ecz['pass_count'] }}<span class="unit"> / {{ $ecz['basket_size'] }}</span></div>
+                    <div class="label">Passed</div>
+                </td>
+                @php
+                    $certColour = match($ecz['certificate']) {
+                        'Full Certificate' => '#14532d',
+                        'Statement'        => '#78350f',
+                        default            => '#7f1d1d',
+                    };
+                    $certBg = match($ecz['certificate']) {
+                        'Full Certificate' => '#dcfce7',
+                        'Statement'        => '#fef3c7',
+                        default            => '#fee2e2',
+                    };
+                @endphp
+                <td style="background:{{ $certBg }};">
+                    <div class="value" style="font-family:'DejaVu Serif',serif; color:{{ $certColour }}; font-size:11pt; letter-spacing:0.2pt;">{{ $ecz['certificate'] }}</div>
+                    <div class="label">Certificate</div>
+                </td>
+            @else
+                <td>
+                    <div class="value">{{ number_format($combined['total'], 0) }}<span class="unit"> / {{ $combined['subjects_count'] * 100 }}</span></div>
+                    <div class="label">Total Marks</div>
+                </td>
+                <td>
+                    <div class="value">{{ $overallGrade ? $overallGrade['grade'] : '—' }}</div>
+                    <div class="label">Overall Grade</div>
+                </td>
+            @endif
         </tr>
     </table>
 
@@ -628,7 +671,9 @@
         <div class="legend">
             <span class="head">Grading Scale</span>
             @foreach($gradingScale->items as $item)
-                <strong>{{ $item->grade }}</strong> {{ (int) $item->min_marks }}&ndash;{{ (int) $item->max_marks }}%@if(!$loop->last) &nbsp;·&nbsp; @endif
+                <strong>{{ $item->grade }}</strong> {{ (int) $item->min_marks }}&ndash;{{ (int) $item->max_marks }}%
+                @if($item->remark) <span style="color:#6B7280;">{{ $item->remark }}</span>@endif
+                @if(!$loop->last) &nbsp;·&nbsp; @endif
             @endforeach
         </div>
     @endif

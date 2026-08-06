@@ -100,9 +100,12 @@ class GradingScale extends Model
      */
     public function calculateGrade(float $marks): ?GradingScaleItem
     {
+        // Round to the nearest integer first so a mark of 69.8 doesn't fall
+        // into the gap between the 65-69 and 70-74 ECZ bands.
+        $rounded = (int) round($marks);
         return $this->items()
-            ->where('min_marks', '<=', $marks)
-            ->where('max_marks', '>=', $marks)
+            ->where('min_marks', '<=', $rounded)
+            ->where('max_marks', '>=', $rounded)
             ->first();
     }
 
