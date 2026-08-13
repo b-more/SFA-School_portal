@@ -3,6 +3,7 @@
 use App\Constants\RoleConstants;
 use App\Http\Controllers\BusPassController;
 use App\Http\Controllers\FeeStatementsController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HomeworkController;
 use App\Http\Controllers\PaymentStatementController;
 use App\Http\Controllers\PayslipController;
@@ -24,6 +25,12 @@ use Illuminate\Support\Facades\Route;
 Route::get('/test', function () {
     return 'Routes are working!';
 });
+
+// Public health endpoint for an external uptime monitor. Returns 200 when
+// payments:reconcile is stamping its heartbeat, 503 when it's gone stale —
+// wire this into a monitor and it'll page whoever is on call the moment
+// the scheduler dies.
+Route::get('/health/scheduler', [HealthController::class, 'scheduler'])->name('health.scheduler');
 
 // Legacy paths from the previous static site → anchors on the Laravel landing.
 // (301 so Google updates indexes; harmless for direct visitors.)

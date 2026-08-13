@@ -118,6 +118,27 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Dedicated channel for the internal /api/bot/* endpoints and the
+        // reconciliation → bot notify hook. Kept separate so we can grep
+        // WhatsApp-bot activity without wading through Laravel's main log.
+        'bot_api' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/bot_api.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 14,
+            'replace_placeholders' => true,
+        ],
+
+        // Payment reconcile heartbeats + self-check alerts. Read this to
+        // audit whether the scheduler stayed alive over a given window.
+        'scheduler' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/scheduler.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 14,
+            'replace_placeholders' => true,
+        ],
+
         'null' => [
             'driver' => 'monolog',
             'handler' => NullHandler::class,
