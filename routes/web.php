@@ -2,6 +2,7 @@
 
 use App\Constants\RoleConstants;
 use App\Http\Controllers\BusPassController;
+use App\Http\Controllers\FeeCollectionTrackerController;
 use App\Http\Controllers\FeeStatementsController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HomeworkController;
@@ -300,6 +301,12 @@ Route::middleware([\App\Http\Middleware\TokenFromQuery::class, \App\Http\Middlew
 
     Route::get('/payslips/{payroll}/download', [PayslipController::class, 'download'])
         ->name('payslips.download');
+});
+
+// Fee Collection Tracker exports — admin-guarded (also gated by role in the controller).
+Route::middleware(['auth'])->prefix('reports/fee-collection-tracker')->group(function () {
+    Route::get('/pdf',  [FeeCollectionTrackerController::class, 'pdf'])->name('reports.fee-collection-tracker.pdf');
+    Route::get('/xlsx', [FeeCollectionTrackerController::class, 'xlsx'])->name('reports.fee-collection-tracker.xlsx');
 });
 
 // Bus Pass Routes

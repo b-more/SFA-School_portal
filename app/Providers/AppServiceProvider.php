@@ -15,6 +15,7 @@ use App\Observers\PaymentTransactionObserver;
 use App\Observers\StudentObserver;
 use App\Observers\StudentFeeObserver;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Console\Command as ConsoleCommand;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Filament\Facades\Filament;
@@ -26,7 +27,22 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Framework commands declared with #[AsCommand] (route:list, about,
+        // schedule:run, package:discover, migrate, etc.) are lazy-loaded via
+        // Symfony's container command loader, which instantiates them
+        // WITHOUT calling setLaravel() — so their internal $laravel is null
+        // and Command::run() dies with "Call to a member function make() on
+        // null" as soon as the command is invoked.
         //
+        // Custom commands using $signature go through Application::add()
+        // and get wired correctly, which is why /this/ app's commands work
+        // but every stock framework command breaks.
+        //
+        // Hook the container so every Illuminate\Console\Command resolved
+        // out of it gets its laravel binding set as it comes off the line.
+        $this->app->afterResolving(ConsoleCommand::class, function (ConsoleCommand $command) {
+            $command->setLaravel($this->app);
+        });
     }
 
     /**
