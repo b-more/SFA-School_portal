@@ -53,7 +53,9 @@ class SchedulerSelfCheck extends Command
         $message = "St Francis alert: payments:reconcile has not run since {$lastRunPhrase}. "
                  . "Mobile-money payments will stay pending until fixed.{$suffix}";
 
-        $sms->send($message, $phone, 'system', null, null, true);
+        // 'other' is the sms_logs message_type bucket for one-off system
+        // messages that don't belong to fees/results/homework/etc.
+        $sms->send($message, $phone, 'other', null, null, true);
 
         Cache::put('scheduler:alert:last_sent', now()->toIso8601String(), now()->addDay());
         Log::channel('scheduler')->error('alert sent — reconcile stale', [
