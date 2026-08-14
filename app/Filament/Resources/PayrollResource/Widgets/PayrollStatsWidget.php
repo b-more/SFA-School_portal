@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PayrollResource\Widgets;
 
 use App\Models\Payroll;
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -16,6 +17,8 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
  */
 class PayrollStatsWidget extends BaseWidget
 {
+    use InteractsWithPageFilters;
+
     protected static bool $isLazy = true;
 
     // Wide stats fit better in the two-column layout on the payroll list.
@@ -28,16 +31,30 @@ class PayrollStatsWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $latest = Payroll::select('month', 'year')
-            ->orderByRaw("year DESC, STR_TO_DATE(CONCAT('1 ', month, ' ', year), '%d %M %Y') DESC")
-            ->first();
+        // Prefer the month/year the accountant selected on the table filters.
+        // The parent ListPayrolls page pushes those in via getHeaderWidgetsData(),
+        // and the InteractsWithPageFilters trait makes them #[Reactive].
+        $month = $this->filters['month'] ?? null;
+        $year  = $this->filters['year']  ?? null;
 
-        if (! $latest) {
-            return [Stat::make('No payroll rows yet', 'Click Generate Bulk Payroll to start')->color('warning')];
+        // If either isn't set, fall back to the most-recent month with rows.
+        if (blank($month) || blank($year)) {
+            $latest = Payroll::select('month', 'year')
+                ->orderByRaw("year DESC, STR_TO_DATE(CONCAT('1 ', month, ' ', year), '%d %M %Y') DESC")
+                ->first();
+            if (! $latest) {
+                return [Stat::make('No payroll rows yet', 'Click Generate Bulk Payroll to start')->color('warning')];
+            }
+            $month = $latest->month;
+            $year  = (int) $latest->year;
         }
 
-        $rows = Payroll::where('month', $latest->month)->where('year', $latest->year)->get();
-        $label = "{$latest->month} {$latest->year}";
+        $rows  = Payroll::where('month', $month)->where('year', $year)->get();
+        $label = "{$month} {$year}";
+
+        if ($rows->isEmpty()) {
+            return [Stat::make("No rows for {$label}", 'Change the Month/Year filter or generate this month first')->color('gray')];
+        }
 
         $gross = (float) $rows->sum('gross_salary');
         $net   = (float) $rows->sum('net_salary');

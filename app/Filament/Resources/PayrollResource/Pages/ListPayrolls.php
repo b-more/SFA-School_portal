@@ -22,6 +22,27 @@ class ListPayrolls extends ListRecords
         ];
     }
 
+    /**
+     * Push the current table filters (Month, Year) into every header
+     * widget so the PayrollStatsWidget can react to whatever period the
+     * accountant selected. The trait InteractsWithPageFilters on the
+     * widget picks these up as a #[Reactive] property.
+     */
+    public function getHeaderWidgetsColumns(): int | string | array
+    {
+        return 4;
+    }
+
+    public function getWidgetData(): array
+    {
+        return [
+            'filters' => [
+                'month' => $this->tableFilters['month']['value'] ?? null,
+                'year'  => $this->tableFilters['year']['value']  ?? null,
+            ],
+        ];
+    }
+
     protected function getHeaderActions(): array
     {
         return [
