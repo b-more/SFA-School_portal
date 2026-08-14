@@ -11,36 +11,80 @@
             color: #1F2937;
             margin: 0;
         }
-        .head {
-            border-bottom: 1.5pt solid #0F2A44;
-            padding-bottom: 4pt;
-            margin-bottom: 6pt;
+
+        /* Faint centred crest as a page-body watermark. */
+        .watermark {
+            position: absolute;
+            top: 70mm;
+            left: 55mm;
+            width: 180mm;
+            opacity: 0.04;
+            z-index: 0;
         }
-        .head .name {
+
+        /* ================= LETTERHEAD =================
+           Crest at left, school name + motto + address stacked to right,
+           closed by a heritage double rule (red over navy). Same lockup
+           as the report card so every document reads as one system. */
+        .letterhead {
+            width: 100%;
+            margin: 0 0 4pt;
+        }
+        .letterhead td { vertical-align: middle; padding: 0; }
+        .letterhead .logo-cell { width: 28mm; padding-right: 6mm; }
+        .letterhead .logo {
+            display: block;
+            height: 22mm;
+            width: 28mm;
+        }
+        .school-name {
             font-family: 'DejaVu Serif', serif;
-            font-size: 13pt;
+            font-size: 15pt;
+            font-weight: bold;
+            color: #0F2A44;
+            letter-spacing: 0.6pt;
+            line-height: 1.15;
+        }
+        .school-motto {
+            font-family: 'DejaVu Serif', serif;
+            font-size: 9pt;
+            font-style: italic;
+            color: #8B1A1A;
+            letter-spacing: 0.4pt;
+            margin: 2pt 0 4pt;
+        }
+        .school-meta {
+            font-size: 8pt;
+            color: #4B5563;
+            line-height: 1.4;
+        }
+        .school-meta .street { color: #1F2937; font-weight: bold; }
+
+        .rule {
+            border-top: 2pt solid #8B1A1A;
+            border-bottom: 0.5pt solid #0F2A44;
+            height: 3pt;
+            margin: 3pt 0 6pt;
+        }
+
+        .doc-title {
+            font-family: 'DejaVu Serif', serif;
+            font-size: 12pt;
             font-weight: bold;
             color: #0F2A44;
             letter-spacing: 0.4pt;
         }
-        .head .sub {
-            font-style: italic;
-            color: #7f1d1d;
-            font-size: 8.5pt;
-        }
-        .head .title {
-            font-family: 'DejaVu Serif', serif;
-            font-size: 11pt;
-            font-weight: bold;
-            color: #0F2A44;
-            margin-top: 2pt;
-        }
-        .meta {
+        .doc-meta {
             font-size: 7.5pt;
             color: #6B7280;
-            text-align: right;
             margin-top: 1pt;
         }
+        .doc-strip {
+            width: 100%;
+            margin-bottom: 6pt;
+        }
+        .doc-strip td { vertical-align: bottom; padding: 0; }
+        .doc-strip .right { text-align: right; }
 
         table.grid { width: 100%; border-collapse: collapse; margin-bottom: 6pt; }
         table.grid th, table.grid td {
@@ -84,14 +128,68 @@
     </style>
 </head>
 <body>
-    <div class="head">
-        <div class="name">ST. FRANCIS OF ASSISI PRIVATE SCHOOL</div>
-        <div class="sub">"For God and Country"</div>
-        <div class="title">Termly Fee Collection Tracker — {{ $d['year_label'] }}</div>
-        <div class="meta">
-            Generated {{ $d['generated_at']->format('d M Y H:i') }} · Actuals from completed payment transactions
-        </div>
-    </div>
+    @php
+        $ss = $schoolSettings ?? null;
+        $logoPath = null;
+        if ($ss && $ss->school_logo && file_exists(public_path('storage/' . $ss->school_logo))) {
+            $logoPath = public_path('storage/' . $ss->school_logo);
+        } elseif (file_exists(public_path('images/logo.png'))) {
+            $logoPath = public_path('images/logo.png');
+        }
+        $addressLine = trim(implode(', ', array_filter([
+            $ss->address ?? null,
+            $ss->city    ?? null,
+            $ss->country ?? null,
+        ])));
+        if ($ss && ! empty($ss->postal_code)) {
+            $addressLine .= ' · P.O. Box ' . $ss->postal_code;
+        }
+        $contactLine = implode('  ·  ', array_filter([
+            ($ss->phone   ?? null) ? 'Tel ' . $ss->phone : null,
+            ($ss->email   ?? null) ? $ss->email          : null,
+            ($ss->website ?? null) ? $ss->website        : null,
+        ]));
+    @endphp
+
+    @if($logoPath)
+        <img src="{{ $logoPath }}" class="watermark" alt="">
+    @endif
+
+    <table class="letterhead">
+        <tr>
+            <td class="logo-cell">
+                @if($logoPath)
+                    <img src="{{ $logoPath }}" class="logo" alt="School crest">
+                @endif
+            </td>
+            <td>
+                <div class="school-name">{{ $ss->school_name ?? 'St. Francis of Assisi Private School' }}</div>
+                <div class="school-motto">&ldquo;{{ $ss->school_motto ?? 'For God and Country' }}&rdquo;</div>
+                <div class="school-meta">
+                    @if($addressLine !== '')
+                        <span class="street">{{ $addressLine }}</span><br>
+                    @endif
+                    @if($contactLine !== '')
+                        {{ $contactLine }}
+                    @endif
+                </div>
+            </td>
+        </tr>
+    </table>
+    <div class="rule"></div>
+
+    <table class="doc-strip">
+        <tr>
+            <td>
+                <div class="doc-title">Termly Fee Collection Tracker — {{ $d['year_label'] }}</div>
+                <div class="doc-meta">Live from the ledger · Actuals from completed payment transactions</div>
+            </td>
+            <td class="right">
+                <div class="doc-meta">Generated {{ $d['generated_at']->format('d M Y · H:i') }}</div>
+                <div class="doc-meta">Ref&nbsp;SFA/FCT/{{ $d['year_label'] }}</div>
+            </td>
+        </tr>
+    </table>
 
     @foreach($d['terms'] as $term)
         @php $rows = $d['by_term'][$term->id]; $t = $d['term_totals'][$term->id]; @endphp
@@ -235,10 +333,31 @@
 
     <div style="page-break-before: always;"></div>
 
-    <div class="head">
-        <div class="name">SCHOOL POPULATION BY CLASS — {{ $d['year_label'] }}</div>
-        <div class="sub">Active enrolment, ordered by section</div>
-    </div>
+    <table class="letterhead">
+        <tr>
+            <td class="logo-cell">
+                @if($logoPath)
+                    <img src="{{ $logoPath }}" class="logo" alt="School crest">
+                @endif
+            </td>
+            <td>
+                <div class="school-name">{{ $ss->school_name ?? 'St. Francis of Assisi Private School' }}</div>
+                <div class="school-motto">&ldquo;{{ $ss->school_motto ?? 'For God and Country' }}&rdquo;</div>
+                <div class="school-meta">
+                    @if($addressLine !== '')
+                        <span class="street">{{ $addressLine }}</span><br>
+                    @endif
+                    @if($contactLine !== '')
+                        {{ $contactLine }}
+                    @endif
+                </div>
+            </td>
+        </tr>
+    </table>
+    <div class="rule"></div>
+
+    <div class="doc-title">School Population by Class — {{ $d['year_label'] }}</div>
+    <div class="doc-meta" style="margin-bottom:6pt;">Active enrolment, ordered by section</div>
 
     <table class="grid">
         <thead>

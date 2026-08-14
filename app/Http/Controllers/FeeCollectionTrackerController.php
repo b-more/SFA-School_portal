@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Constants\RoleConstants;
+use App\Models\SchoolSettings;
 use App\Services\Exports\FeeCollectionTrackerExcelBuilder;
 use App\Services\FeeCollectionTrackerService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -23,7 +24,10 @@ class FeeCollectionTrackerController extends Controller
         $year = $request->integer('academic_year_id') ?: null;
         $data = $this->service->build($year);
 
-        $pdf = Pdf::loadView('pdf.fee-collection-tracker', ['d' => $data]);
+        $pdf = Pdf::loadView('pdf.fee-collection-tracker', [
+            'd'              => $data,
+            'schoolSettings' => SchoolSettings::getInstance(),
+        ]);
         $pdf->setPaper('A4', 'landscape');
 
         $filename = sprintf('fee-collection-tracker-%s-%s.pdf', $data['year_label'], now()->format('Ymd-His'));
