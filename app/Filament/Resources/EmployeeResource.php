@@ -31,6 +31,22 @@ class EmployeeResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    /**
+     * Does this grade belong to the Secondary school section?
+     * Used to hide class-teacher-only fields when a secondary grade is picked.
+     */
+    public static function gradeIsSecondary($gradeId): bool
+    {
+        if (! $gradeId) {
+            return false;
+        }
+
+        return Grade::query()
+            ->where('id', $gradeId)
+            ->whereHas('schoolSection', fn ($q) => $q->where('code', 'SEC'))
+            ->exists();
+    }
+
     public static function shouldRegisterNavigation(): bool
     {
         return in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::SCHOOL_SECRETARY]);
@@ -196,7 +212,7 @@ class EmployeeResource extends Resource
                                                 }
                                             })
                                             ->helperText('Select salary grade to auto-fill basic salary')
-                                            ->visible(fn () => auth()->user()?->role_id === RoleConstants::ADMIN),
+                                            ->visible(fn () => in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT], true)),
                                         Forms\Components\TextInput::make('basic_salary')
                                             ->label('Basic Salary')
                                             ->numeric()
@@ -204,7 +220,7 @@ class EmployeeResource extends Resource
                                             ->disabled()
                                             ->dehydrated()
                                             ->helperText('Derived from salary grade')
-                                            ->visible(fn () => auth()->user()?->role_id === RoleConstants::ADMIN),
+                                            ->visible(fn () => in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT], true)),
                                         Forms\Components\Select::make('employment_type')
                                             ->options([
                                                 'permanent' => 'Permanent',
@@ -247,7 +263,8 @@ class EmployeeResource extends Resource
                                             ->preload()
                                             ->live(),
                                         Forms\Components\Select::make('class_section_id')
-                                            ->label('Class Section')
+                                            ->label('Homeroom Class Section')
+                                            ->helperText('Only set this if this teacher is the class teacher (homeroom / attendance) for a specific class. Other teachers teach subjects across multiple classes.')
                                             ->options(function (Get $get) {
                                                 $gradeId = $get('grade_id');
                                                 if (!$gradeId) return [];
@@ -256,9 +273,11 @@ class EmployeeResource extends Resource
                                             ->searchable()
                                             ->preload(),
                                         Forms\Components\Toggle::make('is_class_teacher')
-                                            ->label('Is Class Teacher?'),
+                                            ->label('Class Teacher (Homeroom)')
+                                            ->helperText('The teacher who marks attendance and manages this class section. In Primary/ECE they also teach all subjects; in Secondary they teach only their specialty — other subjects are handled by subject teachers.'),
                                         Forms\Components\Toggle::make('is_grade_teacher')
-                                            ->label('Is Grade Teacher?'),
+                                            ->label('Head of Grade')
+                                            ->helperText('Coordinator / HOD for a whole grade level (e.g. Head of Grade 12). Primary class teachers are auto-flagged. For Secondary, only tick this for the grade-level coordinator.'),
                                     ])
                                     ->columns(2)
                                     ->visible(fn (Get $get): bool => $get('role_id') == RoleConstants::TEACHER),
