@@ -15,6 +15,13 @@ class ListPayrolls extends ListRecords
 {
     protected static string $resource = PayrollResource::class;
 
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            \App\Filament\Resources\PayrollResource\Widgets\PayrollStatsWidget::class,
+        ];
+    }
+
     protected function getHeaderActions(): array
     {
         return [
