@@ -462,6 +462,99 @@ class PayrollResource extends Resource
                                 ->send();
                         }),
 
+                    Tables\Actions\BulkAction::make('download_merged_pdf')
+                        ->label('Download all as one PDF')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('primary')
+                        ->action(function ($records) {
+                            @set_time_limit(0);
+                            $payrolls = Payroll::with(['employee.salaryGrade', 'employee.leaveBalances'])
+                                ->whereIn('id', $records->pluck('id')->all())
+                                ->orderBy('employee_id')
+                                ->get();
+                            if ($payrolls->isEmpty()) {
+                                Notification::make()->title('No payrolls selected')->warning()->send();
+                                return;
+                            }
+
+                            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('payslips.bulk-pdf', ['payrolls' => $payrolls]);
+                            $pdf->setPaper('A4', 'portrait');
+                            $pdf->setOption('isHtml5ParserEnabled', true);
+                            $pdf->setOption('isRemoteEnabled', true);
+
+                            $first    = $payrolls->first();
+                            $stamp    = now()->format('Ymd-His');
+                            $filename = "payslips-{$first->month}-{$first->year}-{$stamp}.pdf";
+
+                            $written = \Illuminate\Support\Facades\Storage::disk('public')
+                                ->put("exports/{$filename}", $pdf->output());
+                            if (! $written) {
+                                Notification::make()->title('Could not save the merged PDF')
+                                    ->body('Check that storage/app/public/exports is writable.')
+                                    ->danger()->send();
+                                return;
+                            }
+
+                            Notification::make()->title('Merged payslip PDF ready')
+                                ->body("Downloading {$payrolls->count()} payslip(s).")
+                                ->success()->send();
+
+                            return redirect()->to(\Illuminate\Support\Facades\Storage::disk('public')->url("exports/{$filename}"));
+                        }),
+
+                    Tables\Actions\BulkAction::make('download_zip')
+                        ->label('Download all as ZIP (individual PDFs)')
+                        ->icon('heroicon-o-archive-box-arrow-down')
+                        ->color('primary')
+                        ->action(function ($records) {
+                            @set_time_limit(0);
+                            $payrolls = Payroll::with(['employee.salaryGrade', 'employee.leaveBalances'])
+                                ->whereIn('id', $records->pluck('id')->all())
+                                ->orderBy('employee_id')
+                                ->get();
+                            if ($payrolls->isEmpty()) {
+                                Notification::make()->title('No payrolls selected')->warning()->send();
+                                return;
+                            }
+
+                            $stamp   = now()->format('Ymd-His');
+                            $first   = $payrolls->first();
+                            $zipName = "payslips-{$first->month}-{$first->year}-{$stamp}.zip";
+                            $zipPath = storage_path("app/public/exports/{$zipName}");
+                            @mkdir(dirname($zipPath), 0775, true);
+
+                            $zip = new \ZipArchive;
+                            if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+                                Notification::make()->title('Could not create the ZIP file')->danger()->send();
+                                return;
+                            }
+
+                            foreach ($payrolls as $payroll) {
+                                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('payslips.pdf', ['payroll' => $payroll]);
+                                $pdf->setPaper('A4', 'portrait');
+                                $pdf->setOption('isHtml5ParserEnabled', true);
+                                $pdf->setOption('isRemoteEnabled', true);
+
+                                $empId = $payroll->employee->employee_number
+                                    ?? $payroll->employee->employee_id
+                                    ?? $payroll->employee->id;
+                                $safeId   = preg_replace('/[^A-Za-z0-9._-]+/', '-', (string) $empId);
+                                $safeName = preg_replace('/[^A-Za-z0-9._-]+/', '-', (string) $payroll->employee->name);
+                                $entry    = "payslip-{$safeName}-{$safeId}-{$payroll->month}-{$payroll->year}.pdf";
+
+                                $zip->addFromString($entry, $pdf->output());
+                            }
+                            $zip->close();
+
+                            @chown($zipPath, 'www-data'); @chgrp($zipPath, 'www-data');
+
+                            Notification::make()->title('ZIP archive ready')
+                                ->body("Downloading {$payrolls->count()} individual payslip PDF(s).")
+                                ->success()->send();
+
+                            return redirect()->to(\Illuminate\Support\Facades\Storage::disk('public')->url("exports/{$zipName}"));
+                        }),
+
                     Tables\Actions\BulkAction::make('mark_pending')
                         ->label('Revert to Pending')
                         ->icon('heroicon-o-arrow-uturn-left')
