@@ -23,8 +23,7 @@ class FeeCollectionTracker extends Page implements HasForms
     protected static ?string $title           = 'Fee Collection Tracker';
     protected static string  $view            = 'filament.pages.fee-collection-tracker';
 
-    public ?int   $academicYearId = null;
-    public array  $data           = [];
+    public ?int $academicYearId = null;
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -43,27 +42,21 @@ class FeeCollectionTracker extends Page implements HasForms
     public function mount(): void
     {
         $this->academicYearId = AcademicYear::where('is_active', true)->value('id');
-        $this->refresh();
         $this->form->fill(['academicYearId' => $this->academicYearId]);
     }
 
     public function form(Form $form): Form
     {
         return $form
-            ->statePath('') // bind directly to public props on the page
+            ->statePath('')
             ->schema([
                 Select::make('academicYearId')
                     ->label('Academic Year')
                     ->options(AcademicYear::orderByDesc('is_active')->orderBy('name')->pluck('name', 'id'))
                     ->default($this->academicYearId)
-                    ->live()
-                    ->afterStateUpdated(fn () => $this->refresh()),
+                    ->required()
+                    ->live(),
             ]);
-    }
-
-    public function refresh(): void
-    {
-        $this->data = app(FeeCollectionTrackerService::class)->build($this->academicYearId);
     }
 
     public function pdfUrl(): string

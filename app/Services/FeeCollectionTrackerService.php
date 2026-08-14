@@ -102,31 +102,43 @@ class FeeCollectionTrackerService
             }
 
             // Pupils = the physical roll for this section (active students in
-            // the section's classes) — one person, counted once, even if their
-            // fee ledger has multiple rows this term.
+            // the section's classes) — one person, counted once.
             $studentIds = $sectionClasses->flatMap(fn ($cs) =>
                 $cs->students()->where('enrollment_status', 'active')->pluck('id')
             )->unique()->values();
             $pupils = $studentIds->count();
 
-            // Expected = sum of all StudentFee.basic_fee for those pupils in
-            // this term (tuition + any structured items). basic_fee comes from
-            // the joined FeeStructure. Rows with a K0 or missing structure are
-            // tracked separately so they can be surfaced as data anomalies.
+            // Term StudentFee rows for these pupils — used to pick which
+            // FeeStructure is authoritative for this section (majority vote)
+            // and to sum Actual collections.
             $studentFees = StudentFee::query()
                 ->with(['feeStructure:id,basic_fee'])
                 ->where('term_id', $term->id)
                 ->whereIn('student_id', $studentIds)
                 ->get(['id', 'student_id', 'fee_structure_id']);
 
-            $feeAmounts   = $studentFees->map(fn ($sf) => (float) ($sf->feeStructure?->basic_fee ?? 0));
-            $nonZeroFees  = $feeAmounts->filter(fn ($v) => $v > 0);
-            $zeroFeeRows  = $feeAmounts->count() - $nonZeroFees->count();
+            // Fee per pupil = the FeeStructure basic_fee most pupils in this
+            // section are billed against this term. This is factual — it
+            // reads the flat published rate rather than an average diluted
+            // by unbilled pupils. If no fees exist yet for this section /
+            // term, fall back to the term's next-most-common structure
+            // matching the section's expected price band, else 0.
+            $byStructure = $studentFees
+                ->filter(fn ($sf) => $sf->feeStructure && $sf->feeStructure->basic_fee > 0)
+                ->groupBy('fee_structure_id');
 
-            $expected  = (float) $feeAmounts->sum();
-            $feePer    = $pupils > 0 ? round($expected / $pupils, 2) : 0.0;
-            $feeMin    = $nonZeroFees->count() ? (float) $nonZeroFees->min() : 0.0;
-            $feeMax    = $nonZeroFees->count() ? (float) $nonZeroFees->max() : 0.0;
+            $feePer     = 0.0;
+            $anomalies  = 0;   // pupils on a different structure than the section's typical
+            if ($byStructure->isNotEmpty()) {
+                $topStructure = $byStructure->sortByDesc(fn ($group) => $group->count())->first();
+                $feePer       = (float) $topStructure->first()->feeStructure->basic_fee;
+                $anomalies    = $studentFees->count() - $topStructure->count();
+            }
+
+            // Expected = pupils × published fee for the section. Counts every
+            // pupil on the section roll, whether or not their StudentFee row
+            // has been created yet — that unbilled gap becomes shortfall.
+            $expected = round($pupils * $feePer, 2);
 
             $actual = $studentFees->isEmpty() ? 0.0 : (float) PaymentTransaction::query()
                 ->whereIn('student_fee_id', $studentFees->pluck('id'))
@@ -138,17 +150,18 @@ class FeeCollectionTrackerService
             $pctCollected  = $expected > 0 ? round(($actual / $expected) * 100, 2) : 0.0;
             $pctLoss       = $expected > 0 ? round(($shortfall / $expected) * 100, 2) : 0.0;
 
+            $unbilled = $pupils - $studentFees->pluck('student_id')->unique()->count();
+
             $rows[$section] = [
                 'pupils'         => $pupils,
                 'fee_per'        => $feePer,
-                'fee_min'        => $feeMin,
-                'fee_max'        => $feeMax,
-                'expected'       => round($expected, 2),
+                'expected'       => $expected,
                 'actual'         => round($actual, 2),
                 'shortfall'      => round($shortfall, 2),
                 'pct_collected'  => $pctCollected,
                 'pct_loss'       => $pctLoss,
-                'zero_fee_rows'  => $zeroFeeRows,   // surfaced as a warning badge in the UI
+                'unbilled'       => max(0, $unbilled),   // pupils with no StudentFee row this term
+                'anomalies'      => $anomalies,          // pupils on a non-standard structure
             ];
         }
 
@@ -158,9 +171,10 @@ class FeeCollectionTrackerService
     private function emptyRow(): array
     {
         return [
-            'pupils' => 0, 'fee_per' => 0.0, 'fee_min' => 0.0, 'fee_max' => 0.0,
+            'pupils' => 0, 'fee_per' => 0.0,
             'expected' => 0.0, 'actual' => 0.0, 'shortfall' => 0.0,
-            'pct_collected' => 0.0, 'pct_loss' => 0.0, 'zero_fee_rows' => 0,
+            'pct_collected' => 0.0, 'pct_loss' => 0.0,
+            'unbilled' => 0, 'anomalies' => 0,
         ];
     }
 

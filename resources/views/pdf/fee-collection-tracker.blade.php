@@ -115,8 +115,11 @@
                     <tr>
                         <td class="subj">
                             {{ $section }}
-                            @if(($r['zero_fee_rows'] ?? 0) > 0)
-                                <span class="warn">⚠ {{ $r['zero_fee_rows'] }} K0 fee row(s)</span>
+                            @if(($r['unbilled'] ?? 0) > 0)
+                                <span class="warn">⚠ {{ $r['unbilled'] }} unbilled</span>
+                            @endif
+                            @if(($r['anomalies'] ?? 0) > 0)
+                                <span class="warn">⚠ {{ $r['anomalies'] }} on non-standard fee</span>
                             @endif
                         </td>
                         <td>{{ number_format($r['pupils']) }}</td>
@@ -271,9 +274,12 @@
     </table>
 
     <div class="footnote">
-        Actual figures are the sum of completed payment_transactions rows (parent app + WhatsApp bot + office-recorded + QR).
-        Salary figures come from the payrolls ledger, bucketed by which term window each payroll month falls into.
-        Rows flagged K0 fee mean a StudentFee row was created without a fee structure — worth checking with the accountant.
+        Fee per Pupil = the published <em>fee_structures.basic_fee</em> that most pupils in the section
+        are billed against for that term. Expected = Pupils × Fee per Pupil. Actual = completed
+        <em>payment_transactions</em> for those pupils' StudentFee rows (parent app + WhatsApp bot + QR + office).
+        Salary bills come from the <em>payrolls</em> ledger, bucketed by which term window each month falls into.
+        Flags: <span class="warn">⚠ unbilled</span> = pupils on the roll with no StudentFee row this term;
+        <span class="warn">⚠ non-standard fee</span> = pupils billed against a different structure than the section's majority.
     </div>
 </body>
 </html>
