@@ -176,6 +176,7 @@ class AdminPanelProvider extends PanelProvider
                 // Accounts & Finance
                 AccountsDashboard::class,
                 FinancialReports::class,
+                \App\Filament\Pages\FeeCollectionTracker::class,
                 \App\Filament\Pages\GenerateFees::class,
                 // Website Management
                 ManageLandingPage::class,
