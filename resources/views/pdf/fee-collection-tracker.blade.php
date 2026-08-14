@@ -394,8 +394,9 @@
 
     <div class="footnote">
         Fee per Pupil = the published <em>fee_structures.basic_fee</em> that most pupils in the section
-        are billed against for that term. Expected = Pupils × Fee per Pupil. Actual = completed
-        <em>payment_transactions</em> for those pupils' StudentFee rows (parent app + WhatsApp bot + QR + office).
+        are billed against for that term. Expected = Pupils × Fee per Pupil.
+        Actual = the authoritative <em>student_fees.amount_paid</em> column — the same figure used to compute each pupil's balance,
+        totalling every payment source (mobile money, office cash, bank transfer, historical imports).
         Salary bills come from the <em>payrolls</em> ledger, bucketed by which term window each month falls into.
         Flags: <span class="warn">⚠ unbilled</span> = pupils on the roll with no StudentFee row this term;
         <span class="warn">⚠ non-standard fee</span> = pupils billed against a different structure than the section's majority.

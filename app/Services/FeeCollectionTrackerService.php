@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\AcademicYear;
 use App\Models\ClassSection;
-use App\Models\PaymentTransaction;
 use App\Models\Payroll;
 use App\Models\StudentFee;
 use App\Models\Term;
@@ -140,11 +139,15 @@ class FeeCollectionTrackerService
             // has been created yet — that unbilled gap becomes shortfall.
             $expected = round($pupils * $feePer, 2);
 
-            $actual = $studentFees->isEmpty() ? 0.0 : (float) PaymentTransaction::query()
-                ->whereIn('student_fee_id', $studentFees->pluck('id'))
-                ->where('type', 'payment')
-                ->where('status', 'completed')
-                ->sum('amount');
+            // Actual = the authoritative amount_paid column on each StudentFee.
+            // Payments reach the ledger from several sources — CGrate reconcile,
+            // office cash-recording via Filament, historical imports, bank-
+            // transfer entries — and not every source writes a PaymentTransaction
+            // row (that's the audit ledger, not the running total). amount_paid
+            // is what the balance calculator uses, so the tracker should agree.
+            $actual = (float) StudentFee::query()
+                ->whereIn('id', $studentFees->pluck('id'))
+                ->sum('amount_paid');
 
             $shortfall     = max(0.0, $expected - $actual);
             $pctCollected  = $expected > 0 ? round(($actual / $expected) * 100, 2) : 0.0;

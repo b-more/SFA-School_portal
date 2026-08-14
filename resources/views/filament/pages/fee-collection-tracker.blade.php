@@ -37,7 +37,7 @@
                 <li><strong>Pupils</strong> — active students on the roll for each section (ECE / Primary / Secondary).</li>
                 <li><strong>Fee per Pupil</strong> — the published <code>fee_structures.basic_fee</code> that the majority of the section's pupils are billed against for that term.</li>
                 <li><strong>Expected</strong> — Pupils × Fee per Pupil (every pupil on the roll is counted, whether or not a StudentFee row exists yet).</li>
-                <li><strong>Actual Collected</strong> — sum of completed <code>payment_transactions</code> tied to those pupils' StudentFee rows for the term (parent app · WhatsApp bot · public QR · office-recorded).</li>
+                <li><strong>Actual Collected</strong> — sum of <code>student_fees.amount_paid</code> for those pupils' fee rows this term. This is the authoritative running total used across the portal for balance calculations, so every payment source counts (mobile money, office cash, bank transfer, historical imports).</li>
                 <li><strong>Salary Bill</strong> — sum of <code>payrolls.net_salary</code> whose month falls inside the term window.</li>
             </ul>
             <p>The Population sheet lists every active class, its class teacher, and headcount.</p>
