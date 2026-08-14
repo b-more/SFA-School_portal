@@ -4,16 +4,25 @@
     </x-filament-panels::form>
 
     <div class="mt-6 flex flex-wrap gap-3">
-        <a href="{{ $this->pdfUrl() }}" target="_blank"
-           class="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-primary-600 text-white font-semibold hover:bg-primary-700 shadow">
-            <x-heroicon-o-document-arrow-down class="w-5 h-5" />
+        <x-filament::button
+            tag="a"
+            :href="$this->pdfUrl()"
+            target="_blank"
+            color="primary"
+            size="lg"
+            icon="heroicon-o-document-arrow-down">
             Generate PDF Report
-        </a>
-        <a href="{{ $this->xlsxUrl() }}" target="_blank"
-           class="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 shadow">
-            <x-heroicon-o-table-cells class="w-5 h-5" />
+        </x-filament::button>
+
+        <x-filament::button
+            tag="a"
+            :href="$this->xlsxUrl()"
+            target="_blank"
+            color="success"
+            size="lg"
+            icon="heroicon-o-table-cells">
             Generate Excel Report
-        </a>
+        </x-filament::button>
     </div>
 
     <x-filament::section class="mt-6">
