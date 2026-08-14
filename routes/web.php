@@ -303,8 +303,11 @@ Route::middleware([\App\Http\Middleware\TokenFromQuery::class, \App\Http\Middlew
         ->name('payslips.download');
 });
 
-// Fee Collection Tracker exports — admin-guarded (also gated by role in the controller).
-Route::middleware(['auth'])->prefix('reports/fee-collection-tracker')->group(function () {
+// Fee Collection Tracker exports — nested under financial-reports so the
+// nginx path allowlist forwards them to Laravel (a top-level /reports prefix
+// falls through to the marketing vhost). Admin-guarded, also gated by role
+// in the controller.
+Route::middleware(['auth'])->prefix('financial-reports/fee-collection-tracker')->group(function () {
     Route::get('/pdf',  [FeeCollectionTrackerController::class, 'pdf'])->name('reports.fee-collection-tracker.pdf');
     Route::get('/xlsx', [FeeCollectionTrackerController::class, 'xlsx'])->name('reports.fee-collection-tracker.xlsx');
 });
