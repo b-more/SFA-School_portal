@@ -443,6 +443,49 @@ class SchoolSettingsResource extends Resource
                         Forms\Components\Tabs\Tab::make('Fees & Payments')
                             ->icon('heroicon-o-banknotes')
                             ->schema([
+                                Forms\Components\Section::make('Discount Policies')
+                                    ->description('Automatic tuition discounts applied from the Discounts & Bursaries page.')
+                                    ->icon('heroicon-o-receipt-percent')
+                                    ->schema([
+                                        Forms\Components\Toggle::make('sibling_discount_enabled')
+                                            ->label('Sibling discount enabled')
+                                            ->default(false)
+                                            ->columnSpan(3),
+
+                                        Forms\Components\TextInput::make('sibling_discount_min_pupils')
+                                            ->label('Min pupils per family')
+                                            ->helperText('Family qualifies when it has this many active pupils or more.')
+                                            ->numeric()->minValue(2)->maxValue(20)
+                                            ->default(4),
+
+                                        Forms\Components\TextInput::make('sibling_discount_percentage')
+                                            ->label('Sibling % off tuition')
+                                            ->numeric()->minValue(0)->maxValue(100)
+                                            ->suffix('%')
+                                            ->default(10),
+
+                                        Forms\Components\Placeholder::make('sibling_hint')
+                                            ->label('')
+                                            ->content('Flat percentage applied to every pupil in a qualifying family.'),
+
+                                        Forms\Components\Toggle::make('early_payment_discount_enabled')
+                                            ->label('Early payment discount enabled')
+                                            ->default(false)
+                                            ->columnSpan(3),
+
+                                        Forms\Components\TextInput::make('early_payment_discount_percentage')
+                                            ->label('Early payment % off tuition')
+                                            ->numeric()->minValue(0)->maxValue(100)
+                                            ->suffix('%')
+                                            ->default(5),
+
+                                        Forms\Components\Placeholder::make('early_hint')
+                                            ->label('')
+                                            ->content('Qualifies when the full term fee lands on or before the term start date.')
+                                            ->columnSpan(2),
+                                    ])
+                                    ->columns(3),
+
                                 Forms\Components\Section::make('Payment Options')
                                     ->schema([
                                         Forms\Components\Toggle::make('enable_online_payments')
@@ -475,6 +518,67 @@ class SchoolSettingsResource extends Resource
                                             ->columnSpanFull(),
                                     ])
                                     ->columns(3),
+
+                                Forms\Components\Section::make('Payment Gateway — CGrate / 543 Konse Konse')
+                                    ->description('Mobile-money credentials used for online fee payments. Stored encrypted. Online payments will not work until valid credentials are saved here and "Enable Online Payments" is turned on.')
+                                    ->icon('heroicon-o-lock-closed')
+                                    ->schema([
+                                        Forms\Components\Placeholder::make('cgrate_status')
+                                            ->label('Current status')
+                                            ->content(function () {
+                                                $s = \App\Models\SchoolSettings::getInstance();
+                                                return (filled($s->cgrate_username) && filled($s->cgrate_password))
+                                                    ? '✓ Credentials configured'
+                                                    : '⚠ Not configured — enter the username and password below';
+                                            })
+                                            ->columnSpanFull(),
+
+                                        Forms\Components\TextInput::make('cgrate_soap_url')
+                                            ->label('SOAP Endpoint URL')
+                                            ->url()
+                                            ->placeholder('https://543.cgrate.co.zm/Konik/KonikWs')
+                                            ->helperText('Leave blank to use the default CGrate endpoint.')
+                                            ->columnSpanFull(),
+
+                                        Forms\Components\TextInput::make('cgrate_username')
+                                            ->label('CGrate Username')
+                                            ->autocomplete(false)
+                                            ->maxLength(255),
+
+                                        Forms\Components\TextInput::make('cgrate_password')
+                                            ->label('CGrate Password')
+                                            ->password()
+                                            ->revealable()
+                                            ->autocomplete('new-password')
+                                            ->dehydrated(fn ($state) => filled($state))
+                                            ->helperText('Leave blank to keep the current password.')
+                                            ->maxLength(255),
+
+                                        Forms\Components\TextInput::make('cgrate_timeout')
+                                            ->label('Request Timeout')
+                                            ->numeric()
+                                            ->default(30)
+                                            ->minValue(5)
+                                            ->maxValue(120)
+                                            ->suffix('seconds'),
+                                    ])
+                                    ->columns(2)
+                                    ->collapsible(),
+
+                                Forms\Components\Section::make('Report Card / Results Lock')
+                                    ->description('Outstanding balance allowed before results and report cards lock. K0 = strict (any balance locks). A small threshold like K100 forgives tiny leftovers.')
+                                    ->icon('heroicon-o-lock-closed')
+                                    ->schema([
+                                        Forms\Components\TextInput::make('report_card_lock_threshold')
+                                            ->label('Forgiveness Threshold')
+                                            ->numeric()
+                                            ->default(100)
+                                            ->minValue(0)
+                                            ->prefix('K')
+                                            ->helperText('Report cards stay unlocked as long as the outstanding balance is at or below this amount.'),
+                                    ])
+                                    ->columns(1)
+                                    ->collapsible(),
 
                                 Forms\Components\Section::make('Late Fees')
                                     ->schema([

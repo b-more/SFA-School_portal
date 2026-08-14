@@ -89,6 +89,13 @@ class SchoolSettings extends Model
         'bank_details',
         'mobile_money_details',
 
+        // Payment Gateway (CGrate / 543 Konse Konse)
+        'cgrate_soap_url',
+        'cgrate_username',
+        'cgrate_password',
+        'cgrate_timeout',
+        'report_card_lock_threshold',
+
         // SMS & Communication
         'sms_sender_id',
         'enable_sms_notifications',
@@ -149,6 +156,13 @@ class SchoolSettings extends Model
         'secondary_head_title',
         'secondary_head_signature',
 
+        // Discount policies
+        'sibling_discount_enabled',
+        'sibling_discount_min_pupils',
+        'sibling_discount_percentage',
+        'early_payment_discount_enabled',
+        'early_payment_discount_percentage',
+
         // Metadata
         'custom_settings',
         'settings_last_updated_at',
@@ -162,6 +176,9 @@ class SchoolSettings extends Model
         'bank_details' => 'array',
         'mobile_money_details' => 'array',
         'custom_settings' => 'array',
+
+        // Encrypted secrets
+        'cgrate_password' => 'encrypted',
 
         // Booleans
         'show_position_in_class' => 'boolean',
@@ -217,8 +234,10 @@ class SchoolSettings extends Model
         'max_login_attempts' => 'integer',
         'lockout_duration_minutes' => 'integer',
         'backup_retention_days' => 'integer',
+        'cgrate_timeout' => 'integer',
         'minimum_partial_payment' => 'decimal:2',
         'late_fee_percentage' => 'decimal:2',
+        'report_card_lock_threshold' => 'decimal:2',
 
         // Grading scale
         'grade_a_min' => 'integer',
