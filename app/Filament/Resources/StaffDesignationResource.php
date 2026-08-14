@@ -58,8 +58,8 @@ class StaffDesignationResource extends Resource
                             ->numeric()
                             ->default(5)
                             ->minValue(1)
-                            ->maxValue(10)
-                            ->helperText('1 = Highest, 10 = Lowest')
+                            ->maxValue(20)
+                            ->helperText('1 = Highest, 20 = Lowest')
                             ->required(),
 
                         Forms\Components\TextInput::make('sort_order')
