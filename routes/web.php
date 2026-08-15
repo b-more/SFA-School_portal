@@ -303,6 +303,15 @@ Route::middleware([\App\Http\Middleware\TokenFromQuery::class, \App\Http\Middlew
         ->name('payslips.download');
 });
 
+// Clinic PDF exports — nested under financial-reports so the nginx vhost
+// allowlist forwards them to Laravel. Admin/Clinician-gated in the controller.
+Route::middleware(['auth'])->prefix('financial-reports/clinic')->group(function () {
+    Route::get('/weekly.pdf',  [\App\Http\Controllers\ClinicReportController::class, 'weeklyPdf'])->name('reports.clinic-weekly.pdf');
+    Route::get('/monthly.pdf', [\App\Http\Controllers\ClinicReportController::class, 'monthlyPdf'])->name('reports.clinic-monthly.pdf');
+    Route::get('/termly.pdf',  [\App\Http\Controllers\ClinicReportController::class, 'termlyPdf'])->name('reports.clinic-termly.pdf');
+    Route::get('/custom.pdf',  [\App\Http\Controllers\ClinicReportController::class, 'customPdf'])->name('reports.clinic-custom.pdf');
+});
+
 // Fee Collection Tracker exports — nested under financial-reports so the
 // nginx path allowlist forwards them to Laravel (a top-level /reports prefix
 // falls through to the marketing vhost). Admin-guarded, also gated by role

@@ -179,6 +179,7 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Pages\FeeCollectionTracker::class,
                 \App\Filament\Pages\DiscountsAndBursaries::class,
                 \App\Filament\Pages\GenerateFees::class,
+                \App\Filament\Pages\ClinicReports::class,
                 // Website Management
                 ManageLandingPage::class,
                 // Profile
