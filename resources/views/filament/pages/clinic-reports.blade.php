@@ -129,6 +129,161 @@
         </x-filament::section>
     @endif
 
+    {{-- ===== ANALYTICAL REPORT CATALOG (C1–L1) ===== --}}
+    <x-filament::section class="mt-6">
+        <x-slot name="heading">Analytical reports</x-slot>
+        <x-slot name="description">
+            Seven purpose-built PDFs — clinical, governance, operational and class-level cuts.
+            Each opens in a new tab with the school letterhead and signature blocks.
+        </x-slot>
+
+        @php
+            $inputCls  = 'w-full rounded-md border-gray-300 dark:border-gray-600 text-sm py-1.5';
+            $btnCls    = 'inline-flex items-center px-3 py-1.5 rounded-md bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium';
+            $cardCls   = 'rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900';
+            $labelCls  = 'block text-xs uppercase tracking-wide text-gray-500 mb-1';
+            $students  = \App\Models\Student::where('enrollment_status','active')->orderBy('name')->pluck('name','id');
+            $complaints= \App\Models\ClinicComplaint::orderBy('name')->pluck('name','id');
+            $classes   = \App\Models\ClassSection::with('grade')->get()
+                            ->sortBy(fn ($c) => ($c->grade?->name ?? '') . '-' . $c->name)
+                            ->mapWithKeys(fn ($c) => [$c->id => ($c->grade?->name ?? '—') . ' - ' . $c->name]);
+            $todayIso  = now()->toDateString();
+            $monthAgo  = now()->subMonth()->toDateString();
+        @endphp
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {{-- C1 · Per-pupil medical history --}}
+            <form method="GET" action="{{ route('reports.clinic-pupil-history.pdf') }}" target="_blank" class="{{ $cardCls }}">
+                <div class="font-semibold text-primary-700 dark:text-primary-400">C1 · Per-pupil medical history</div>
+                <div class="text-xs text-gray-500 mb-3">Full visit ledger for one pupil, ready for parent, GP or referral.</div>
+                <label class="{{ $labelCls }}">Pupil</label>
+                <select name="student_id" required class="{{ $inputCls }}">
+                    <option value="">— Choose pupil —</option>
+                    @foreach($students as $id => $n)<option value="{{ $id }}">{{ $n }}</option>@endforeach
+                </select>
+                <div class="mt-3 text-right"><button class="{{ $btnCls }}">Download PDF</button></div>
+            </form>
+
+            {{-- C2 · Complaint trend --}}
+            <form method="GET" action="{{ route('reports.clinic-complaint-trend.pdf') }}" target="_blank" class="{{ $cardCls }}">
+                <div class="font-semibold text-primary-700 dark:text-primary-400">C2 · Complaint trend</div>
+                <div class="text-xs text-gray-500 mb-3">See if one complaint (or all) is rising month-on-month.</div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="{{ $labelCls }}">Complaint</label>
+                        <select name="complaint_id" class="{{ $inputCls }}">
+                            <option value="">All complaints</option>
+                            @foreach($complaints as $id => $n)<option value="{{ $id }}">{{ $n }}</option>@endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="{{ $labelCls }}">Window</label>
+                        <select name="months" class="{{ $inputCls }}">
+                            <option value="6">Last 6 months</option>
+                            <option value="12" selected>Last 12 months</option>
+                            <option value="18">Last 18 months</option>
+                            <option value="24">Last 24 months</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-3 text-right"><button class="{{ $btnCls }}">Download PDF</button></div>
+            </form>
+
+            {{-- G1 · Sick notes register --}}
+            <form method="GET" action="{{ route('reports.clinic-sick-notes.pdf') }}" target="_blank" class="{{ $cardCls }}">
+                <div class="font-semibold text-primary-700 dark:text-primary-400">G1 · Sick-notes register</div>
+                <div class="text-xs text-gray-500 mb-3">Signed collection register — guardians sign when collecting pupils.</div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="{{ $labelCls }}">From</label>
+                        <input type="date" name="from" value="{{ $monthAgo }}" required class="{{ $inputCls }}">
+                    </div>
+                    <div>
+                        <label class="{{ $labelCls }}">To</label>
+                        <input type="date" name="to" value="{{ $todayIso }}" required class="{{ $inputCls }}">
+                    </div>
+                </div>
+                <input type="hidden" name="period" value="custom">
+                <div class="mt-3 text-right"><button class="{{ $btnCls }}">Download PDF</button></div>
+            </form>
+
+            {{-- G4 · Attendance-loss impact --}}
+            <form method="GET" action="{{ route('reports.clinic-attendance-loss.pdf') }}" target="_blank" class="{{ $cardCls }}">
+                <div class="font-semibold text-primary-700 dark:text-primary-400">G4 · Attendance-loss impact</div>
+                <div class="text-xs text-gray-500 mb-3">School-days lost after sent-home / referred visits.</div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="{{ $labelCls }}">From</label>
+                        <input type="date" name="from" value="{{ $monthAgo }}" required class="{{ $inputCls }}">
+                    </div>
+                    <div>
+                        <label class="{{ $labelCls }}">To</label>
+                        <input type="date" name="to" value="{{ $todayIso }}" required class="{{ $inputCls }}">
+                    </div>
+                </div>
+                <input type="hidden" name="period" value="custom">
+                <div class="mt-3 text-right"><button class="{{ $btnCls }}">Download PDF</button></div>
+            </form>
+
+            {{-- O1 · Cost per visit / pupil --}}
+            <form method="GET" action="{{ route('reports.clinic-cost-metrics.pdf') }}" target="_blank" class="{{ $cardCls }}">
+                <div class="font-semibold text-primary-700 dark:text-primary-400">O1 · Cost per visit &amp; per pupil</div>
+                <div class="text-xs text-gray-500 mb-3">Bursar-ready cost analysis with a per-section breakdown.</div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="{{ $labelCls }}">From</label>
+                        <input type="date" name="from" value="{{ $monthAgo }}" required class="{{ $inputCls }}">
+                    </div>
+                    <div>
+                        <label class="{{ $labelCls }}">To</label>
+                        <input type="date" name="to" value="{{ $todayIso }}" required class="{{ $inputCls }}">
+                    </div>
+                </div>
+                <input type="hidden" name="period" value="custom">
+                <div class="mt-3 text-right"><button class="{{ $btnCls }}">Download PDF</button></div>
+            </form>
+
+            {{-- O2 · Burn rate --}}
+            <form method="GET" action="{{ route('reports.clinic-burn-rate.pdf') }}" target="_blank" class="{{ $cardCls }}">
+                <div class="font-semibold text-primary-700 dark:text-primary-400">O2 · Stock burn-rate</div>
+                <div class="text-xs text-gray-500 mb-3">Days-of-supply ranking so you never run out unnoticed.</div>
+                <label class="{{ $labelCls }}">Averaging window</label>
+                <select name="window" class="{{ $inputCls }}">
+                    <option value="14">Last 14 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="60">Last 60 days</option>
+                    <option value="90">Last 90 days</option>
+                </select>
+                <div class="mt-3 text-right"><button class="{{ $btnCls }}">Download PDF</button></div>
+            </form>
+
+            {{-- L1 · Class health snapshot --}}
+            <form method="GET" action="{{ route('reports.clinic-class-snapshot.pdf') }}" target="_blank" class="{{ $cardCls }} lg:col-span-2">
+                <div class="font-semibold text-primary-700 dark:text-primary-400">L1 · Class health snapshot</div>
+                <div class="text-xs text-gray-500 mb-3">One-page snapshot for the class teacher — top complaints, repeat visitors, missed days.</div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="{{ $labelCls }}">Class</label>
+                        <select name="class_section_id" required class="{{ $inputCls }}">
+                            <option value="">— Choose class —</option>
+                            @foreach($classes as $id => $n)<option value="{{ $id }}">{{ $n }}</option>@endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="{{ $labelCls }}">From</label>
+                        <input type="date" name="from" value="{{ $monthAgo }}" required class="{{ $inputCls }}">
+                    </div>
+                    <div>
+                        <label class="{{ $labelCls }}">To</label>
+                        <input type="date" name="to" value="{{ $todayIso }}" required class="{{ $inputCls }}">
+                    </div>
+                </div>
+                <input type="hidden" name="period" value="custom">
+                <div class="mt-3 text-right"><button class="{{ $btnCls }}">Download PDF</button></div>
+            </form>
+        </div>
+    </x-filament::section>
+
     {{-- ===== STOCK METRICS ===== --}}
     <x-filament::section class="mt-6">
         <x-slot name="heading">Stock — spend & movement</x-slot>

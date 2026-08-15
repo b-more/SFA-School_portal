@@ -310,6 +310,15 @@ Route::middleware(['auth'])->prefix('financial-reports/clinic')->group(function 
     Route::get('/monthly.pdf', [\App\Http\Controllers\ClinicReportController::class, 'monthlyPdf'])->name('reports.clinic-monthly.pdf');
     Route::get('/termly.pdf',  [\App\Http\Controllers\ClinicReportController::class, 'termlyPdf'])->name('reports.clinic-termly.pdf');
     Route::get('/custom.pdf',  [\App\Http\Controllers\ClinicReportController::class, 'customPdf'])->name('reports.clinic-custom.pdf');
+
+    // Analytical clinic reports (C1 / C2 / G1 / G4 / O1 / O2 / L1)
+    Route::get('/pupil-history.pdf',    [\App\Http\Controllers\ClinicReportController::class, 'pupilHistoryPdf'])   ->name('reports.clinic-pupil-history.pdf');
+    Route::get('/complaint-trend.pdf',  [\App\Http\Controllers\ClinicReportController::class, 'complaintTrendPdf']) ->name('reports.clinic-complaint-trend.pdf');
+    Route::get('/sick-notes.pdf',       [\App\Http\Controllers\ClinicReportController::class, 'sickNotesPdf'])      ->name('reports.clinic-sick-notes.pdf');
+    Route::get('/attendance-loss.pdf',  [\App\Http\Controllers\ClinicReportController::class, 'attendanceLossPdf']) ->name('reports.clinic-attendance-loss.pdf');
+    Route::get('/cost-metrics.pdf',     [\App\Http\Controllers\ClinicReportController::class, 'costMetricsPdf'])    ->name('reports.clinic-cost-metrics.pdf');
+    Route::get('/burn-rate.pdf',        [\App\Http\Controllers\ClinicReportController::class, 'burnRatePdf'])       ->name('reports.clinic-burn-rate.pdf');
+    Route::get('/class-snapshot.pdf',   [\App\Http\Controllers\ClinicReportController::class, 'classSnapshotPdf'])  ->name('reports.clinic-class-snapshot.pdf');
 });
 
 // Fee Collection Tracker exports — nested under financial-reports so the
