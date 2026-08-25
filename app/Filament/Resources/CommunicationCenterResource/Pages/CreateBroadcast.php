@@ -254,14 +254,19 @@ class CreateBroadcast extends CreateRecord
                                         ->placeholder('Enter your message here...')
                                         ->helperText('Available placeholders: {parent_name}, {student_name}, {grade}')
                                         ->rows(5)
-                                        ->live()
+                                        ->live(debounce: 300)
                                         ->afterStateUpdated(function ($state, Set $set) {
-                                            if ($state) {
-                                                $messageParts = ceil(strlen($state) / 160);
-                                                $cost = 0.50 * $messageParts * $this->recipientCount;
-                                                $this->estimatedCost = $cost;
-                                                $set('message_preview', $this->getMessagePreview($state));
-                                            }
+                                            $state = (string) $state;
+                                            $chars = strlen($state);
+                                            $parts = max(1, (int) ceil($chars / 160));
+                                            $cost  = 0.50 * $parts * max(0, $this->recipientCount);
+
+                                            $set('character_count', $chars);
+                                            $set('sms_parts',       $parts);
+                                            $set('total_cost',      number_format($cost, 2));
+
+                                            $this->estimatedCost = $cost;
+                                            $set('message_preview', $this->getMessagePreview($state));
                                         }),
 
                                     Forms\Components\Grid::make()
@@ -365,10 +370,21 @@ class CreateBroadcast extends CreateRecord
         $recipientScope = $data['recipient_scope'] ?? 'parents';
         $isStaffNotice = in_array($recipientScope, ['all_staff', 'teachers']);
 
-        if (!$isStaffNotice && $this->recipientCount === 0) {
+        // Livewire drops large public arrays between page-lifecycle events,
+        // and the wizard's step navigation is one such event — so a user who
+        // clicked "Preview Recipients" three steps back can arrive here with
+        // $this->recipientCount reset to 0 even though their filters are
+        // still valid. Recompute from the current filter set as the source
+        // of truth for the submit path.
+        if (! $isStaffNotice && $this->recipientCount === 0) {
+            $this->recipientCount = $this->computeRecipientCount($data);
+            $this->estimatedCost  = $this->recipientCount * 0.50 * max(1, (int) ceil(strlen((string) ($data['message'] ?? '')) / 160));
+        }
+
+        if (! $isStaffNotice && $this->recipientCount === 0) {
             Notification::make()
                 ->title('No Recipients Selected')
-                ->body('Please select at least one recipient before sending the broadcast.')
+                ->body('No parents match the selected grade / fee filters. Adjust the filters on step 1 and try again.')
                 ->warning()
                 ->send();
             return;
@@ -431,6 +447,49 @@ class CreateBroadcast extends CreateRecord
                 ->danger()
                 ->send();
         }
+    }
+
+    /**
+     * Mirror the same filter logic used by previewRecipients() but return
+     * only the message count — cheaper, and safe to call on submit.
+     * Counts one message per qualifying child (matching the send flow).
+     */
+    protected function computeRecipientCount(array $data): int
+    {
+        if (($data['recipient_type'] ?? 'parents') !== 'parents') {
+            return 0;
+        }
+
+        $query = ParentGuardian::whereNotNull('phone')->whereHas('students');
+
+        if (! empty($data['grade_id'])) {
+            $query->whereHas('students', function ($q) use ($data) {
+                $q->whereHas('classSection', function ($csq) use ($data) {
+                    $csq->where('grade_id', $data['grade_id']);
+                });
+            });
+        }
+
+        if (! empty($data['fee_status']) && $data['fee_status'] !== 'all') {
+            $query->whereHas('students.fees', function ($q) use ($data) {
+                $q->where('payment_status', $data['fee_status']);
+            });
+        }
+
+        // One message per qualifying student (matches the send flow).
+        $count = 0;
+        foreach ($query->with('students.classSection.grade')->cursor() as $parent) {
+            foreach ($parent->students as $student) {
+                if (! empty($data['grade_id'])) {
+                    if (! $student->classSection || $student->classSection->grade_id != $data['grade_id']) {
+                        continue;
+                    }
+                }
+                $count++;
+            }
+        }
+
+        return $count;
     }
 
     protected function getMessagePreview($message)
