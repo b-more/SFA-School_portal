@@ -306,10 +306,18 @@ class SendBroadcast extends Page
                         'recipient' => $formattedPhone,
                         'response' => $sendSenderSMS->body()
                     ]);
+
+                    // Gateway rate-limit response — back off to let the window reset
+                    // before hammering the API further this batch.
+                    if (is_array($json) && (int) ($json['status'] ?? 0) === 104) {
+                        Log::warning('SMS gateway rate-limited us — sleeping 5s before continuing.');
+                        sleep(5);
+                    }
                 }
 
-                // Optimized delay for faster processing
-                usleep(100000); // 100ms delay
+                // CloudServiceZm caps us at 60 requests/minute — pace at 1050 ms
+                // per send (≈57/min) to stay safely under the limit.
+                usleep(1050000);
 
             } catch (\Exception $e) {
                 // Update SMS log with error
