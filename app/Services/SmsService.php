@@ -175,39 +175,51 @@ class SmsService
 
             // Set a longer timeout for the HTTP request
             try {
-                // Build the URL with query parameters (GET request like Postman)
+                // Ontech Bulk SMS API (bulksms.ontech.co.zm/smsservice/httpapi).
+                // Params: api_key (Access ID ak_… or Secret sk_…), phone (digits, no +), msg.
+                // Optional: sender_id (only if approved by Ontech for this account).
+                // Response: { status: 100=success | 101=no credit | 102=invalid user | 103=bad request | 104=rate limited, message, message_id? }
                 $apiUrl = config('services.sms.api_url', env('SMS_API_URL'));
-                $queryParams = http_build_query([
-                    'username' => config('services.sms.username', env('SMS_USERNAME')),
-                    'password' => config('services.sms.password', env('SMS_PASSWORD')),
-                    'msg' => $sanitizedMessage, // Don't double-encode, http_build_query will encode
-                    'shortcode' => config('services.sms.shortcode', env('SMS_SHORTCODE')),
-                    'sender_id' => config('services.sms.sender_id', env('SMS_SENDER_ID', 'StFrancis')),
-                    'phone' => '+' . $formattedPhone, // Add + prefix
+                $senderId = config('services.sms.sender_id', env('SMS_SENDER_ID', ''));
+
+                $payload = [
                     'api_key' => config('services.sms.api_key', env('SMS_API_KEY')),
-                ]);
+                    'phone'   => $formattedPhone,
+                    'msg'     => $sanitizedMessage,
+                ];
+                if ($senderId !== '' && $senderId !== null) {
+                    $payload['sender_id'] = $senderId;
+                }
 
-                $fullUrl = $apiUrl . '?' . $queryParams;
-
-                // Log the request URL (with masked credentials)
                 Log::debug('SMS API Request', [
-                    'url' => preg_replace('/password=[^&]+/', 'password=***', $fullUrl),
+                    'endpoint' => $apiUrl,
+                    'phone'    => $this->maskPhoneNumber($formattedPhone),
+                    'has_sender_id' => isset($payload['sender_id']),
                 ]);
 
-                // Send as GET request (matching working Postman request)
                 $response = Http::timeout($this->timeout)
                     ->withoutVerifying()
-                    ->get($fullUrl);
+                    ->get($apiUrl, $payload);
 
-                // Check if successful (response body is "Success")
-                $isSuccessful = $response->successful() &&
-                               (strtolower(trim($response->body())) === 'success');
+                // Ontech returns JSON. Success is HTTP 200 AND JSON status == 100.
+                // Fall back to the legacy "success" string parse in case the account
+                // is briefly routed through a compatibility layer.
+                $body = $response->body();
+                $json = null;
+                try { $json = $response->json(); } catch (\Throwable) { $json = null; }
+                $providerStatus = is_array($json) ? ($json['status'] ?? null) : null;
+                $providerMessage = is_array($json) ? ($json['message'] ?? null) : null;
+                $providerMessageId = is_array($json) ? ($json['message_id'] ?? null) : null;
 
-                // Update the SMS log with the result
+                $isSuccessful = $response->successful() && (
+                    (int) $providerStatus === 100 ||
+                    strtolower(trim($body)) === 'success'
+                );
+
                 $smsLog->update([
                     'status' => $isSuccessful ? 'sent' : 'failed',
-                    'provider_reference' => $response->json('message_id') ?? null,
-                    'error_message' => $isSuccessful ? null : $response->body(),
+                    'provider_reference' => $providerMessageId,
+                    'error_message' => $isSuccessful ? null : ($providerMessage ?: $body),
                 ]);
 
                 // Deduct credit if successful and not skipped
@@ -519,8 +531,17 @@ class SmsService
                     ->withoutVerifying()
                     ->get($apiUrl . '?' . $queryParams);
 
-                $isSuccessful = $response->successful() &&
-                               (strtolower(trim($response->body())) === 'success');
+                // CloudServiceZm returns {"status":100,"message":"Success",...}
+                // for delivered SMS. Keep the legacy plain-body match for
+                // compatibility with older provider versions.
+                $body = trim($response->body());
+                $json = null;
+                try { $json = $response->json(); } catch (\Throwable) { $json = null; }
+                $isSuccessful = $response->successful() && (
+                       (is_array($json) && (int) ($json['status'] ?? 0) === 100)
+                    || (is_array($json) && strtolower((string) ($json['message'] ?? '')) === 'success')
+                    || strtolower($body) === 'success'
+                );
 
                 // Update the message status
                 if ($isSuccessful) {

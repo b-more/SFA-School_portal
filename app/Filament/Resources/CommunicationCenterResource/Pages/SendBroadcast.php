@@ -273,8 +273,17 @@ class SendBroadcast extends Page
                     ->retry(2, 1000)
                     ->get($apiUrl . '?' . $queryParams);
 
-                $isSuccessful = $sendSenderSMS->successful() &&
-                              (strtolower(trim($sendSenderSMS->body())) === 'success');
+                // CloudServiceZm returns JSON: {"status":100,"message":"Success",...}
+                // for a delivered SMS and {"status":103,...} etc. for rejects.
+                // The legacy plain-body "success" string is kept as a fallback
+                // for older provider versions.
+                $body = trim($sendSenderSMS->body());
+                $json = $sendSenderSMS->json();
+                $isSuccessful = $sendSenderSMS->successful() && (
+                       (is_array($json) && (int) ($json['status'] ?? 0) === 100)
+                    || (is_array($json) && strtolower((string) ($json['message'] ?? '')) === 'success')
+                    || strtolower($body) === 'success'
+                );
 
                 // Update SMS log with result
                 DB::table('sms_logs')->where('id', $smsLog)->update([
