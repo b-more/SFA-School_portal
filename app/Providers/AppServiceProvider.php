@@ -14,8 +14,15 @@ use App\Observers\HomeworkSubmissionObserver;
 use App\Observers\PaymentTransactionObserver;
 use App\Observers\StudentObserver;
 use App\Observers\StudentFeeObserver;
+use App\Listeners\LogAuthEvent;
+use Illuminate\Auth\Events\Failed as LoginFailed;
+use Illuminate\Auth\Events\Lockout;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Console\Command as ConsoleCommand;
+use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Filament\Facades\Filament;
@@ -73,5 +80,22 @@ class AppServiceProvider extends ServiceProvider
 
         // Register accounting integration observer
         PaymentTransaction::observe(PaymentTransactionObserver::class);
+
+        // Login trail — write every auth event (login / logout / failed
+        // login / lockout / password reset) into audit_logs so we always
+        // have a "who signed in, from where, when" record.
+        //
+        // Guarded so it registers once per process — Filament's panel
+        // provider triggers a second boot pass that would otherwise
+        // duplicate the listener and double-write every event.
+        static $authListenerBooted = false;
+        if (! $authListenerBooted) {
+            $authListenerBooted = true;
+            EventFacade::listen(Login::class,         [LogAuthEvent::class, 'handleLogin']);
+            EventFacade::listen(Logout::class,        [LogAuthEvent::class, 'handleLogout']);
+            EventFacade::listen(LoginFailed::class,   [LogAuthEvent::class, 'handleFailed']);
+            EventFacade::listen(Lockout::class,       [LogAuthEvent::class, 'handleLockout']);
+            EventFacade::listen(PasswordReset::class, [LogAuthEvent::class, 'handlePasswordReset']);
+        }
     }
 }
