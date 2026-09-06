@@ -47,7 +47,7 @@
     $heroHeadline       = $landing['hero_headline']       ?? 'Educating minds.';
     $heroAccent         = $landing['hero_headline_accent'] ?? 'Forming character. Inspiring purpose.';
     $heroSub            = $landing['hero_subheadline']    ?? $mission;
-    $heroImage          = $img($landing['hero_image'] ?? null, 'images/campus/campus1.jpg');
+    $heroImage          = $img($landing['hero_image'] ?? null, 'images/primary/primary5.jpg');
     $ctaPrimaryLabel    = $landing['cta_primary_label']   ?? 'Apply for Admission';
     $ctaPrimaryUrl      = $landing['cta_primary_url']     ?? '#contact';
     $ctaSecondaryLabel  = $landing['cta_secondary_label'] ?? 'Access Portal';
@@ -283,6 +283,9 @@
             --crimson:    #9c1d2c;
             --crimson-d:  #6f1320;
             --gold:       #b08a3e;
+            --gold-soft:  #c7a75e;
+            --sage:       #4b6b4b;
+            --paper-warm: #faf6ec;
             --max:        1180px;
             --gap:        clamp(1rem, 3vw, 2rem);
             --serif:      'EB Garamond', Georgia, 'Times New Roman', serif;
@@ -410,40 +413,84 @@
         .announce-inner { padding-block:.55rem; text-align:center; }
         .announce a { color:#fff; text-decoration:underline; text-underline-offset:3px; }
 
-        /* ============== HERO — full-bleed photo, single editorial statement ============== */
-        .hero { position:relative; isolation:isolate; color:#fff; overflow:hidden; }
-        .hero-bg { position:absolute; inset:0; z-index:-2; }
-        .hero-bg img { width:100%; height:100%; object-fit:cover; }
-        .hero::before {
-            content:''; position:absolute; inset:0; z-index:-1;
-            background:linear-gradient(180deg, rgba(6,24,47,.45) 0%, rgba(6,24,47,.65) 100%);
-        }
+        /* ============== HERO — split editorial with arched photo ============== */
+        .hero { position: relative; padding-block: clamp(3.5rem, 6vw, 6rem); background: var(--paper); }
         .hero-inner {
-            min-height: clamp(560px, 88vh, 820px);
-            display:grid; align-content:end; padding-block: 7rem 3.5rem;
+            display: grid; gap: clamp(2rem, 4vw, 4rem);
+            grid-template-columns: 1fr; align-items: center;
         }
+        @media (min-width: 900px) {
+            .hero-inner { grid-template-columns: 5fr 6fr; }
+        }
+        .hero .text { padding-right: clamp(0px, 2vw, 1.5rem); }
         .hero-deck {
-            font-family:var(--sans); text-transform:uppercase; letter-spacing:.22em;
-            font-size:.78rem; font-weight:500; color:rgba(255,255,255,.85);
-            margin-bottom:1.25rem;
+            font-family: var(--sans); text-transform: uppercase; letter-spacing: .28em;
+            font-size: .72rem; font-weight: 500; color: var(--crimson);
+            margin-bottom: 1.25rem;
         }
         .hero h1 {
-            color:#fff; font-weight:500; font-size: clamp(2.4rem, 7vw, 5.4rem);
-            max-width: 18ch; line-height:1.04; letter-spacing:-0.01em;
+            color: var(--navy); font-weight: 500;
+            font-size: clamp(2.4rem, 6vw, 4.6rem);
+            max-width: 14ch; line-height: 1.03; letter-spacing: -0.015em;
         }
-        .hero h1 em { font-style: italic; color:#f3e9c8; }
+        .hero h1 em { font-style: italic; color: var(--crimson); font-weight: 500; }
         .hero .lede {
-            font-family:var(--serif); font-size: clamp(1.15rem, 1.8vw, 1.4rem); font-weight:400;
-            color:rgba(255,255,255,.92); margin-top:1.5rem; max-width: 62ch; line-height:1.5;
+            font-family: var(--serif); font-size: clamp(1.1rem, 1.6vw, 1.35rem); font-weight: 400;
+            color: var(--ink-soft); margin-top: 1.5rem; max-width: 46ch; line-height: 1.55;
         }
-        .hero-actions { display:flex; flex-wrap:wrap; gap:1rem; margin-top:2rem; }
+        .hero-actions { display: flex; flex-wrap: wrap; gap: .85rem; margin-top: 2rem; }
         .hero-foot {
-            display:flex; flex-wrap:wrap; gap:.4rem 1.5rem; align-items:baseline;
-            margin-top: 4rem; padding-top: 1.5rem;
-            border-top:1px solid rgba(255,255,255,.2);
-            color:rgba(255,255,255,.78); font-family:var(--sans); font-size:.86rem;
+            display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem; align-items: baseline;
+            margin-top: 2.75rem; padding-top: 1.5rem;
+            border-top: 1px solid var(--rule);
+            font-family: var(--sans); font-size: .8rem; color: var(--muted);
         }
-        .hero-foot strong { color:#fff; font-weight:500; font-family:var(--serif); font-size:1.05rem; letter-spacing:.005em; }
+        .hero-foot .kv { display: flex; flex-direction: column; gap: .3rem; }
+        .hero-foot .kv .k { font-family: var(--serif); font-size: 1.5rem; color: var(--navy); font-weight: 500; letter-spacing: 0; line-height: 1; }
+        .hero-foot .kv .l { font-size: .7rem; letter-spacing: .18em; text-transform: uppercase; }
+        .hero .photo { position: relative; }
+        .hero .photo .arched { height: clamp(420px, 62vw, 640px); }
+        .hero .photo .caption {
+            margin-top: 1rem; font-family: var(--serif); font-style: italic;
+            font-size: .95rem; color: var(--muted); text-align: center;
+        }
+
+        /* ============== SIGNATURE COMPONENTS ============== */
+        .arched {
+            position: relative;
+            border-radius: 240px 240px 8px 8px;
+            overflow: hidden;
+            background: var(--paper-deep);
+        }
+        .arched::after {
+            content: ''; position: absolute; inset: 0;
+            border: 1px solid var(--gold-soft);
+            border-radius: inherit; pointer-events: none;
+        }
+        .arched img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+        /* Roman-numeral illuminated section marker */
+        .numeral {
+            display: inline-flex; align-items: baseline; gap: .75rem;
+            font-family: var(--serif); color: var(--gold);
+        }
+        .numeral .n { font-size: 2.6rem; font-weight: 500; letter-spacing: .05em; line-height: 1; }
+        .numeral .r { display: inline-block; width: 3rem; height: 1px; background: var(--gold); transform: translateY(-.4rem); }
+        .numeral.on-dark { color: var(--gold-soft); }
+        .numeral.on-dark .r { background: var(--gold-soft); }
+
+        /* Motto ribbon — narrow all-caps band under hero */
+        .ribbon {
+            background: var(--navy); color: var(--gold-soft);
+            text-align: center; padding: 1rem 1.5rem;
+            font-family: var(--serif); font-size: .95rem;
+            letter-spacing: .28em; text-transform: uppercase;
+        }
+        .ribbon .cross { margin: 0 1rem; color: var(--gold); }
+        @media (max-width: 640px) {
+            .ribbon { font-size: .78rem; letter-spacing: .2em; padding: .8rem 1rem; }
+            .ribbon .cross { margin: 0 .5rem; }
+        }
 
         /* ============== WELCOME LETTER — replaces "About" icon-card pattern ============== */
         .welcome { padding-block: clamp(4rem, 8vw, 6.5rem); }
@@ -802,37 +849,52 @@
     <main id="main">
         {{-- ===== HERO ===== --}}
         <section class="hero">
-            <div class="hero-bg">
-                <img src="{{ $heroImage }}" alt="{{ $schoolName }} campus" loading="eager">
-            </div>
             <div class="container hero-inner">
-                <div class="hero-deck">{{ $shortName }} · Lusaka, Zambia</div>
-                <h1>A school where every child is <em>known.</em></h1>
-                <p class="lede">{{ $heroSub }}</p>
-                <div class="hero-actions">
-                    <a class="btn btn-light" href="{{ $ctaPrimaryUrl }}">{{ $ctaPrimaryLabel }}</a>
-                    <a class="btn btn-paper" href="{{ $ctaSecondaryUrl }}">{{ $ctaSecondaryLabel }}</a>
-                </div>
+                <div class="text">
+                    <div class="hero-deck">Est. 1994 · {{ $address }}</div>
+                    <h1>A school where every child is <em>known.</em></h1>
+                    <p class="lede">{{ $heroSub }}</p>
+                    <div class="hero-actions">
+                        <a class="btn" href="{{ $ctaPrimaryUrl }}">{{ $ctaPrimaryLabel }}</a>
+                        <a class="btn btn-ghost" href="{{ $ctaSecondaryUrl }}">{{ $ctaSecondaryLabel }}</a>
+                    </div>
 
-                @if($heroStats->isNotEmpty())
-                <div class="hero-foot">
-                    @foreach($heroStats as $i => $hs)
-                        <span><strong>{{ $hs['value'] ?? '' }}</strong> &nbsp; {{ $hs['label'] ?? '' }}</span>
-                        @if(!$loop->last) <span aria-hidden="true">·</span> @endif
-                    @endforeach
+                    @if($heroStats->isNotEmpty())
+                    <div class="hero-foot">
+                        @foreach($heroStats as $hs)
+                            <span class="kv">
+                                <span class="k">{{ $hs['value'] ?? '' }}</span>
+                                <span class="l">{{ $hs['label'] ?? '' }}</span>
+                            </span>
+                        @endforeach
+                    </div>
+                    @endif
                 </div>
-                @endif
+                <div class="photo">
+                    <div class="arched">
+                        <img src="{{ $heroImage }}" alt="{{ $schoolName }} campus" loading="eager">
+                    </div>
+                    <div class="caption">Learners at St. Francis, this term</div>
+                </div>
             </div>
         </section>
+
+        {{-- ===== MOTTO RIBBON ===== --}}
+        <div class="ribbon">
+            <span>For God</span><span class="cross">✠</span><span>For Country</span><span class="cross">✠</span><span>For Every Child</span>
+        </div>
 
         {{-- ===== WELCOME / LETTER ===== --}}
         <section class="welcome" id="welcome">
             <div class="container welcome-grid">
                 <figure>
-                    <img src="{{ $aboutImage }}" alt="At {{ $shortName }}" loading="lazy">
+                    <div class="arched" style="aspect-ratio: 4/5;">
+                        <img src="{{ $aboutImage }}" alt="At {{ $shortName }}" loading="lazy">
+                    </div>
                     <figcaption>The campus, this term</figcaption>
                 </figure>
                 <div class="body">
+                    <div class="numeral" style="margin-bottom: 1rem;"><span class="n">I</span><span class="r"></span></div>
                     <span class="label">A word from us</span>
                     <h2>Education is, above all, a relationship.</h2>
                     <p class="text"><span class="dropcap">A</span>t {{ $shortName }}, every learner is met by name. Our teachers know who each child is, where they're from, what they love, and where they need to grow. We've built our days around that conviction — small classes, attentive pastoral care, and a curriculum that asks more than memorisation.</p>
@@ -878,6 +940,7 @@
         <section class="learning" id="learning">
             <div class="container">
                 <div class="learning-head">
+                    <div class="numeral" style="margin-bottom: 1rem;"><span class="n">II</span><span class="r"></span></div>
                     <span class="label">Worth knowing</span>
                     <h2>Four things, plainly.</h2>
                     <p>Less promise, more practice. Four facts about how this school actually runs and what its learners have done lately.</p>
@@ -914,13 +977,17 @@
         <section class="programs" id="programs">
             <div class="container">
                 <div class="programs-head">
+                    <div class="numeral" style="margin-bottom: 1rem;"><span class="n">III</span><span class="r"></span></div>
+                    <span class="label" style="font-family:var(--sans); font-size:.72rem; letter-spacing:.28em; text-transform:uppercase; color:var(--crimson); font-weight:500; display:block; margin-bottom:.75rem;">Programs</span>
                     <h2>Programs that grow with the child.</h2>
                     <p>From early years to school-leaving examinations — every stage is built for what your child is becoming, not just where they are now.</p>
                 </div>
                 <div class="programs-grid">
                     @foreach($programs as $p)
                         <article class="program">
-                            <div class="ph"><img src="{{ $p['image'] }}" alt="{{ $p['title'] }}" loading="lazy"></div>
+                            <div class="arched" style="height: 260px; margin-bottom: 1.25rem;">
+                                <img src="{{ $p['image'] }}" alt="{{ $p['title'] }}" loading="lazy">
+                            </div>
                             <span class="age">{{ $p['age_range'] }}</span>
                             <h3>{{ $p['title'] }}</h3>
                             <p>{{ $p['description'] }}</p>
@@ -939,6 +1006,7 @@
         <section class="portal" id="portal">
             <div class="container">
                 <div class="portal-head">
+                    <div class="numeral" style="margin-bottom: 1rem;"><span class="n">IV</span><span class="r"></span></div>
                     <h2>Portal access.</h2>
                     <p>Real-time results, attendance, homework, fees and communication — for parents, teachers and staff.</p>
                 </div>
@@ -1068,6 +1136,7 @@
         <section class="cta">
             <div class="container cta-grid">
                 <div>
+                    <div class="numeral on-dark" style="margin-bottom: 1rem;"><span class="n">V</span><span class="r"></span></div>
                     <h2>{{ $ctaBannerTitle }}</h2>
                     <p>{{ $ctaBannerBody }}</p>
                 </div>
@@ -1085,12 +1154,12 @@
 
         {{-- ===== CONTACT ===== --}}
         <section class="contact" id="contact">
-            <div class="container contact-grid">
-                <div class="contact-info">
-                    <h2>Talk to us.</h2>
-                    <p>Send a note and our admissions office will respond within one working day. Or call — we'd be glad to host you on campus.</p>
+            <div class="container contact-grid" style="grid-template-columns:1fr; max-width:760px; margin-inline:auto;">
+                <div class="contact-info" style="text-align:center;">
+                    <h2 style="margin-inline:auto;">Talk to us.</h2>
+                    <p style="margin-inline:auto;">Call, email, or visit campus — our admissions office is glad to hear from you.</p>
 
-                    <dl class="contact-list">
+                    <dl class="contact-list" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); text-align:left;">
                         <div><dt>Address</dt><dd>{{ $address }}</dd></div>
                         <div><dt>Phone</dt><dd>
                             <a href="tel:{{ preg_replace('/\s+/','',$phone) }}">{{ $phone }}</a>
@@ -1099,46 +1168,12 @@
                         <div><dt>Email</dt><dd><a href="mailto:{{ $email }}">{{ $email }}</a></dd></div>
                         <div><dt>Office hours</dt><dd>Monday — Friday · 07:30 – 16:30</dd></div>
                     </dl>
-                </div>
 
-                <form class="contact-form" method="post" action="#" onsubmit="return false;" aria-label="Contact form">
-                    <div class="form-row">
-                        <div class="field">
-                            <label for="cname">Full name</label>
-                            <input type="text" id="cname" name="name" required autocomplete="name">
-                        </div>
-                        <div class="field">
-                            <label for="cphone">Phone</label>
-                            <input type="tel" id="cphone" name="phone" autocomplete="tel">
-                        </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:.75rem; justify-content:center; margin-top:2rem;">
+                        <a class="btn" href="tel:{{ preg_replace('/\s+/','',$phone) }}">Call us</a>
+                        <a class="btn" href="mailto:{{ $email }}">Email us</a>
                     </div>
-                    <div class="form-row">
-                        <div class="field">
-                            <label for="cemail">Email</label>
-                            <input type="email" id="cemail" name="email" required autocomplete="email">
-                        </div>
-                        <div class="field">
-                            <label for="cinterest">Enquiry type</label>
-                            <select id="cinterest" name="interest">
-                                <option>Admissions enquiry</option>
-                                <option>Campus tour</option>
-                                <option>Fees &amp; financial info</option>
-                                <option>Employment</option>
-                                <option>Other</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row full">
-                        <div class="field">
-                            <label for="cmessage">Message</label>
-                            <textarea id="cmessage" name="message" rows="3" required></textarea>
-                        </div>
-                    </div>
-                    <div class="contact-submit">
-                        <small>We respect your privacy. Your details are not shared.</small>
-                        <button type="submit" class="btn">Send message →</button>
-                    </div>
-                </form>
+                </div>
             </div>
         </section>
     </main>
