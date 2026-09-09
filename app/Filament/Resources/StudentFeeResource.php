@@ -34,9 +34,16 @@ class StudentFeeResource extends Resource
     protected static ?string $navigationGroup = 'Finance Management';
 
     protected static ?int $navigationSort = 2;
+    public static function canAccess(): bool
+    {
+        if (auth()->user()?->isFinanceLocked()) return false;
+        return static::shouldRegisterNavigation();
+    }
+
 
     public static function shouldRegisterNavigation(): bool
     {
+        if (auth()->user()?->isFinanceLocked()) return false;
         return in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT]) ?? false;
     }
 
@@ -1177,23 +1184,23 @@ class StudentFeeResource extends Resource
            // Payment amount is either the specified last payment or the total amount paid
            $paymentAmount = $lastPaymentAmount ?? $studentFee->amount_paid;
 
-           // Format the message with payment details
-           $message = "Dear {$parentGuardian->name}, thank you for your payment of ZMW {$paymentAmount} for {$student->name}'s fees. ";
+           // Build a category-aware narration so parents see exactly which fee was paid
+           // (Tuition, Bus May 2026, PTA 2026, etc.) rather than a generic "fees" message.
+           $studentFee->loadMissing('feeCategory');
+           $categoryName = optional($studentFee->feeCategory)->name ?? 'Tuition';
+           $periodLabel  = $studentFee->period_label
+               ?: trim((optional(optional($studentFee->feeStructure)->term)->name ?? 'Term')
+                   . ' ' . (optional(optional($studentFee->feeStructure)->academicYear)->name ?? ''));
 
-           // Add fee structure details
-           if ($studentFee->feeStructure) {
-               $sectionName = $studentFee->feeStructure->section_name ?? 'Unknown';
-               $termName = $studentFee->feeStructure->term->name ?? 'Unknown';
-               $message .= "Section: {$sectionName}, Term: {$termName}. ";
-           }
-
-           // Add payment status
-           $message .= "Tuition fee: ZMW {$studentFee->feeStructure->basic_fee}, Balance: ZMW {$studentFee->balance}. ";
+           $message = "Dear {$parentGuardian->name}, thank you for your payment of ZMW "
+               . number_format((float) $paymentAmount, 2)
+               . " for {$student->name}'s {$categoryName} ({$periodLabel}). "
+               . "Balance: ZMW " . number_format((float) $studentFee->balance, 2) . ". ";
 
            if ($studentFee->payment_status === 'paid') {
                $message .= "Status: FULLY PAID. Thank you!";
            } else {
-               $message .= "Status: PARTIALLY PAID. Receipt No: {$studentFee->receipt_number}.";
+               $message .= "Status: PARTIALLY PAID. Receipt No: " . ($studentFee->receipt_number ?? '—') . ".";
            }
 
            // Send SMS using SmsService (handles logging automatically)

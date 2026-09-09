@@ -40,9 +40,16 @@ class FeeReports extends Page implements HasForms, HasTable
     protected static string $view = 'filament.pages.fee-reports';
 
     public ?array $data = [];
+    public static function canAccess(): bool
+    {
+        if (auth()->user()?->isFinanceLocked()) return false;
+        return static::shouldRegisterNavigation();
+    }
+
 
     public static function shouldRegisterNavigation(): bool
     {
+        if (auth()->user()?->isFinanceLocked()) return false;
         return auth()->user()?->role_id === RoleConstants::ADMIN ?? false;
     }
 

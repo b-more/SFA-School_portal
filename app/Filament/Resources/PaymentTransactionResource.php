@@ -500,9 +500,16 @@ class PaymentTransactionResource extends Resource
     {
         return false;
     }
+    public static function canAccess(): bool
+    {
+        if (auth()->user()?->isFinanceLocked()) return false;
+        return static::shouldRegisterNavigation();
+    }
+
 
     public static function shouldRegisterNavigation(): bool
     {
+        if (auth()->user()?->isFinanceLocked()) return false;
         $user = Auth::user();
         if (!$user) return false;
 

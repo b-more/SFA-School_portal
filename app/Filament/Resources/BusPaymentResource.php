@@ -28,9 +28,16 @@ class BusPaymentResource extends Resource
     protected static ?string $navigationLabel = 'Bus Payments';
 
     protected static ?int $navigationSort = 6;
+    public static function canAccess(): bool
+    {
+        if (auth()->user()?->isFinanceLocked()) return false;
+        return static::shouldRegisterNavigation();
+    }
+
 
     public static function shouldRegisterNavigation(): bool
     {
+        if (auth()->user()?->isFinanceLocked()) return false;
         return in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::SCHOOL_SECRETARY, RoleConstants::ACCOUNTANT]) ?? false;
     }
 

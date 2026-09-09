@@ -26,10 +26,17 @@ class QrPaymentResource extends Resource
     protected static ?string $navigationLabel = 'QR Code Payments';
 
     protected static ?int $navigationSort = 3;
+    public static function canAccess(): bool
+    {
+        if (auth()->user()?->isFinanceLocked()) return false;
+        return static::shouldRegisterNavigation();
+    }
+
 
     public static function shouldRegisterNavigation(): bool
     {
-        return ! in_array(auth()->user()?->role_id, [RoleConstants::LIBRARIAN, RoleConstants::TEACHER, RoleConstants::PARENT, RoleConstants::STUDENT, RoleConstants::DRIVER]) ?? false;
+        if (auth()->user()?->isFinanceLocked()) return false;
+        return ! in_array(auth()->user()?->role_id, [RoleConstants::LIBRARIAN, RoleConstants::TEACHER, RoleConstants::PARENT, RoleConstants::STUDENT, RoleConstants::DRIVER, RoleConstants::CLINICIAN, RoleConstants::NURSE]) ?? false;
     }
 
     public static function form(Form $form): Form

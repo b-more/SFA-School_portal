@@ -134,6 +134,18 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
+     * Fee/payment resources gate on this: true when the account has
+     * settings.finance_locked = true, meaning they can see everything
+     * else in the admin but cannot open the fee, payment, payroll or
+     * discount modules. Set on the "Manager" user account whose brief
+     * excludes finance oversight.
+     */
+    public function isFinanceLocked(): bool
+    {
+        return (bool) data_get($this->settings, 'finance_locked', false);
+    }
+
+    /**
      * Check if user is a teacher
      */
     public function isTeacher(): bool

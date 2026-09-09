@@ -39,9 +39,16 @@ class FeeCollectionHistory extends Page implements HasForms, HasTable
     protected static string $view = 'filament.pages.fee-collection-history';
 
     public ?array $data = [];
+    public static function canAccess(): bool
+    {
+        if (auth()->user()?->isFinanceLocked()) return false;
+        return static::shouldRegisterNavigation();
+    }
+
 
     public static function shouldRegisterNavigation(): bool
     {
+        if (auth()->user()?->isFinanceLocked()) return false;
         return in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT]) ?? false;
     }
 

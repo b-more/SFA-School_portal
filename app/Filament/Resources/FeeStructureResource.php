@@ -28,9 +28,16 @@ class FeeStructureResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
 
     protected static ?string $navigationGroup = 'Finance Management';
+    public static function canAccess(): bool
+    {
+        if (auth()->user()?->isFinanceLocked()) return false;
+        return static::shouldRegisterNavigation();
+    }
+
 
     public static function shouldRegisterNavigation(): bool
     {
+        if (auth()->user()?->isFinanceLocked()) return false;
         return in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT]) ?? false;
     }
 

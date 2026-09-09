@@ -27,11 +27,13 @@ class FeeCollectionTracker extends Page implements HasForms
 
     public static function shouldRegisterNavigation(): bool
     {
+        if (auth()->user()?->isFinanceLocked()) return false;
         return self::canAccess();
     }
 
     public static function canAccess(): bool
     {
+        if (auth()->user()?->isFinanceLocked()) return false;
         return in_array(auth()->user()?->role_id, [
             RoleConstants::ADMIN,
             RoleConstants::ACCOUNTANT,
