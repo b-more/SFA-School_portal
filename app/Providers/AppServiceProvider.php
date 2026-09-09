@@ -8,6 +8,8 @@ use App\Models\HomeworkSubmission;
 use App\Models\PaymentTransaction;
 use App\Models\Student;
 use App\Models\StudentFee;
+use App\Models\ClassSection;
+use App\Observers\ClassSectionObserver;
 use App\Observers\EmployeeObserver;
 use App\Observers\EventObserver;
 use App\Observers\HomeworkSubmissionObserver;
@@ -80,6 +82,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Register accounting integration observer
         PaymentTransaction::observe(PaymentTransactionObserver::class);
+
+        // Keep the class-teacher pointer in sync on both sides
+        // (class_sections.class_teacher_id ↔ teachers.class_section_id).
+        ClassSection::observe(ClassSectionObserver::class);
 
         // Login trail — write every auth event (login / logout / failed
         // login / lockout / password reset) into audit_logs so we always
