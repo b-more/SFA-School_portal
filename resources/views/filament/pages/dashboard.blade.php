@@ -139,6 +139,123 @@
         @endif
 
         {{-- ============================================================
+             FEE COLLECTION · TERM-SCOPED DASHBOARD
+             ============================================================ --}}
+        @php
+            $fd = $viewData['feeDashboard'] ?? [];
+            $money = fn ($n) => 'K ' . number_format((float) $n, 2);
+            $rateBand = function ($r) {
+                if ($r >= 70) return ['bg' => '#059669', 'label' => 'strong'];
+                if ($r >= 40) return ['bg' => '#d97706', 'label' => 'watch'];
+                if ($r >= 15) return ['bg' => '#b45309', 'label' => 'behind'];
+                return ['bg' => '#b91c1c', 'label' => 'critical'];
+            };
+        @endphp
+
+        <div class="sfa-fees" style="background:#fff; border:1px solid #e5e7eb; border-top:3px solid #1e3a5f; padding:22px 22px 24px; border-radius:2px;">
+            <div class="sfa-fees-head" style="display:flex; flex-wrap:wrap; gap:16px; justify-content:space-between; align-items:baseline; margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid #e5e7eb;">
+                <div>
+                    <div style="font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:#8b1a1a; font-weight:600;">Fee Collection</div>
+                    <h2 style="font-family:'EB Garamond', Georgia, serif; font-size:28px; color:#0e2746; font-weight:600; margin:2px 0 0; letter-spacing:-.01em;">
+                        {{ $fd['termLabel'] ?? '—' }} <span style="color:#6b7280; font-weight:400;">·</span> {{ $fd['yearLabel'] ?? '' }}
+                    </h2>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <label for="feeTermPicker" style="font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#6b7280; font-weight:500;">Term</label>
+                    <select id="feeTermPicker" wire:model.live="feeTermId"
+                            style="padding:8px 12px; border:1px solid #d1d5db; border-radius:2px; background:#fff; font-family:inherit; font-size:14px; color:#1f2937; min-width:220px;">
+                        @foreach($fd['termChoices'] ?? [] as $t)
+                            <option value="{{ $t->id }}">{{ $t->name }} — {{ optional($t->academicYear)->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            {{-- Four KPI tiles --}}
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:20px;">
+                <div style="background:#fafafa; border:1px solid #e5e7eb; border-left:3px solid #1e3a5f; padding:16px 18px;">
+                    <div style="font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#6b7280; font-weight:500;">Expected</div>
+                    <div style="font-family:'EB Garamond', Georgia, serif; font-size:28px; color:#0e2746; font-weight:600; margin-top:4px;">{{ $money($fd['expected'] ?? 0) }}</div>
+                    <div style="font-size:12px; color:#6b7280; margin-top:2px; font-style:italic;">Tuition + arrears − discounts</div>
+                </div>
+                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-left:3px solid #059669; padding:16px 18px;">
+                    <div style="font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#065f46; font-weight:500;">Collected</div>
+                    <div style="font-family:'EB Garamond', Georgia, serif; font-size:28px; color:#065f46; font-weight:600; margin-top:4px;">{{ $money($fd['collected'] ?? 0) }}</div>
+                    <div style="font-size:12px; color:#065f46; margin-top:2px; font-style:italic;">Received this term</div>
+                </div>
+                <div style="background:#fef2f2; border:1px solid #fecaca; border-left:3px solid #b91c1c; padding:16px 18px;">
+                    <div style="font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#7f1d1d; font-weight:500;">Outstanding</div>
+                    <div style="font-family:'EB Garamond', Georgia, serif; font-size:28px; color:#7f1d1d; font-weight:600; margin-top:4px;">{{ $money($fd['outstanding'] ?? 0) }}</div>
+                    <div style="font-size:12px; color:#7f1d1d; margin-top:2px; font-style:italic;">Still to collect</div>
+                </div>
+                @php $band = $rateBand($fd['rate'] ?? 0); @endphp
+                <div style="background:#fafafa; border:1px solid #e5e7eb; border-left:3px solid {{ $band['bg'] }}; padding:16px 18px;">
+                    <div style="font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#6b7280; font-weight:500;">Collection rate</div>
+                    <div style="font-family:'EB Garamond', Georgia, serif; font-size:28px; color:{{ $band['bg'] }}; font-weight:600; margin-top:4px;">{{ number_format($fd['rate'] ?? 0, 1) }}%</div>
+                    <div style="font-size:12px; color:#6b7280; margin-top:2px; font-style:italic;">
+                        {{ ($fd['counts']['paid'] ?? 0) }} paid · {{ ($fd['counts']['partial'] ?? 0) }} partial · {{ ($fd['counts']['unpaid'] ?? 0) }} unpaid
+                    </div>
+                </div>
+            </div>
+
+            {{-- Per-class heat-map + top defaulters, side by side --}}
+            <div style="display:grid; grid-template-columns:1.4fr 1fr; gap:20px;">
+                {{-- Left: per-class heat map --}}
+                <div>
+                    <div style="font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#8b1a1a; font-weight:600; margin-bottom:10px;">Collection by class</div>
+                    <div style="border:1px solid #e5e7eb;">
+                        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                            <thead style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+                                <tr>
+                                    <th style="text-align:left;   padding:8px 10px; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:#6b7280; font-weight:600;">Class</th>
+                                    <th style="text-align:right;  padding:8px 10px; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:#6b7280; font-weight:600;">Pupils</th>
+                                    <th style="text-align:right;  padding:8px 10px; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:#6b7280; font-weight:600;">Billed</th>
+                                    <th style="text-align:right;  padding:8px 10px; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:#6b7280; font-weight:600;">Collected</th>
+                                    <th style="text-align:right;  padding:8px 10px; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:#6b7280; font-weight:600;">Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($fd['byClass'] ?? [] as $r)
+                                    @php $b = $rateBand($r->rate); @endphp
+                                    <tr style="border-bottom:1px solid #f3f4f6;">
+                                        <td style="padding:8px 10px; font-family:'EB Garamond', Georgia, serif; font-size:15px; color:#0e2746;">{{ $r->label }}</td>
+                                        <td style="padding:8px 10px; text-align:right; color:#4b5563;">{{ $r->pupils }}</td>
+                                        <td style="padding:8px 10px; text-align:right; color:#4b5563;">{{ $money($r->billed) }}</td>
+                                        <td style="padding:8px 10px; text-align:right; color:#4b5563;">{{ $money($r->collected) }}</td>
+                                        <td style="padding:8px 10px; text-align:right;">
+                                            <span style="display:inline-block; padding:2px 10px; background:{{ $b['bg'] }}; color:#fff; font-size:11px; font-weight:600; border-radius:2px; min-width:52px; text-align:center;">{{ number_format($r->rate, 0) }}%</span>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="5" style="padding:20px; text-align:center; color:#9ca3af; font-style:italic;">No fees generated for this term.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {{-- Right: top defaulters --}}
+                <div>
+                    <div style="font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#8b1a1a; font-weight:600; margin-bottom:10px;">Top defaulters — this term</div>
+                    <div style="border:1px solid #e5e7eb;">
+                        @forelse($fd['defaulters'] ?? [] as $i => $d)
+                            <div style="display:grid; grid-template-columns:24px 1fr auto; gap:10px; padding:10px 12px; border-bottom:1px solid #f3f4f6; align-items:center;">
+                                <div style="font-family:'EB Garamond', Georgia, serif; font-size:16px; color:#b08a3e; text-align:right;">{{ $i + 1 }}</div>
+                                <div>
+                                    <div style="font-family:'EB Garamond', Georgia, serif; font-size:15px; color:#0e2746;">{{ $d->name }}</div>
+                                    <div style="font-size:11px; color:#6b7280; margin-top:1px;">{{ $d->student_id_number ?? '—' }} · {{ ($d->grade ?? '—') . ' / ' . ($d->section ?? '—') }}</div>
+                                </div>
+                                <div style="font-family:'EB Garamond', Georgia, serif; font-size:15px; color:#b91c1c; font-weight:600;">{{ $money($d->balance) }}</div>
+                            </div>
+                        @empty
+                            <div style="padding:20px; text-align:center; color:#9ca3af; font-style:italic;">No outstanding balances this term.</div>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- ============================================================
              CHARTS — 2×2 grid
              ============================================================ --}}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">

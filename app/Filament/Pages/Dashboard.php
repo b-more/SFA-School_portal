@@ -34,15 +34,22 @@ class Dashboard extends Page
     protected static string $view = 'filament.pages.dashboard';
     protected static ?int $navigationSort = 1;
 
+    /**
+     * Reactive filter for the fee-collection section. Bound to the term
+     * picker in the view via wire:model.live so the section reloads without
+     * a full page refresh. Defaults to the current term on first mount.
+     */
+    public ?int $feeTermId = null;
+
     // Add access control methods
     public static function canAccess(): bool
     {
-        return in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::SCHOOL_SECRETARY]) ?? false;
+        return in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT], true);
     }
 
     public static function shouldRegisterNavigation(): bool
     {
-        return in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::SCHOOL_SECRETARY]) ?? false;
+        return in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT], true);
     }
 
     public function mount()
@@ -260,36 +267,44 @@ class Dashboard extends Page
         $recentPayments = StudentFee::where('payment_status', '!=', 'unpaid')
             ->with(['student', 'feeStructure.grade'])
             ->latest()
-            ->take(5)
+            ->take(10)
             ->get()
+            ->filter(fn ($payment) => $payment->student !== null)
+            ->take(5)
             ->map(function ($payment) {
+                $gradeName = $payment->feeStructure?->grade?->name ?? 'Unknown Grade';
                 return [
                     'id' => $payment->id,
-                    'name' => $payment->student->name,
-                    'grade' => $payment->feeStructure?->grade?->name ?? 'Unknown Grade',
+                    'name' => $payment->student?->name ?? 'Unknown student',
+                    'grade' => $gradeName,
                     'type' => 'payment',
                     'amount' => $payment->amount_paid,
                     'time' => $payment->updated_at->diffForHumans(),
-                    'description' => "Payment of ZMW {$payment->amount_paid} for {$payment->feeStructure?->grade?->name}"
+                    'description' => "Payment of ZMW {$payment->amount_paid} for {$gradeName}",
                 ];
-            });
+            })
+            ->values();
 
         // Get recent homework submissions with proper formatting
         $recentSubmissions = HomeworkSubmission::with(['student', 'homework.grade'])
             ->latest()
-            ->take(5)
+            ->take(10)
             ->get()
+            ->filter(fn ($submission) => $submission->student !== null && $submission->homework !== null)
+            ->take(5)
             ->map(function ($submission) {
+                $title = $submission->homework?->title ?? 'Untitled homework';
                 return [
                     'id' => $submission->id,
-                    'name' => $submission->student->name,
-                    'homework' => $submission->homework->title,
-                    'grade' => $submission->homework->grade?->name ?? 'Unknown Grade',
+                    'name' => $submission->student?->name ?? 'Unknown student',
+                    'homework' => $title,
+                    'grade' => $submission->homework?->grade?->name ?? 'Unknown Grade',
                     'type' => 'submission',
                     'time' => $submission->created_at->diffForHumans(),
-                    'description' => "Homework submission: {$submission->homework->title}"
+                    'description' => "Homework submission: {$title}",
                 ];
-            });
+            })
+            ->values();
 
         // Get recent SMS logs with proper formatting
         $recentSms = SmsLog::latest()
@@ -424,7 +439,123 @@ class Dashboard extends Page
             'gradeCapacity' => $this->getGradeCapacity(),
             'monthlyComparison' => $this->getMonthlyComparison(),
             'attendanceRegister' => $this->getAttendanceRegister(),
+            'feeDashboard' => $this->getFeeDashboard(),
         ];
+    }
+
+    /**
+     * Term-scoped fee collection dashboard: KPIs, per-class heat-map,
+     * top defaulters. Feeds the new "Fee Collection · {Term}" section
+     * on the admin dashboard. Reactively rebound to $feeTermId so the
+     * term picker in the view swaps the whole section live.
+     */
+    public function getFeeDashboard(): array
+    {
+        // Default the picker to the current term the first time the page
+        // renders. After that, the wired property carries the choice.
+        if ($this->feeTermId === null) {
+            $current = Term::where('is_current', true)->first();
+            $this->feeTermId = $current?->id;
+        }
+
+        $term = $this->feeTermId ? Term::find($this->feeTermId) : null;
+        if (! $term) {
+            return ['empty' => true, 'term' => null, 'termChoices' => $this->feeTermChoices()];
+        }
+
+        // Term-scoped fee query base — matches StudentFeeStatsWidget so the
+        // dashboard tile and the fees resource widget always agree.
+        $base = fn () => StudentFee::query()
+            ->where('student_fees.term_id', $term->id)
+            ->where('student_fees.payment_status', '!=', 'carried_forward');
+
+        // Money totals: expected = tuition (basic_fee) + arrears carried in
+        // minus applied discounts. Collected and outstanding read straight
+        // off the fee rows for reconcilability with the receipt trail.
+        $exp = $base()
+            ->join('fee_structures', 'student_fees.fee_structure_id', '=', 'fee_structures.id')
+            ->selectRaw('COALESCE(SUM(fee_structures.basic_fee), 0) AS tuition, COALESCE(SUM(student_fees.previous_balance), 0) AS arrears, COALESCE(SUM(student_fees.discount_amount), 0) AS discounts')
+            ->first();
+
+        $expected    = max(0, (float) $exp->tuition + (float) $exp->arrears - (float) $exp->discounts);
+        $collected   = (float) $base()->sum('amount_paid');
+        $outstanding = (float) $base()->sum('balance');
+        $rate        = $expected > 0 ? round(($collected / $expected) * 100, 1) : 0.0;
+
+        // Per-class heat-map: pupils billed / collected / rate for every
+        // class that has at least one Term-{term} fee row. Sorted by rate
+        // ascending so the worst-performers rise to the top of the table.
+        $byClass = DB::select("
+            SELECT g.name AS grade, cs.name AS section,
+                   COUNT(DISTINCT sf.student_id) AS pupils,
+                   COALESCE(SUM(sf.amount_paid + sf.balance), 0) AS billed,
+                   COALESCE(SUM(sf.amount_paid), 0)              AS collected,
+                   COALESCE(SUM(sf.balance), 0)                  AS outstanding
+              FROM student_fees sf
+              JOIN students s ON s.id = sf.student_id
+         LEFT JOIN class_sections cs ON cs.id = s.class_section_id
+         LEFT JOIN grades g          ON g.id = cs.grade_id
+             WHERE sf.term_id = ?
+               AND sf.payment_status <> 'carried_forward'
+          GROUP BY g.id, g.name, cs.id, cs.name
+          ORDER BY g.id, cs.name
+        ", [$term->id]);
+
+        $byClass = collect($byClass)->map(function ($r) {
+            $r->rate = $r->billed > 0 ? round(($r->collected / $r->billed) * 100, 1) : 0.0;
+            $r->label = ($r->grade ?? '—') . ' / ' . ($r->section ?? '—');
+            return $r;
+        });
+
+        // Distinct-pupil counts by payment status — matches StudentFeeStatsWidget.
+        $counts = [
+            'paid'    => $base()->where('payment_status', 'paid')->distinct('student_id')->count('student_id'),
+            'partial' => $base()->where('payment_status', 'partial')->distinct('student_id')->count('student_id'),
+            'unpaid'  => $base()->where('payment_status', 'unpaid')->distinct('student_id')->count('student_id'),
+        ];
+
+        // Top 10 pupils with the biggest outstanding balance in this term.
+        $defaulters = DB::select("
+            SELECT sf.student_id, s.name, s.student_id_number,
+                   g.name AS grade, cs.name AS section,
+                   sf.amount_paid, sf.balance, sf.payment_status
+              FROM student_fees sf
+              JOIN students s ON s.id = sf.student_id
+         LEFT JOIN class_sections cs ON cs.id = s.class_section_id
+         LEFT JOIN grades g          ON g.id = cs.grade_id
+             WHERE sf.term_id = ?
+               AND sf.balance > 0
+               AND sf.payment_status <> 'carried_forward'
+          ORDER BY sf.balance DESC
+             LIMIT 10
+        ", [$term->id]);
+
+        return [
+            'empty'        => false,
+            'term'         => $term,
+            'termLabel'    => $term->name,
+            'yearLabel'    => optional($term->academicYear)->name ?? '',
+            'expected'     => $expected,
+            'collected'    => $collected,
+            'outstanding'  => $outstanding,
+            'rate'         => $rate,
+            'counts'       => $counts,
+            'byClass'      => $byClass,
+            'defaulters'   => $defaulters,
+            'termChoices'  => $this->feeTermChoices(),
+        ];
+    }
+
+    /**
+     * Term picker options for the fee dashboard — every term, newest
+     * academic year first. Cheap to compute, so no caching.
+     */
+    protected function feeTermChoices(): Collection
+    {
+        return Term::with('academicYear')
+            ->orderByDesc('academic_year_id')
+            ->orderBy('id')
+            ->get(['id', 'name', 'academic_year_id']);
     }
 
     /**
