@@ -44,12 +44,18 @@ class Dashboard extends Page
     // Add access control methods
     public static function canAccess(): bool
     {
-        return in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT], true);
+        $u = auth()->user();
+        if (! $u) return false;
+        if ($u->isFinanceLocked()) return false;  // Manager sees ManagerDashboard instead
+        return in_array($u->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT], true);
     }
 
     public static function shouldRegisterNavigation(): bool
     {
-        return in_array(auth()->user()?->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT], true);
+        $u = auth()->user();
+        if (! $u) return false;
+        if ($u->isFinanceLocked()) return false;  // Manager sees ManagerDashboard instead
+        return in_array($u->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT], true);
     }
 
     public function mount()

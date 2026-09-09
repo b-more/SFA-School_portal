@@ -151,6 +151,7 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 // Register your custom admin dashboard
                 Dashboard::class,
+                \App\Filament\Pages\ManagerDashboard::class,
                 // Register role-specific dashboards
                 HeadTeacherDashboard::class,
                 TeacherDashboard::class,
@@ -179,6 +180,7 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Pages\FeeCollectionTracker::class,
                 \App\Filament\Pages\DiscountsAndBursaries::class,
                 \App\Filament\Pages\GenerateFees::class,
+                \App\Filament\Pages\ClinicianDashboard::class,
                 \App\Filament\Pages\ClinicReports::class,
                 // Website Management
                 ManageLandingPage::class,
