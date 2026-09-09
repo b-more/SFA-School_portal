@@ -28,7 +28,24 @@ class LogAuthEvent
     public function handleLogin(Login $event): void
     {
         if ($this->alreadySeen($event)) return;
-        $this->write('login', $event->user?->getKey(), null);
+        $userId = $event->user?->getKey();
+
+        // Also stamp last_login_at on the user row itself, so the admin
+        // panel's "last seen" column reflects reality even for logins that
+        // don't route through the API controllers. saveQuietly avoids
+        // triggering observers or nesting model events into this listener.
+        if ($userId) {
+            try {
+                User::whereKey($userId)->update([
+                    'last_login_at' => now(),
+                    'last_login_ip' => request()?->ip(),
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('last_login stamp failed', ['user_id' => $userId, 'error' => $e->getMessage()]);
+            }
+        }
+
+        $this->write('login', $userId, null);
     }
 
     public function handleLogout(Logout $event): void

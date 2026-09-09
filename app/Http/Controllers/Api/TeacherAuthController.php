@@ -42,7 +42,13 @@ class TeacherAuthController extends Controller
             return response()->json(['message' => 'Your account has been deactivated. Contact administration.'], 403);
         }
 
-        $user->update(['last_login' => now()]);
+        // Column is `last_login_at` (with `_at`), not `last_login`. The old
+        // key was silently dropped by mass-assignment, which is why every
+        // teacher's "last seen" timestamp read NULL in the admin panel.
+        $user->forceFill([
+            'last_login_at' => now(),
+            'last_login_ip' => request()->ip(),
+        ])->saveQuietly();
 
         $user->tokens()->where('name', 'teacher-mobile')->delete();
         $token = $user->createToken('teacher-mobile')->plainTextToken;

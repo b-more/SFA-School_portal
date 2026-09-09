@@ -44,7 +44,14 @@ class AuthController extends Controller
             return response()->json(['message' => 'Your account has been deactivated. Contact the school.'], 403);
         }
 
-        $user->update(['last_login' => now()]);
+        // The column on users is `last_login_at` (with `_at`), not `last_login` —
+        // the mass-assignment filter silently drops any unfillable key, so the
+        // old `last_login` line succeeded without updating anything, leaving
+        // every parent's "last seen" timestamp blank in the admin.
+        $user->forceFill([
+            'last_login_at' => now(),
+            'last_login_ip' => request()->ip(),
+        ])->saveQuietly();
 
         // Revoke old tokens and issue new one
         $user->tokens()->delete();
