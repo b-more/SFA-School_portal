@@ -107,6 +107,64 @@ class LoginActivity extends Page
     }
 
     /**
+     * Suspicious IPs — those with an unusually high number of failed
+     * attempts in the last 24h (≥ 3). Sorted by count desc so the
+     * loudest brute-force / credential-stuffing sources rise to the top.
+     */
+    public function suspiciousIps(): Collection
+    {
+        return collect(DB::select("
+            SELECT ip_address,
+                   COUNT(*)                AS failures,
+                   COUNT(DISTINCT user_id) AS accounts_hit,
+                   MAX(created_at)         AS last_at
+              FROM audit_logs
+             WHERE event = 'failed_login'
+               AND created_at > NOW() - INTERVAL 24 HOUR
+               AND ip_address IS NOT NULL
+          GROUP BY ip_address
+            HAVING failures >= 3
+          ORDER BY failures DESC, last_at DESC
+             LIMIT 10
+        "))->map(function ($r) {
+            $r->last = Carbon::parse($r->last_at);
+            return $r;
+        });
+    }
+
+    /**
+     * Daily login vs failed-attempt counts for the last 14 days.
+     * Feeds a simple SVG bar chart on the page.
+     */
+    public function trend(int $days = 14): array
+    {
+        $rows = DB::select("
+            SELECT DATE(created_at) AS d,
+                   SUM(CASE WHEN event = 'login'        THEN 1 ELSE 0 END) AS logins,
+                   SUM(CASE WHEN event = 'failed_login' THEN 1 ELSE 0 END) AS failures
+              FROM audit_logs
+             WHERE created_at > NOW() - INTERVAL ? DAY
+          GROUP BY DATE(created_at)
+          ORDER BY d
+        ", [$days]);
+
+        $byDay = collect($rows)->keyBy('d');
+        $series = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $d = now()->subDays($i)->toDateString();
+            $r = $byDay->get($d);
+            $series[] = [
+                'date'      => $d,
+                'label'     => Carbon::parse($d)->format('D d M'),
+                'logins'    => (int) ($r?->logins ?? 0),
+                'failures'  => (int) ($r?->failures ?? 0),
+            ];
+        }
+        $peak = max(1, ...array_map(fn ($x) => max($x['logins'], $x['failures']), $series));
+        return ['series' => $series, 'peak' => $peak, 'days' => $days];
+    }
+
+    /**
      * At-a-glance counters shown at the top of the page.
      */
     public function summary(): array

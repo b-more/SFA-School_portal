@@ -4,6 +4,8 @@
         $now = $this->currentlySignedIn();
         $logins = $this->recentLogins();
         $failures = $this->recentFailures();
+        $trend = $this->trend();
+        $suspiciousIps = $this->suspiciousIps();
 
         $roleColor = function ($roleId) {
             return match ($roleId) {
@@ -39,6 +41,63 @@
                 <div style="font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#6b7280; font-weight:500;">Lockouts · 24 h</div>
                 <div style="font-family:'EB Garamond', Georgia, serif; font-size:32px; color:#d97706; font-weight:600; margin-top:4px; line-height:1;">{{ $s['lockouts_24h'] }}</div>
                 <div style="font-size:12px; color:#6b7280; margin-top:6px; font-style:italic;">Rate-limited by throttle</div>
+            </div>
+        </div>
+
+        {{-- ============= 14-DAY TREND + SUSPICIOUS IPs ============= --}}
+        <div style="display:grid; grid-template-columns:1.6fr 1fr; gap:20px;">
+            {{-- Trend chart --}}
+            <div style="background:#fff; border:1px solid #e5e7eb; border-top:3px solid #0e2746;">
+                <div style="padding:16px 20px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:baseline;">
+                    <div>
+                        <div style="font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:#8b1a1a; font-weight:600;">Trend</div>
+                        <h2 style="font-family:'EB Garamond', Georgia, serif; font-size:20px; color:#0e2746; font-weight:600; margin:2px 0 0;">Login activity · last {{ $trend['days'] }} days</h2>
+                    </div>
+                    <div style="display:flex; gap:14px; align-items:center; font-size:11px; color:#4b5563;">
+                        <span><span style="display:inline-block; width:10px; height:10px; background:#059669; margin-right:6px; vertical-align:middle;"></span>Logins</span>
+                        <span><span style="display:inline-block; width:10px; height:10px; background:#b91c1c; margin-right:6px; vertical-align:middle;"></span>Failed</span>
+                    </div>
+                </div>
+                <div style="padding:20px; overflow-x:auto;">
+                    <div style="display:grid; grid-template-columns:repeat({{ count($trend['series']) }}, minmax(38px, 1fr)); gap:6px; align-items:end; height:180px;">
+                        @foreach($trend['series'] as $d)
+                            @php
+                                $loginH = $trend['peak'] > 0 ? ($d['logins']   / $trend['peak']) * 100 : 0;
+                                $failH  = $trend['peak'] > 0 ? ($d['failures'] / $trend['peak']) * 100 : 0;
+                            @endphp
+                            <div style="display:flex; flex-direction:column; align-items:center; height:100%; justify-content:end;" title="{{ $d['label'] }}: {{ $d['logins'] }} in, {{ $d['failures'] }} failed">
+                                <div style="display:flex; gap:3px; align-items:end; width:100%; height:150px; justify-content:center;">
+                                    <div style="width:12px; height:{{ $loginH }}%; background:#059669; min-height:{{ $d['logins'] > 0 ? '2px' : '0' }};"></div>
+                                    <div style="width:12px; height:{{ $failH }}%; background:#b91c1c; min-height:{{ $d['failures'] > 0 ? '2px' : '0' }};"></div>
+                                </div>
+                                <div style="font-size:9px; color:#6b7280; margin-top:6px; letter-spacing:.05em; text-align:center;">{{ substr($d['label'], 0, 3) }}<br>{{ substr($d['label'], 4) }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+
+            {{-- Suspicious IPs --}}
+            <div style="background:#fff; border:1px solid #e5e7eb; border-top:3px solid #b91c1c;">
+                <div style="padding:16px 20px; border-bottom:1px solid #e5e7eb;">
+                    <div style="font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:#8b1a1a; font-weight:600;">Security</div>
+                    <h2 style="font-family:'EB Garamond', Georgia, serif; font-size:20px; color:#0e2746; font-weight:600; margin:2px 0 0;">Suspicious IPs · 24 h</h2>
+                </div>
+                @if($suspiciousIps->isEmpty())
+                    <div style="padding:30px; text-align:center; color:#9ca3af; font-style:italic; font-family:'EB Garamond', Georgia, serif;">— No IP has ≥3 failed attempts in the last 24 h. Nothing to flag.</div>
+                @else
+                    @foreach($suspiciousIps as $ip)
+                        <div style="padding:12px 20px; border-top:1px solid #f3f4f6; display:grid; grid-template-columns:1fr auto; gap:10px; align-items:baseline;">
+                            <div>
+                                <div style="font-family:ui-monospace, monospace; font-size:14px; color:#0e2746;">{{ $ip->ip_address }}</div>
+                                <div style="font-size:11px; color:#6b7280; margin-top:2px;">
+                                    <strong style="color:#b91c1c;">{{ $ip->failures }}</strong> failed attempts against <strong>{{ $ip->accounts_hit }}</strong> account{{ $ip->accounts_hit > 1 ? 's' : '' }}
+                                </div>
+                            </div>
+                            <div style="font-family:'EB Garamond', Georgia, serif; font-style:italic; color:#b91c1c; font-size:12px;">last {{ $ip->last->diffForHumans() }}</div>
+                        </div>
+                    @endforeach
+                @endif
             </div>
         </div>
 

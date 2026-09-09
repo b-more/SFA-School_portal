@@ -4,14 +4,84 @@ namespace App\Filament\Resources\UserResource\Pages;
 
 use App\Filament\Resources\UserResource;
 use Carbon\Carbon;
+use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
 
 class ViewUser extends ViewRecord
 {
     protected static string $resource = UserResource::class;
     protected static string $view     = 'filament.resources.user-resource.pages.view-user';
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\Action::make('force_logout')
+                ->label('Force sign-out')
+                ->icon('heroicon-o-arrow-right-on-rectangle')
+                ->color('warning')
+                ->requiresConfirmation()
+                ->modalHeading('Force this user to sign out')
+                ->modalDescription('Kills every active portal session and revokes every parent/teacher-app API token. They will need to log in again everywhere.')
+                ->modalSubmitActionLabel('Yes, sign them out')
+                ->action(function () {
+                    $userId = $this->record->id;
+
+                    $sessions = DB::table('sessions')->where('user_id', $userId)->delete();
+                    $tokens = DB::table('personal_access_tokens')->where('tokenable_type', get_class($this->record))->where('tokenable_id', $userId)->delete();
+
+                    // Also stamp an audit_logs 'logout' row so the trail shows admin force-signout.
+                    DB::table('audit_logs')->insert([
+                        'auditable_type' => \App\Models\User::class,
+                        'auditable_id'   => $userId,
+                        'event'          => 'logout',
+                        'user_id'        => $userId,
+                        'ip_address'     => request()?->ip(),
+                        'user_agent'     => 'Admin force-signout via /admin/users/' . $userId,
+                        'new_values'     => json_encode(['forced_by_admin_id' => auth()->id()]),
+                        'created_at'     => now(),
+                        'updated_at'     => now(),
+                    ]);
+
+                    Notification::make()
+                        ->title('Signed out')
+                        ->body("Killed {$sessions} browser session(s) and revoked {$tokens} API token(s).")
+                        ->success()
+                        ->send();
+                }),
+
+            Actions\Action::make('send_reset_link')
+                ->label('Send reset link')
+                ->icon('heroicon-o-envelope')
+                ->color('primary')
+                ->requiresConfirmation()
+                ->modalHeading('Send a password-reset email')
+                ->modalDescription('The user receives a Filament reset link at their email address. Their current password stays valid until they click the link and pick a new one.')
+                ->visible(fn () => filled($this->record->email))
+                ->action(function () {
+                    $status = Password::sendResetLink(['email' => $this->record->email]);
+
+                    if ($status === Password::RESET_LINK_SENT) {
+                        Notification::make()
+                            ->title('Reset link sent')
+                            ->body("Emailed to {$this->record->email}. It expires in 60 minutes.")
+                            ->success()
+                            ->send();
+                    } else {
+                        Notification::make()
+                            ->title('Could not send reset link')
+                            ->body('Broker returned: ' . $status . '. Check MAIL config or that the user has a valid email.')
+                            ->danger()
+                            ->send();
+                    }
+                }),
+
+            Actions\EditAction::make(),
+        ];
+    }
 
     /**
      * Session record for this user right now (if any).
