@@ -1294,7 +1294,10 @@ class StudentResource extends Resource
                 $year = $currentAcademicYear->start_date->format('y');
             }
 
-            // Map grade names to grade levels (numbers)
+            // Map grade names to grade levels (numbers).
+            // Form 1 and Form 2 are this school's names for Grade 8 and Grade 9
+            // — they share the same slots (10, 11) since the school never uses
+            // both sets of names at once.
             $gradeLevelMap = [
                 'Baby Class' => '00',
                 'Middle Class' => '01',
@@ -1307,7 +1310,9 @@ class StudentResource extends Resource
                 'Grade 6' => '08',
                 'Grade 7' => '09',
                 'Grade 8' => '10',
+                'Form 1'  => '10',
                 'Grade 9' => '11',
+                'Form 2'  => '11',
                 'Grade 10' => '12',
                 'Grade 11' => '13',
                 'Grade 12' => '14',
