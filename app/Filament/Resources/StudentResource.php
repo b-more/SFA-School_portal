@@ -937,8 +937,18 @@ class StudentResource extends Resource
                                 ])
                                 ->required(),
                         ])
-                        ->action(function (Builder $query, array $data): void {
-                            $query->update(['enrollment_status' => $data['enrollment_status']]);
+                        ->action(function (\Illuminate\Support\Collection $records, array $data): void {
+                            // Filament v3 hands a Collection of selected records, not a Builder.
+                            // The old (Builder $query) signature made DI resolve a Builder with no
+                            // model bound, which blew up with "usesTimestamps() on null" on update.
+                            Student::whereIn('id', $records->pluck('id'))
+                                ->update(['enrollment_status' => $data['enrollment_status']]);
+
+                            Notification::make()
+                                ->title('Status updated')
+                                ->body($records->count() . ' pupil(s) set to ' . $data['enrollment_status'] . '.')
+                                ->success()
+                                ->send();
                         })
                         ->deselectRecordsAfterCompletion()
                         ->visible($isAdmin),
