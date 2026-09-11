@@ -39,7 +39,77 @@ class TeacherApiController extends Controller
 {
     private function getTeacher(): ?Teacher
     {
-        return Teacher::where('user_id', Auth::id())->where('is_active', true)->first();
+        $userId = Auth::id();
+        if (! $userId) return null;
+
+        $teacher = Teacher::where('user_id', $userId)->where('is_active', true)->first();
+        if ($teacher) return $teacher;
+
+        // Fallback: a duplicate user or a soft-deleted twin can leave the
+        // teachers row pointing at a stale user_id. Match on the login user's
+        // email or phone against the teachers table, then self-heal the
+        // pointer so the next request goes through the fast path.
+        $u = Auth::user();
+        if (! $u) return null;
+
+        $q = Teacher::query()->where('is_active', true);
+        $q->where(function ($w) use ($u) {
+            if (! empty($u->email)) $w->orWhere('email', $u->email);
+            if (! empty($u->phone)) $w->orWhere('phone', $u->phone);
+        });
+        $candidate = $q->first();
+        if (! $candidate) return null;
+
+        \Illuminate\Support\Facades\Log::warning('Teacher record repointed by fallback match', [
+            'user_id'   => $userId,
+            'teacher_id'=> $candidate->id,
+            'old_user'  => $candidate->user_id,
+            'via'       => $candidate->email === $u->email ? 'email' : 'phone',
+        ]);
+
+        $candidate->forceFill(['user_id' => $userId])->saveQuietly();
+        return $candidate;
+    }
+
+    /**
+     * Students who "take" $subjectId in $classSectionId (and $gradeId) for $yearId.
+     *
+     * Optional/elective subjects (Home Economics, Food and Nutrition, French, …) only
+     * apply to the students who actually picked them, recorded in
+     * student_subject_enrollments. Core subjects (English, Maths, etc.) usually have
+     * no enrollment rows because everyone in the class takes them.
+     *
+     * Rule: if ANY student_subject_enrollments rows exist for (subject, grade, year),
+     * treat the subject as elective and filter by those enrollments. Otherwise fall
+     * back to the full class roster — that keeps core subjects working unchanged.
+     */
+    private function studentsTakingSubject(int $classSectionId, int $subjectId, int $gradeId, ?int $yearId)
+    {
+        $base = Student::query()
+            ->where('class_section_id', $classSectionId)
+            ->where('enrollment_status', 'active');
+
+        if (! $yearId || ! $gradeId || ! $subjectId) {
+            return $base;
+        }
+
+        $hasEnrollments = \Illuminate\Support\Facades\DB::table('student_subject_enrollments')
+            ->where('subject_id', $subjectId)
+            ->where('grade_id', $gradeId)
+            ->where('academic_year_id', $yearId)
+            ->exists();
+
+        if (! $hasEnrollments) {
+            return $base;
+        }
+
+        return $base->whereIn('id', function ($q) use ($subjectId, $gradeId, $yearId) {
+            $q->select('student_id')
+              ->from('student_subject_enrollments')
+              ->where('subject_id', $subjectId)
+              ->where('grade_id', $gradeId)
+              ->where('academic_year_id', $yearId);
+        });
     }
 
     public function dashboard()
@@ -56,8 +126,39 @@ class TeacherApiController extends Controller
             ->with(['subject', 'classSection.grade', 'classSection.students'])
             ->get();
 
-        $totalStudents = $teachings->sum(fn($t) => $t->classSection?->students?->where('enrollment_status', 'active')->count() ?? 0);
-        $totalClasses = $teachings->pluck('class_section_id')->unique()->count();
+        // Distinct class sections this teacher touches via subject teachings, plus the
+        // homeroom class (if any).
+        $classSectionIds = $teachings->pluck('class_section_id')
+            ->push($teacher->is_class_teacher ? $teacher->class_section_id : null)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        // total_students: count distinct active students this teacher can teach.
+        // For each subject_teaching, only the students enrolled in that subject (if
+        // it is elective) or the whole class (if it is core). Plus all homeroom kids
+        // if she is the class teacher. Deduped at the end so a homeroom kid who also
+        // happens to take one of her electives isn't counted twice.
+        $studentIds = collect();
+        foreach ($teachings as $t) {
+            $ids = $this->studentsTakingSubject(
+                (int) $t->class_section_id,
+                (int) $t->subject_id,
+                (int) ($t->classSection?->grade_id ?? 0),
+                $yearId
+            )->pluck('id');
+            $studentIds = $studentIds->merge($ids);
+        }
+        if ($teacher->is_class_teacher && $teacher->class_section_id) {
+            $homeroomIds = Student::where('class_section_id', $teacher->class_section_id)
+                ->where('enrollment_status', 'active')
+                ->pluck('id');
+            $studentIds = $studentIds->merge($homeroomIds);
+        }
+        $totalStudents = $studentIds->unique()->count();
+
+        $totalClasses = count($classSectionIds);
         $totalSubjects = $teachings->pluck('subject_id')->unique()->count();
 
         // Pending grading
@@ -123,7 +224,7 @@ class TeacherApiController extends Controller
 
         $yearId = AcademicYear::where('is_active', true)->first()?->id;
 
-        $relations = ['subject', 'classSection.grade', 'classSection.students', 'teacher'];
+        $relations = ['subject', 'classSection.grade', 'teacher'];
 
         // (a) Rows this teacher personally teaches this year.
         $own = SubjectTeaching::where('teacher_id', $teacher->id)
@@ -158,13 +259,20 @@ class TeacherApiController extends Controller
             ->unique(fn($t) => $t->class_section_id . '|' . $t->subject_id)
             ->values();
 
-        return response()->json($teachings->map(function ($t) use ($teacher) {
+        return response()->json($teachings->map(function ($t) use ($teacher, $yearId) {
             $isMine = (int) $t->teacher_id === (int) $teacher->id;
             $assignedName = null;
             if (!$isMine && $t->teacher) {
                 // Surname preferred — same convention as the Filament page.
                 $assignedName = trim(preg_replace('/^\S+\s+/', '', $t->teacher->name)) ?: $t->teacher->name;
             }
+
+            $count = $this->studentsTakingSubject(
+                (int) $t->class_section_id,
+                (int) $t->subject_id,
+                (int) ($t->classSection?->grade_id ?? 0),
+                $yearId
+            )->count();
 
             return [
                 'id' => $t->id,
@@ -174,22 +282,37 @@ class TeacherApiController extends Controller
                 'subject' => $t->subject?->name,
                 'grade' => $t->classSection?->grade?->name,
                 'class_section' => $t->classSection?->name,
-                'student_count' => $t->classSection?->students?->where('enrollment_status', 'active')->count() ?? 0,
+                'student_count' => $count,
                 'assignment' => $isMine ? 'you' : ($t->teacher ? 'colleague' : 'unassigned'),
                 'assigned_teacher_name' => $assignedName,
             ];
         })->values());
     }
 
-    public function classStudents($classSectionId)
+    public function classStudents($classSectionId, Request $request)
     {
         $teacher = $this->getTeacher();
         if (!$teacher) return response()->json(['message' => 'Not found.'], 404);
 
-        $students = Student::where('class_section_id', $classSectionId)
-            ->where('enrollment_status', 'active')
-            ->orderBy('name')
-            ->get();
+        // If the PWA passes ?subject_id=N, restrict to students taking that subject
+        // (so an elective teacher only sees her own takers, not the whole class).
+        $subjectId = $request->query('subject_id');
+        $yearId    = AcademicYear::where('is_active', true)->first()?->id;
+
+        if ($subjectId) {
+            $gradeId = (int) (ClassSection::find($classSectionId)?->grade_id ?? 0);
+            $query   = $this->studentsTakingSubject(
+                (int) $classSectionId,
+                (int) $subjectId,
+                $gradeId,
+                $yearId
+            );
+        } else {
+            $query = Student::where('class_section_id', $classSectionId)
+                ->where('enrollment_status', 'active');
+        }
+
+        $students = $query->orderBy('name')->get();
 
         return response()->json(['students' => $students->map(fn($s) => [
             'id' => $s->id,
@@ -242,10 +365,26 @@ class TeacherApiController extends Controller
     {
         $date = $request->input('date', today()->toDateString());
 
-        $students = Student::where('class_section_id', $classSectionId)
-            ->where('enrollment_status', 'active')
-            ->orderBy('name')
-            ->get();
+        // When a subject_id is supplied (typical for elective subject teachers like
+        // Home Management), restrict to students taking that subject. Otherwise
+        // return the full class roster (class teachers / core subjects).
+        $subjectId = $request->query('subject_id');
+        $yearId    = AcademicYear::where('is_active', true)->first()?->id;
+
+        if ($subjectId) {
+            $gradeId = (int) (ClassSection::find($classSectionId)?->grade_id ?? 0);
+            $query   = $this->studentsTakingSubject(
+                (int) $classSectionId,
+                (int) $subjectId,
+                $gradeId,
+                $yearId
+            );
+        } else {
+            $query = Student::where('class_section_id', $classSectionId)
+                ->where('enrollment_status', 'active');
+        }
+
+        $students = $query->orderBy('name')->get();
 
         $records = Attendance::where('class_section_id', $classSectionId)
             ->where('attendance_date', $date)
