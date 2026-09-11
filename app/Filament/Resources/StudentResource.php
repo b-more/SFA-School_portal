@@ -52,6 +52,19 @@ class StudentResource extends Resource
             return $query;
         }
 
+        // Section-wide oversight roles: Head, Deputy, Dean for their whole
+        // section. Uses the same trait EnterResults uses so the definition of
+        // "section" stays in one place.
+        if (
+            RoleConstants::isHeadTeacher($user->role_id)
+            || RoleConstants::isDeputyHeadTeacher($user->role_id)
+            || in_array($user->role_id, [RoleConstants::DEAN_OF_PRIMARY, RoleConstants::DEAN_OF_SECONDARY])
+            || $user->role_id === RoleConstants::DIRECTOR
+        ) {
+            $accessor = new class { use \App\Traits\HasSectionBasedAccess; };
+            return $accessor->filterStudentsBySection($query, $user);
+        }
+
         // Teachers can only see students in their classes
         if (in_array($user->role_id, RoleConstants::teaching())) {
             $teacher = Teacher::where('user_id', $user->id)->first();

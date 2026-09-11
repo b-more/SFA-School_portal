@@ -428,8 +428,8 @@ class TeacherResource extends Resource
                                             }),
 
                                         Forms\Components\Toggle::make('is_grade_teacher')
-                                            ->label('Is Grade Teacher?')
-                                            ->helperText('Grade teachers have additional responsibilities for overseeing an entire grade level')
+                                            ->label('Head of Grade')
+                                            ->helperText('Coordinator / HOD for a secondary grade level (e.g. Head of Grade 12). They oversee the cohort but still teach only their specialist subject. Leave OFF for regular subject teachers.')
                                             ->default(false)
                                             ->live()
                                             ->visible(function (Forms\Get $get) {
@@ -672,11 +672,13 @@ class TeacherResource extends Resource
                     }),
 
                 Tables\Columns\ToggleColumn::make('is_grade_teacher')
-                    ->label('Grade Teacher')
+                    ->label('Head of Grade')
+                    ->tooltip('Coordinator for the whole grade level (Primary class teachers are also auto-flagged here).')
                     ->sortable(),
 
                 Tables\Columns\ToggleColumn::make('is_class_teacher')
                     ->label('Class Teacher')
+                    ->tooltip('Homeroom / attendance teacher for a class section. In Primary/ECE they also teach all subjects; in Secondary they teach only their specialty.')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('subjects.name')
@@ -993,11 +995,39 @@ class TeacherResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->with(['grade', 'classSection.grade', 'role', 'schoolSection']) // Eager load relationships
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        // Admin, School Secretary and Director see everyone.
+        $user = auth()->user();
+        if (! $user) return $query->whereRaw('1 = 0');
+
+        if (in_array($user->role_id, [
+            RoleConstants::ADMIN,
+            RoleConstants::SCHOOL_SECRETARY,
+            RoleConstants::DIRECTOR,
+        ], true)) {
+            return $query;
+        }
+
+        // Section-wide oversight: Head Teacher, Deputy Head, Dean — limited to
+        // their own school section (Primary vs Secondary), via the same trait
+        // used elsewhere so the section definition stays consistent.
+        if (
+            RoleConstants::isHeadTeacher($user->role_id)
+            || RoleConstants::isDeputyHeadTeacher($user->role_id)
+            || in_array($user->role_id, [RoleConstants::DEAN_OF_PRIMARY, RoleConstants::DEAN_OF_SECONDARY], true)
+        ) {
+            $accessor = new class { use \App\Traits\HasSectionBasedAccess; };
+            return $accessor->filterTeachersBySection($query, $user);
+        }
+
+        // Everyone else who managed to reach here (should be no one, since
+        // shouldRegisterNavigation gates it) sees only their own record.
+        return $query->where('user_id', $user->id);
     }
 
     /**
