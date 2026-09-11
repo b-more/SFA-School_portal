@@ -243,7 +243,7 @@
                                 <div style="font-family:'EB Garamond', Georgia, serif; font-size:16px; color:#b08a3e; text-align:right;">{{ $i + 1 }}</div>
                                 <div>
                                     <div style="font-family:'EB Garamond', Georgia, serif; font-size:15px; color:#0e2746;">{{ $d->name }}</div>
-                                    <div style="font-size:11px; color:#6b7280; margin-top:1px;">{{ $d->student_id_number ?? '—' }} · {{ ($d->grade ?? '—') . ' / ' . ($d->section ?? '—') }}</div>
+                                    <div style="font-size:11px; color:#6b7280; margin-top:1px;">{{ $d->student_id_number ?? '—' }} · {{ $d->context ?? ($d->grade ?? '—') }}</div>
                                 </div>
                                 <div style="font-family:'EB Garamond', Georgia, serif; font-size:15px; color:#b91c1c; font-weight:600;">{{ $money($d->balance) }}</div>
                             </div>

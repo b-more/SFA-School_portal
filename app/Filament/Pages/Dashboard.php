@@ -488,28 +488,35 @@ class Dashboard extends Page
         $outstanding = (float) $base()->sum('balance');
         $rate        = $expected > 0 ? round(($collected / $expected) * 100, 1) : 0.0;
 
-        // Per-class heat-map: pupils billed / collected / rate for every
-        // class that has at least one Term-{term} fee row. Sorted by rate
-        // ascending so the worst-performers rise to the top of the table.
+        // Per-grade heat-map: pupils billed / collected / rate for every
+        // grade that has at least one Term-{term} fee row.
+        //
+        // Groups by student_fees.grade_id — the grade the fee row was billed
+        // for. Using the pupil's current class_section would break when a
+        // pupil moves class or leaves the school: their historical fees
+        // would migrate to their new class, and pupils whose class was
+        // nulled on transfer collapsed into a phantom '— / —' row. sf.grade_id
+        // is populated on every real fee row (verified 100% coverage on
+        // active terms) and stays stable across class moves.
         $byClass = DB::select("
-            SELECT g.name AS grade, cs.name AS section,
+            SELECT g.id AS gid, g.name AS grade,
                    COUNT(DISTINCT sf.student_id) AS pupils,
                    COALESCE(SUM(sf.amount_paid + sf.balance), 0) AS billed,
                    COALESCE(SUM(sf.amount_paid), 0)              AS collected,
                    COALESCE(SUM(sf.balance), 0)                  AS outstanding
               FROM student_fees sf
-              JOIN students s ON s.id = sf.student_id
-         LEFT JOIN class_sections cs ON cs.id = s.class_section_id
-         LEFT JOIN grades g          ON g.id = cs.grade_id
+         LEFT JOIN grades g ON g.id = sf.grade_id
              WHERE sf.term_id = ?
                AND sf.payment_status <> 'carried_forward'
-          GROUP BY g.id, g.name, cs.id, cs.name
-          ORDER BY g.id, cs.name
+               AND sf.grade_id IS NOT NULL
+          GROUP BY g.id, g.name
+          ORDER BY g.id
         ", [$term->id]);
 
         $byClass = collect($byClass)->map(function ($r) {
             $r->rate = $r->billed > 0 ? round(($r->collected / $r->billed) * 100, 1) : 0.0;
-            $r->label = ($r->grade ?? '—') . ' / ' . ($r->section ?? '—');
+            $r->label = $r->grade ?? '—';
+            $r->section = null; // no longer meaningful — kept for view back-compat
             return $r;
         });
 
@@ -521,20 +528,42 @@ class Dashboard extends Page
         ];
 
         // Top 10 pupils with the biggest outstanding balance in this term.
+        // Grade taken from the fee row (billed grade); the pupil's CURRENT
+        // class is shown separately in parentheses so admins can find them
+        // even after a transfer.
         $defaulters = DB::select("
             SELECT sf.student_id, s.name, s.student_id_number,
-                   g.name AS grade, cs.name AS section,
+                   g.name AS grade,
+                   COALESCE(cs.name, '—') AS current_class,
+                   COALESCE(cg.name, '—') AS current_grade,
+                   s.enrollment_status,
                    sf.amount_paid, sf.balance, sf.payment_status
               FROM student_fees sf
               JOIN students s ON s.id = sf.student_id
+         LEFT JOIN grades g          ON g.id = sf.grade_id
          LEFT JOIN class_sections cs ON cs.id = s.class_section_id
-         LEFT JOIN grades g          ON g.id = cs.grade_id
+         LEFT JOIN grades cg         ON cg.id = cs.grade_id
              WHERE sf.term_id = ?
                AND sf.balance > 0
                AND sf.payment_status <> 'carried_forward'
           ORDER BY sf.balance DESC
              LIMIT 10
         ", [$term->id]);
+
+        // Precompute a friendly section label:
+        //   - billed grade (canonical for the term)
+        //   - if the pupil has since moved to a different class in that same
+        //     grade, or transferred out, show the current context inline.
+        foreach ($defaulters as $d) {
+            $d->section = null; // back-compat with old view
+            if ($d->enrollment_status !== 'active') {
+                $d->context = "was {$d->grade} · now {$d->enrollment_status}";
+            } elseif ($d->current_grade !== $d->grade) {
+                $d->context = "billed as {$d->grade} · now in {$d->current_grade}";
+            } else {
+                $d->context = ($d->grade ?? '—') . ' / ' . ($d->current_class ?? '—');
+            }
+        }
 
         return [
             'empty'        => false,
