@@ -41,6 +41,32 @@ trait HasSectionBasedAccess
     }
 
     /**
+     * Every school section the user oversees.
+     *
+     * Primary section leadership (Head, Deputy, Dean) also oversees ECE.
+     * A teacher's own row still contributes just its one section — this
+     * expansion applies to the management roles above teachers.
+     */
+    public function getUserSectionIds(?User $user = null): array
+    {
+        $user = $user ?? auth()->user();
+        if (! $user) return [];
+
+        $section = $this->getUserSection($user);
+        if (! $section) return [];
+
+        $ids = [$section->id];
+
+        // ECE rolls up under Primary leadership.
+        if ($section->code === 'PRI') {
+            $ece = SchoolSection::where('code', 'ECE')->first();
+            if ($ece) $ids[] = $ece->id;
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
      * Get the section code for the current user
      */
     public function getUserSectionCode(?User $user = null): ?string
@@ -183,10 +209,9 @@ trait HasSectionBasedAccess
 
         // Section-based access (head teachers, deputies, deans)
         if (in_array($accessLevel, ['section_full', 'section_no_settings', 'extended'])) {
-            if ($section) {
-                // Get grades in the section
-                $gradeIds = Grade::where('school_section_id', $section->id)->pluck('id');
-                // Get class sections in those grades
+            $sectionIds = $this->getUserSectionIds($user);
+            if (! empty($sectionIds)) {
+                $gradeIds = Grade::whereIn('school_section_id', $sectionIds)->pluck('id');
                 $classSectionIds = ClassSection::whereIn('grade_id', $gradeIds)->pluck('id');
 
                 return $query->whereIn('class_section_id', $classSectionIds);
@@ -227,11 +252,12 @@ trait HasSectionBasedAccess
             return $query;
         }
 
-        $section = $this->getUserSection($user);
-
         // Section-based access
-        if (in_array($accessLevel, ['section_full', 'section_no_settings', 'extended']) && $section) {
-            return $query->where('school_section_id', $section->id);
+        if (in_array($accessLevel, ['section_full', 'section_no_settings', 'extended'])) {
+            $sectionIds = $this->getUserSectionIds($user);
+            if (! empty($sectionIds)) {
+                return $query->whereIn('school_section_id', $sectionIds);
+            }
         }
 
         // Assigned only - only show own record
@@ -251,12 +277,13 @@ trait HasSectionBasedAccess
             return $query;
         }
 
-        $section = $this->getUserSection($user);
-
         // Section-based access
-        if (in_array($accessLevel, ['section_full', 'section_no_settings', 'extended']) && $section) {
-            $gradeIds = Grade::where('school_section_id', $section->id)->pluck('id');
-            return $query->whereIn('grade_id', $gradeIds);
+        if (in_array($accessLevel, ['section_full', 'section_no_settings', 'extended'])) {
+            $sectionIds = $this->getUserSectionIds($user);
+            if (! empty($sectionIds)) {
+                $gradeIds = Grade::whereIn('school_section_id', $sectionIds)->pluck('id');
+                return $query->whereIn('grade_id', $gradeIds);
+            }
         }
 
         // Assigned only - filter by teacher's assigned classes
@@ -291,11 +318,12 @@ trait HasSectionBasedAccess
             return $query;
         }
 
-        $section = $this->getUserSection($user);
-
         // Section-based access
-        if (in_array($accessLevel, ['section_full', 'section_no_settings', 'extended']) && $section) {
-            return $query->where('school_section_id', $section->id);
+        if (in_array($accessLevel, ['section_full', 'section_no_settings', 'extended'])) {
+            $sectionIds = $this->getUserSectionIds($user);
+            if (! empty($sectionIds)) {
+                return $query->whereIn('school_section_id', $sectionIds);
+            }
         }
 
         // For teachers with assigned only access, get grades of their assigned classes
@@ -324,9 +352,8 @@ trait HasSectionBasedAccess
      */
     public function belongsToUserSection(?User $user, $record): bool
     {
-        $userSection = $this->getUserSection($user);
-
-        if (!$userSection) {
+        $sectionIds = $this->getUserSectionIds($user);
+        if (empty($sectionIds)) {
             return false;
         }
 
@@ -336,12 +363,12 @@ trait HasSectionBasedAccess
                 return false;
             }
 
-            return $record->classSection->grade->school_section_id === $userSection->id;
+            return in_array($record->classSection->grade->school_section_id, $sectionIds, true);
         }
 
         // For teachers, check their school_section_id
         if ($record instanceof Teacher) {
-            return $record->school_section_id === $userSection->id;
+            return in_array($record->school_section_id, $sectionIds, true);
         }
 
         // For class sections, check grade's section
@@ -350,12 +377,12 @@ trait HasSectionBasedAccess
                 return false;
             }
 
-            return $record->grade->school_section_id === $userSection->id;
+            return in_array($record->grade->school_section_id, $sectionIds, true);
         }
 
         // For grades, check directly
         if ($record instanceof Grade) {
-            return $record->school_section_id === $userSection->id;
+            return in_array($record->school_section_id, $sectionIds, true);
         }
 
         return false;
