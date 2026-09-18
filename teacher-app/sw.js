@@ -1,9 +1,19 @@
-const CACHE_NAME = 'sfa-teacher-v6';
-const API_CACHE = 'sfa-teacher-api-v1';
+const CACHE_NAME = 'sfa-teacher-v14';
+// Bumping API_CACHE forces stale teacher-api responses (e.g. old "66 students"
+// dashboard, full class rosters) to be evicted on the next activation.
+const API_CACHE = 'sfa-teacher-api-v2';
 const ASSETS = ['/', '/css/app.css', '/js/app.js', '/js/api.js', '/js/pages/splash.js', '/js/pages/login.js', '/js/pages/dashboard.js'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
-self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE_NAME && k !== API_CACHE).map(k => caches.delete(k))))); });
+self.addEventListener('activate', e => {
+    e.waitUntil((async () => {
+        const ks = await caches.keys();
+        await Promise.all(ks.filter(k => k !== CACHE_NAME && k !== API_CACHE).map(k => caches.delete(k)));
+        // Take control of all open PWA tabs immediately so users don't have
+        // to close every tab before the new code starts serving.
+        await self.clients.claim();
+    })());
+});
 
 self.addEventListener('fetch', e => {
     if (e.request.url.includes('/teacher-api/')) {

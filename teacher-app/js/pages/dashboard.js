@@ -355,7 +355,7 @@ async function renderClasses(el, api) {
                     <div class="card-body" style="padding:12px 14px">
                         <div class="text-sm bold">${c.subject || ''}</div>
                         <div style="display:flex;gap:8px;margin-top:8px">
-                            <a href="#/dashboard/attendance?class=${c.class_section_id}" class="btn btn-outline" style="flex:1;text-decoration:none;font-size:0.72rem;padding:8px">${SVG.check} Attendance</a>
+                            <a href="#/dashboard/attendance?class=${c.class_section_id}&subject=${c.subject_id}" class="btn btn-outline" style="flex:1;text-decoration:none;font-size:0.72rem;padding:8px">${SVG.check} Attendance</a>
                             <a href="#/dashboard/results?class=${c.class_section_id}&subject=${c.subject_id}" class="btn btn-outline" style="flex:1;text-decoration:none;font-size:0.72rem;padding:8px">${SVG.chart} Results</a>
                         </div>
                     </div>
@@ -373,7 +373,28 @@ async function renderAttendance(el, api) {
     try {
         const classes = await api.getMyClasses();
         const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
-        const selectedClass = params.get('class') || (classes.length > 0 ? classes[0].class_section_id : null);
+        // Dropdown values are encoded "classSectionId|subjectId" so we can pass
+        // subject_id to the API and filter to elective takers only.
+        // Accept either ?class=N&subject=N (when navigated from a class card) or
+        // a bare ?class=N for older shortcuts — match the pair against options.
+        // Dropdown key: "sectionId|subjectId" where subjectId is either a
+        // real subject id or the empty string for a whole-class register row.
+        // Using '' (not 'null'/null) avoids the string "null" leaking into
+        // the URL query when someone splits the value.
+        const keyFor = c => `${c.class_section_id}|${c.subject_id ?? ''}`;
+        const defaultKey = classes.length > 0 ? keyFor(classes[0]) : null;
+        const urlClass   = params.get('class');
+        const urlSubject = params.get('subject');
+        let selectedKey;
+        if (urlClass && urlSubject) {
+            selectedKey = `${urlClass}|${urlSubject}`;
+        } else if (urlClass) {
+            // Try to find any of her classes matching that classSectionId.
+            const m = classes.find(c => String(c.class_section_id) === String(urlClass));
+            selectedKey = m ? keyFor(m) : defaultKey;
+        } else {
+            selectedKey = defaultKey;
+        }
         const today = new Date().toISOString().split('T')[0];
         const selectedDate = params.get('date') || today;
 
@@ -383,7 +404,10 @@ async function renderAttendance(el, api) {
         // Class + Date selectors
         html += `<div class="card" style="overflow:visible"><div style="padding:12px 14px;display:flex;gap:8px">
             <select id="att-class" class="form-input" style="flex:1;padding:8px 10px;font-size:0.75rem">
-                ${classes.map(c => `<option value="${c.class_section_id}" ${String(c.class_section_id) === String(selectedClass) ? 'selected' : ''}>${c.grade} ${c.class_section} - ${c.subject}</option>`).join('')}
+                ${classes.map(c => {
+                    const key = keyFor(c);
+                    return `<option value="${key}" ${key === String(selectedKey) ? 'selected' : ''}>${c.grade} ${c.class_section} - ${c.subject}</option>`;
+                }).join('')}
             </select>
             <input type="date" id="att-date" class="form-input" value="${selectedDate}" style="width:auto;padding:8px 10px;font-size:0.75rem">
         </div></div>`;
@@ -394,12 +418,18 @@ async function renderAttendance(el, api) {
 
         // Load attendance
         async function loadAttendance() {
-            const classId = document.getElementById('att-class').value;
+            const [classId, rawSubject] = document.getElementById('att-class').value.split('|');
+            // Empty subject slot means "whole class register" — pass null so
+            // getAttendance() skips the ?subject_id= query param and the
+            // backend falls back to the full roster.
+            const subjectId = rawSubject && rawSubject !== 'null' ? rawSubject : null;
             const date = document.getElementById('att-date').value;
             const listEl = document.getElementById('att-list');
 
             try {
-                const data = await api.getAttendance(classId, date);
+                // Pass subjectId so elective subject teachers see only their takers,
+                // not the full class roster.
+                const data = await api.getAttendance(classId, date, subjectId);
                 const students = data.students || [];
                 let h = '';
 
@@ -733,7 +763,10 @@ async function renderResults(el, api) {
             const listEl = document.getElementById('res-list');
 
             try {
-                const data = await api.getClassStudents(classId);
+                // Pass subjectId so the backend filters to elective takers only
+                // (e.g. Madam Kaposhi sees her 18 Home Management students,
+                // not the full 29-student Grade 10 A roster).
+                const data = await api.getClassStudents(classId, subjectId);
                 const students = data.students || data || [];
                 let h = '<div class="card"><div class="att-grid">';
 
@@ -2273,28 +2306,105 @@ async function renderProfile(el, api, user) {
 function quizEsc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function quizEscAttr(s) { return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
+function tqSubjectStyle(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('math')) return { cls: 'tsc-math', emoji: '🧮' };
+    if (n.includes('english') || n.includes('language') || n.includes('literacy')) return { cls: 'tsc-eng', emoji: '📖' };
+    if (n.includes('biolog')) return { cls: 'tsc-bio', emoji: '🧬' };
+    if (n.includes('chem')) return { cls: 'tsc-chem', emoji: '⚗️' };
+    if (n.includes('phys')) return { cls: 'tsc-phys', emoji: '⚛️' };
+    if (n.includes('science')) return { cls: 'tsc-sci', emoji: '🔬' };
+    if (n.includes('social') || n.includes('history') || n.includes('geog') || n.includes('civic')) return { cls: 'tsc-soc', emoji: '🌍' };
+    if (n.includes('art') || n.includes('music') || n.includes('creative')) return { cls: 'tsc-art', emoji: '🎨' };
+    if (n.includes('religi')) return { cls: 'tsc-soc', emoji: '🕊️' };
+    if (n.includes('comput') || n.includes('ict')) return { cls: 'tsc-phys', emoji: '💻' };
+    return { cls: 'tsc-other', emoji: '📝' };
+}
+
+function tqInitials(name) {
+    const parts = (name || '').trim().split(/\s+/).slice(0, 2);
+    return parts.map(p => p[0] || '').join('').toUpperCase() || '?';
+}
+
 async function renderQuiz(el, api) {
     try {
         const [quizzes, classes] = await Promise.all([api.getMyQuizzes(), api.getMyClasses()]);
+
+        // Aggregates for the hero
+        const totalQ = quizzes.length;
+        const openQ = quizzes.filter(q => q.status !== 'closed').length;
+        const totalAttempts = quizzes.reduce((s, q) => s + (q.students_attempted || 0), 0);
+        const pcts = quizzes.filter(q => q.average_percentage !== null && q.average_percentage !== undefined).map(q => Number(q.average_percentage));
+        const avgPct = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null;
+
         let html = '<div class="dash-scroll">';
-        html += `<div class="flex-between" style="margin-bottom:12px">
-            <div style="font-size:1rem;font-weight:700">Quizzes</div>
-            <button id="btn-new-quiz" class="btn btn-primary" style="width:auto;padding:8px 14px;font-size:0.72rem">${SVG.plus} New</button></div>`;
-        if (!quizzes.length) {
-            html += '<div class="card"><div class="card-empty">No quizzes yet. Tap “New” to create one.</div></div>';
+        html += `<div class="tq-hero">
+            <div class="tq-hero-row">
+                <div>
+                    <div class="tq-hero-eyebrow">Teaching</div>
+                    <div class="tq-hero-title">My Quizzes</div>
+                    <div class="tq-hero-sub">${totalQ ? 'Track progress, see results, create new quizzes.' : 'Create your first quiz for your class.'}</div>
+                </div>
+                <button id="btn-new-quiz" class="tq-hero-new">${SVG.plus} New Quiz</button>
+            </div>
+            ${totalQ ? `<div class="tq-hero-stats">
+                <div class="tq-hero-stat"><div class="tq-hero-stat-val">${openQ}</div><div class="tq-hero-stat-lbl">Open</div></div>
+                <div class="tq-hero-stat"><div class="tq-hero-stat-val">${totalAttempts}</div><div class="tq-hero-stat-lbl">Attempts</div></div>
+                <div class="tq-hero-stat"><div class="tq-hero-stat-val">${avgPct !== null ? avgPct + '%' : '—'}</div><div class="tq-hero-stat-lbl">Avg Score</div></div>
+            </div>` : ''}
+        </div>`;
+
+        if (!totalQ) {
+            html += `<div class="tq-empty">
+                <div class="tq-empty-emoji">📝</div>
+                <div class="tq-empty-title">No quizzes yet</div>
+                <div>Tap "New Quiz" above to create one.<br>Or pick from the question bank to get started fast.</div>
+            </div>`;
         } else {
-            for (const q of quizzes) {
+            const open = quizzes.filter(q => q.status !== 'closed');
+            const closed = quizzes.filter(q => q.status === 'closed');
+
+            const renderCard = (q) => {
                 const timed = q.time_limit_minutes ? `${q.time_limit_minutes} min` : 'Untimed';
-                const statusBadge = q.status === 'closed' ? '<span class="badge badge-red">Closed</span>' : '<span class="badge badge-green">Open</span>';
-                html += `<div class="card"><div style="padding:12px 14px">
-                    <div class="flex-between"><div class="list-title">${quizEsc(q.title)}</div>${statusBadge}</div>
-                    <div class="list-sub mt-2">${q.class_section || ''}${q.subject ? ' · ' + q.subject : ''} · ${q.num_questions} Q · ${timed}</div>
-                    <div class="text-xs text-gray mt-2">${q.students_attempted} attempted${q.average_percentage !== null ? ' · avg ' + q.average_percentage + '%' : ''}</div>
-                    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-                        <button class="btn btn-outline btn-quiz-results" data-id="${q.id}" style="width:auto;padding:6px 12px;font-size:0.7rem">${SVG.chart} Results</button>
-                        ${q.status !== 'closed' ? `<button class="btn btn-outline btn-quiz-close" data-id="${q.id}" style="width:auto;padding:6px 12px;font-size:0.7rem">Close</button>` : ''}
-                        <button class="btn btn-outline btn-quiz-del" data-id="${q.id}" style="width:auto;padding:6px 12px;font-size:0.7rem;color:var(--red);border-color:var(--red)">Delete</button>
-                    </div></div></div>`;
+                const sub = tqSubjectStyle(q.subject);
+                const isClosed = q.status === 'closed';
+                const avgClass = q.average_percentage === null ? 'muted' : (q.average_percentage >= 50 ? 'good' : 'warn');
+                return `<div class="tq-card ${sub.cls} ${isClosed ? 'closed' : ''}">
+                    <div class="tq-card-accent" style="background:var(--tsc)"></div>
+                    <div class="tq-body">
+                        <div class="tq-top">
+                            <div class="tq-icon" style="background:var(--tsc-bg);color:var(--tsc)">${sub.emoji}</div>
+                            <div class="tq-info">
+                                <div class="tq-title">${quizEsc(q.title)}</div>
+                                <div class="tq-meta">
+                                    ${q.class_section ? `<span style="font-weight:700;color:var(--text)">${quizEsc(q.class_section)}</span><span class="tq-meta-dot"></span>` : ''}
+                                    ${q.subject ? `<span style="color:var(--tsc);font-weight:600">${quizEsc(q.subject)}</span><span class="tq-meta-dot"></span>` : ''}
+                                    <span>${q.num_questions} Q</span><span class="tq-meta-dot"></span><span>${timed}</span>
+                                </div>
+                            </div>
+                            <div class="tq-status ${isClosed ? 'tq-status-closed' : 'tq-status-open'}">${isClosed ? '● Closed' : '● Open'}</div>
+                        </div>
+                        <div class="tq-stats-row">
+                            <div class="tq-stat"><div class="tq-stat-val">${q.students_attempted ?? 0}</div><div class="tq-stat-lbl">Attempts</div></div>
+                            <div class="tq-stat"><div class="tq-stat-val ${avgClass}">${q.average_percentage !== null ? q.average_percentage + '%' : '—'}</div><div class="tq-stat-lbl">Avg</div></div>
+                            <div class="tq-stat"><div class="tq-stat-val muted">${q.total_points}</div><div class="tq-stat-lbl">Points</div></div>
+                        </div>
+                        <div class="tq-actions">
+                            <button class="tq-btn tq-btn-primary btn-quiz-results" data-id="${q.id}">${SVG.chart} Results</button>
+                            ${!isClosed ? `<button class="tq-btn btn-quiz-close" data-id="${q.id}" title="Close quiz">Close</button>` : ''}
+                            <button class="tq-btn tq-btn-danger btn-quiz-del tq-btn-icon" data-id="${q.id}" title="Delete">${SVG.trash || '×'}</button>
+                        </div>
+                    </div>
+                </div>`;
+            };
+
+            if (open.length) {
+                html += `<div class="tq-section-label">Active · ${open.length}</div>`;
+                html += open.map(renderCard).join('');
+            }
+            if (closed.length) {
+                html += `<div class="tq-section-label">Closed · ${closed.length}</div>`;
+                html += closed.map(renderCard).join('');
             }
         }
         html += '</div>';
@@ -2312,7 +2422,7 @@ async function renderQuiz(el, api) {
             b.disabled = true;
             try { await api.deleteQuiz(b.dataset.id); renderQuiz(el, api); } catch (e) { alert(e.message); b.disabled = false; }
         }));
-    } catch (err) { el.innerHTML = `<div class="dash-scroll card-empty">${err.message}</div>`; }
+    } catch (err) { el.innerHTML = `<div class="dash-scroll"><div class="tq-empty"><div class="tq-empty-emoji">⚠️</div><div class="tq-empty-title">${quizEsc(err.message)}</div></div></div>`; }
 }
 
 function showNewQuizModal(api, pageEl, classes) {
@@ -2328,9 +2438,9 @@ function showNewQuizModal(api, pageEl, classes) {
     let questions = [newQuestion('mcq')];
 
     modal.innerHTML = `<div class="modal" style="max-height:88vh;overflow-y:auto">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-            <div class="list-title" style="font-size:0.95rem">Create Quiz</div>
-            <button id="close-quiz" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text3)">&times;</button>
+        <div class="modal-header">
+            <div class="modal-header-title">📝 Create Quiz</div>
+            <button id="close-quiz" class="modal-header-close">&times;</button>
         </div>
         <div class="form-group"><label class="form-label">Title</label><input type="text" id="quiz-title" class="form-input" placeholder="e.g. Week 3 Maths Quiz" style="padding:10px 12px"></div>
         <div class="form-group"><label class="form-label">Class & Subject</label>
@@ -2369,9 +2479,10 @@ function showNewQuizModal(api, pageEl, classes) {
                 <input type="text" class="form-input q-opt" data-qi="${qi}" data-oi="${oi}" value="${quizEscAttr(o.text)}" placeholder="Option ${oi + 1}" style="padding:7px 9px;font-size:0.8rem;flex:1">
                 ${q.options.length > 2 ? `<button class="q-opt-del" data-qi="${qi}" data-oi="${oi}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem">&times;</button>` : ''}</div>`;
         }).join('');
-        return `<div class="card" style="padding:12px;margin-bottom:8px;background:#f8fafc">
-            <div class="flex-between" style="margin-bottom:6px"><span class="text-xs bold">Question ${qi + 1}</span>
-                ${questions.length > 1 ? `<button class="q-del" data-qi="${qi}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.72rem">Remove</button>` : ''}</div>
+        return `<div class="tq-q-card">
+            <div class="tq-q-card-head">
+                <span class="tq-q-num"><span class="tq-q-num-badge">${qi + 1}</span> Question</span>
+                ${questions.length > 1 ? `<button class="q-del tq-q-remove" data-qi="${qi}">Remove</button>` : ''}</div>
             <textarea class="form-input q-text" data-qi="${qi}" rows="2" placeholder="Enter the question..." style="padding:8px;font-size:0.82rem;resize:vertical;font-family:inherit;margin-bottom:6px">${quizEsc(q.text)}</textarea>
             <div style="display:flex;gap:8px;margin-bottom:6px">
                 <select class="form-input q-type" data-qi="${qi}" style="padding:7px 9px;font-size:0.8rem;flex:1">
@@ -2470,22 +2581,147 @@ function showNewQuizModal(api, pageEl, classes) {
 async function showQuizResults(api, pageEl, quizId) {
     try {
         const data = await api.getQuizResults(quizId);
+        const passed = data.results.filter(r => r.best_percentage !== null && r.best_percentage >= 50).length;
+        const failed = data.results.filter(r => r.best_percentage !== null && r.best_percentage < 50).length;
+        const notDone = data.class_size - data.students_attempted;
+        const topScore = data.results.reduce((max, r) => r.best_percentage !== null && r.best_percentage > max ? r.best_percentage : max, 0);
+
+        const renderRows = (filter) => {
+            let rows = data.results;
+            if (filter === 'attempted') rows = rows.filter(r => r.best_percentage !== null);
+            else if (filter === 'pending') rows = rows.filter(r => r.best_percentage === null);
+            else if (filter === 'fail') rows = rows.filter(r => r.best_percentage !== null && r.best_percentage < 50);
+            if (!rows.length) return `<div class="tq-empty" style="padding:20px"><div style="font-size:0.78rem">No students in this view.</div></div>`;
+            return rows.map(r => {
+                const hasScore = r.best_percentage !== null;
+                const pass = hasScore && r.best_percentage >= 50;
+                const hist = Array.isArray(r.history) ? r.history : [];
+                const histRows = hist.map((a, i) => {
+                    const pctCls = a.percentage === null ? '' : (a.percentage >= 50 ? 'good' : 'warn');
+                    const num = hist.length - i;
+                    return `<div class="tq-hist-row">
+                        <div class="tq-hist-num">${num}</div>
+                        <div class="tq-hist-main">
+                            <div class="tq-hist-date">${a.submitted_at || ''}</div>
+                            <div class="tq-hist-meta">
+                                <span>${a.score ?? 0} / ${a.total_points} pts</span>
+                                ${a.is_best ? '<span class="tq-hist-best">★ Best</span>' : ''}
+                                ${a.auto_submitted ? '<span class="tq-hist-auto">⏱ Auto</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="tq-hist-pct ${pctCls}">${a.percentage !== null ? a.percentage + '%' : '—'}</div>
+                    </div>`;
+                }).join('');
+
+                const sub = hasScore
+                    ? `${r.best_score}/${data.total_points} · ${r.attempts} attempt${r.attempts > 1 ? 's' : ''}${r.last_attempt ? ' · ' + r.last_attempt : ''}`
+                    : 'Not attempted yet';
+                const expandable = hist.length > 0;
+                return `<div class="tq-student-wrap" data-expandable="${expandable ? '1' : '0'}">
+                    <div class="tq-student">
+                        <div class="tq-student-avatar">${tqInitials(r.name)}</div>
+                        <div class="tq-student-info">
+                            <div class="tq-student-name">${quizEsc(r.name)}</div>
+                            <div class="tq-student-sub">${sub}${expandable ? ' <span class="tq-hist-chev">▾</span>' : ''}</div>
+                        </div>
+                        <div class="tq-student-score">
+                            <span class="tq-score-pct ${hasScore ? (pass ? 'good' : 'warn') : 'muted'}">${hasScore ? r.best_percentage + '%' : '—'}</span>
+                        </div>
+                    </div>
+                    ${expandable ? `<div class="tq-hist" style="display:none">${histRows}</div>` : ''}
+                </div>`;
+            }).join('');
+        };
+
+        const wireRows = () => {
+            pageEl.querySelectorAll('.tq-student-wrap[data-expandable="1"] .tq-student').forEach(row => {
+                row.addEventListener('click', () => {
+                    const wrap = row.closest('.tq-student-wrap');
+                    const panel = wrap.querySelector('.tq-hist');
+                    if (!panel) return;
+                    const open = panel.style.display !== 'none';
+                    panel.style.display = open ? 'none' : 'block';
+                    wrap.classList.toggle('open', !open);
+                });
+            });
+        };
+
         let html = '<div class="dash-scroll">';
-        html += `<button id="quiz-back" class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:0.7rem;margin-bottom:10px">← Back</button>`;
-        html += `<div style="font-size:1rem;font-weight:700">${quizEsc(data.title)}</div>`;
-        html += `<div class="text-xs text-gray" style="margin-bottom:12px">${data.students_attempted}/${data.class_size} attempted${data.average_percentage !== null ? ' · class avg ' + data.average_percentage + '%' : ''}</div>`;
-        for (const r of data.results) {
-            const badge = r.best_percentage !== null
-                ? `<span class="badge ${r.best_percentage >= 50 ? 'badge-green' : 'badge-red'}">${r.best_percentage}%</span>`
-                : '<span class="badge badge-amber">Not attempted</span>';
-            html += `<div class="card"><div style="padding:10px 14px" class="flex-between">
-                <div><div class="list-title">${quizEsc(r.name)}</div>${r.attempts ? `<div class="list-sub">${r.best_score}/${data.total_points} · ${r.attempts} attempt${r.attempts > 1 ? 's' : ''} · ${r.last_attempt || ''}</div>` : ''}</div>
-                ${badge}</div></div>`;
-        }
+        html += `<button id="quiz-back" class="tq-btn" style="margin-bottom:10px">← Back</button>`;
+        html += `<div class="tq-results-hero">
+            <div class="tq-results-title">${quizEsc(data.title)}</div>
+            <div class="tq-results-sub">${data.students_attempted} of ${data.class_size} attempted · ${data.total_points} pts total</div>
+            <div class="tq-results-stats">
+                <div class="tq-results-stat"><div class="tq-results-stat-val">${data.average_percentage !== null ? data.average_percentage + '%' : '—'}</div><div class="tq-results-stat-lbl">Class Avg</div></div>
+                <div class="tq-results-stat"><div class="tq-results-stat-val">${topScore || '—'}${topScore ? '%' : ''}</div><div class="tq-results-stat-lbl">Top Score</div></div>
+                <div class="tq-results-stat"><div class="tq-results-stat-val">${passed}</div><div class="tq-results-stat-lbl">Passed</div></div>
+                <div class="tq-results-stat"><div class="tq-results-stat-val">${notDone}</div><div class="tq-results-stat-lbl">Pending</div></div>
+            </div>
+        </div>`;
+        // ─ Class Summary chart (distribution + per-question) ─
+        const dist = Array.isArray(data.distribution) ? data.distribution : [];
+        const qstats = Array.isArray(data.question_stats) ? data.question_stats : [];
+        const maxBucket = Math.max(1, ...dist.map(b => b.count || 0));
+        const distHtml = dist.length
+            ? dist.map((b, i) => `<div class="tq-dist-row ${(b.count || 0) === 0 ? 'tq-dist-zero' : ''}">
+                <div class="tq-dist-lbl">${b.label}</div>
+                <div class="tq-dist-track"><div class="tq-dist-fill b${i}" style="width:${((b.count || 0) / maxBucket) * 100}%"></div></div>
+                <div class="tq-dist-count">${b.count || 0}</div>
+            </div>`).join('')
+            : '<div class="tq-chart-empty">No attempts yet.</div>';
+        const pctClass = (p) => p >= 75 ? 'good' : (p >= 50 ? 'ok' : 'warn');
+        const qstatsHtml = qstats.length
+            ? qstats.map(q => `<div class="tq-qstat">
+                <div class="tq-qstat-head">
+                    <div class="tq-qstat-text"><b>Q${q.position}.</b>${quizEsc(q.text)}</div>
+                    <div class="tq-qstat-pct ${pctClass(q.pct_correct)}">${q.pct_correct}%</div>
+                </div>
+                <div class="tq-qstat-bar"><div class="tq-qstat-bar-fill ${pctClass(q.pct_correct)}" style="width:${q.pct_correct}%"></div></div>
+                <div class="tq-qstat-meta">${q.correct} of ${q.total} got it right${q.unanswered ? ' · ' + q.unanswered + ' skipped' : ''} · ${q.points} pt${q.points > 1 ? 's' : ''}</div>
+            </div>`).join('')
+            : '<div class="tq-chart-empty">No attempts yet — chart appears once pupils submit.</div>';
+
+        html += `<div class="tq-chart">
+            <div class="tq-chart-head">
+                <div class="tq-chart-title">📊 Class Summary</div>
+                <div class="tq-chart-tab">
+                    <button class="tq-chart-tab-btn active" data-view="dist">Distribution</button>
+                    <button class="tq-chart-tab-btn" data-view="qs">By Question</button>
+                </div>
+            </div>
+            <div id="tq-chart-dist">${distHtml}</div>
+            <div id="tq-chart-qs" style="display:none">${qstatsHtml}</div>
+        </div>`;
+
+        html += `<div class="tq-filter">
+            <button class="tq-filter-btn active" data-filter="all">All · ${data.class_size}</button>
+            <button class="tq-filter-btn" data-filter="attempted">Done · ${data.students_attempted}</button>
+            <button class="tq-filter-btn" data-filter="fail">Failed · ${failed}</button>
+            <button class="tq-filter-btn" data-filter="pending">Pending · ${notDone}</button>
+        </div>`;
+        html += `<div id="tq-rows">${renderRows('all')}</div>`;
         html += '</div>';
         pageEl.innerHTML = html;
+
         document.getElementById('quiz-back').addEventListener('click', () => renderQuiz(pageEl, api));
-    } catch (err) { pageEl.innerHTML = `<div class="dash-scroll card-empty">${err.message}</div>`; }
+        const distPanel = document.getElementById('tq-chart-dist');
+        const qsPanel = document.getElementById('tq-chart-qs');
+        pageEl.querySelectorAll('.tq-chart-tab-btn').forEach(b => b.addEventListener('click', () => {
+            pageEl.querySelectorAll('.tq-chart-tab-btn').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            const showDist = b.dataset.view === 'dist';
+            if (distPanel) distPanel.style.display = showDist ? '' : 'none';
+            if (qsPanel) qsPanel.style.display = showDist ? 'none' : '';
+        }));
+        wireRows();
+        const rowsEl = document.getElementById('tq-rows');
+        pageEl.querySelectorAll('.tq-filter-btn').forEach(b => b.addEventListener('click', () => {
+            pageEl.querySelectorAll('.tq-filter-btn').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            rowsEl.innerHTML = renderRows(b.dataset.filter);
+            wireRows();
+        }));
+    } catch (err) { pageEl.innerHTML = `<div class="dash-scroll"><div class="tq-empty"><div class="tq-empty-emoji">⚠️</div><div class="tq-empty-title">${quizEsc(err.message)}</div></div></div>`; }
 }
 
 // ─── QUESTION BANK (teacher) ───

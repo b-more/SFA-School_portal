@@ -259,7 +259,7 @@ class TeacherApiController extends Controller
             ->unique(fn($t) => $t->class_section_id . '|' . $t->subject_id)
             ->values();
 
-        return response()->json($teachings->map(function ($t) use ($teacher, $yearId) {
+        $subjectRows = $teachings->map(function ($t) use ($teacher, $yearId) {
             $isMine = (int) $t->teacher_id === (int) $teacher->id;
             $assignedName = null;
             if (!$isMine && $t->teacher) {
@@ -286,7 +286,49 @@ class TeacherApiController extends Controller
                 'assignment' => $isMine ? 'you' : ($t->teacher ? 'colleague' : 'unassigned'),
                 'assigned_teacher_name' => $assignedName,
             ];
-        })->values());
+        })->values();
+
+        // Whole-class register rows (subject_id = null) for every section the
+        // teacher personally oversees:
+        //   · homeroom (class teacher pointer, both sources)
+        //   · every section in the teacher's grade if she is grade teacher
+        // These sit ABOVE the subject-fragmented rows so the class/grade
+        // teacher has an unambiguous "mark the register" option.
+        $registerSectionIds = collect();
+        if ($teacher->is_class_teacher && $teacher->class_section_id) {
+            $registerSectionIds->push((int) $teacher->class_section_id);
+        }
+        $registerSectionIds = $registerSectionIds->merge(
+            ClassSection::where('class_teacher_id', $teacher->id)->pluck('id')
+        );
+        if ($teacher->is_grade_teacher && $teacher->grade_id) {
+            $registerSectionIds = $registerSectionIds->merge(
+                ClassSection::where('grade_id', $teacher->grade_id)->pluck('id')
+            );
+        }
+        $registerSectionIds = $registerSectionIds->unique()->values();
+
+        $registerRows = $registerSectionIds->isEmpty()
+            ? collect()
+            : ClassSection::with('grade')->whereIn('id', $registerSectionIds)->get()->map(function ($cs) {
+                $count = Student::where('class_section_id', $cs->id)
+                    ->where('enrollment_status', 'active')
+                    ->count();
+                return [
+                    'id'                    => 'register-' . $cs->id,
+                    'class_section_id'      => $cs->id,
+                    'subject_id'            => null,
+                    'grade_id'              => $cs->grade_id,
+                    'subject'               => 'Class Register',
+                    'grade'                 => $cs->grade?->name,
+                    'class_section'         => $cs->name,
+                    'student_count'         => $count,
+                    'assignment'            => 'you',
+                    'assigned_teacher_name' => null,
+                ];
+            });
+
+        return response()->json($registerRows->concat($subjectRows)->values());
     }
 
     public function classStudents($classSectionId, Request $request)
