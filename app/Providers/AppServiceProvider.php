@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\ClinicVisit;
 use App\Models\Employee;
 use App\Models\Event;
 use App\Models\HomeworkSubmission;
@@ -10,6 +11,7 @@ use App\Models\Student;
 use App\Models\StudentFee;
 use App\Models\ClassSection;
 use App\Observers\ClassSectionObserver;
+use App\Observers\ClinicVisitObserver;
 use App\Observers\EmployeeObserver;
 use App\Observers\EventObserver;
 use App\Observers\HomeworkSubmissionObserver;
@@ -86,6 +88,11 @@ class AppServiceProvider extends ServiceProvider
         // Keep the class-teacher pointer in sync on both sides
         // (class_sections.class_teacher_id ↔ teachers.class_section_id).
         ClassSection::observe(ClassSectionObserver::class);
+
+        // Every edit to a clinic visit writes a field-level diff to
+        // audit_logs so the medical trail is preserved when the Clinician
+        // corrects a record after the fact.
+        ClinicVisit::observe(ClinicVisitObserver::class);
 
         // Login trail — write every auth event (login / logout / failed
         // login / lockout / password reset) into audit_logs so we always

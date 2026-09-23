@@ -30,19 +30,19 @@ class EditClinicVisit extends EditRecord
         return $data;
     }
 
-    // Only the recording clinician can edit their own visits within 48 hours;
-    // after that (or for anyone else), Admin must open the record.
+    // Any active Clinician or Admin can edit any visit at any time. Every
+    // change is audit-logged by App\Observers\ClinicVisitObserver, so a
+    // correction is never lost — the original values and the actor stay on
+    // record. See /admin/clinic-audit-trail for the trail.
     protected function beforeFill(): void
     {
         $user = auth()->user();
-        $isAdmin = $user?->role_id === RoleConstants::ADMIN;
-        $isRecorder = $this->record->recorded_by === $user?->id;
-        $withinWindow = $this->record->created_at && $this->record->created_at->gt(now()->subHours(48));
+        $allowed = in_array($user?->role_id, [RoleConstants::ADMIN, RoleConstants::CLINICIAN], true);
 
-        if (! $isAdmin && ! ($isRecorder && $withinWindow)) {
+        if (! $allowed) {
             Notification::make()
                 ->title('Edit locked')
-                ->body('This visit is older than 48 hours. Ask an Admin to make the correction.')
+                ->body('Only the Clinician or an Admin can edit medical records.')
                 ->warning()->persistent()->send();
             $this->halt();
         }
