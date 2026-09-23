@@ -37,8 +37,11 @@ class PayrollResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        if (auth()->user()?->isFinanceLocked()) return false;
-        return auth()->user()?->role_id === RoleConstants::ADMIN ?? false;
+        $u = auth()->user();
+        if (! $u) return false;
+        if ($u->isFinanceLocked()) return false;
+        // Payroll is finance work — Accountant runs it, Admin oversees.
+        return in_array($u->role_id, [RoleConstants::ADMIN, RoleConstants::ACCOUNTANT], true);
     }
 
     public static function form(Form $form): Form
