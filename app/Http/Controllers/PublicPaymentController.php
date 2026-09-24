@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Student;
 use App\Models\StudentFee;
 use App\Models\QrPayment;
+use App\Models\SchoolSettings;
 use App\Services\CGrateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -12,10 +13,22 @@ use Illuminate\Support\Str;
 class PublicPaymentController extends Controller
 {
     /**
+     * Whether online payments are currently enabled (admin-controlled).
+     */
+    protected function paymentsEnabled(): bool
+    {
+        return (bool) SchoolSettings::get('enable_online_payments', false);
+    }
+
+    /**
      * Show the payment form
      */
     public function index()
     {
+        if (! $this->paymentsEnabled()) {
+            return response()->view('payment.unavailable');
+        }
+
         return view('payment.index');
     }
 
@@ -24,6 +37,13 @@ class PublicPaymentController extends Controller
      */
     public function searchStudent(Request $request)
     {
+        if (! $this->paymentsEnabled()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Online payments are temporarily unavailable. Please contact the school office.',
+            ], 503);
+        }
+
         $search = $request->input('search');
 
         $student = Student::with(['grade', 'parentGuardian'])
@@ -83,6 +103,13 @@ class PublicPaymentController extends Controller
      */
     public function processPayment(Request $request)
     {
+        if (! $this->paymentsEnabled()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Online payments are temporarily unavailable. Please contact the school office.',
+            ], 503);
+        }
+
         $request->validate([
             'student_id' => 'required|exists:students,id',
             'amount' => 'required|numeric|min:1',
@@ -118,7 +145,7 @@ class PublicPaymentController extends Controller
         if ($result['success']) {
             $qrPayment->update([
                 'status' => 'processing',
-                'cgrate_payment_id' => $result['paymentId'] ?? null,
+                'cgrate_payment_id' => $result['paymentID'] ?? $result['paymentId'] ?? null,
                 'response_message' => $result['message'] ?? 'Payment initiated',
                 'response_code' => $result['responseCode'] ?? null,
             ]);
@@ -148,6 +175,13 @@ class PublicPaymentController extends Controller
      */
     public function checkPaymentStatus(Request $request)
     {
+        if (! $this->paymentsEnabled()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Online payments are temporarily unavailable. Please contact the school office.',
+            ], 503);
+        }
+
         $paymentId = $request->input('payment_id');
 
         $qrPayment = QrPayment::findOrFail($paymentId);

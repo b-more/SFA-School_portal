@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ClassSection;
 use App\Models\Quiz;
+use App\Models\QuizAnswer;
 use App\Models\QuizAttempt;
 use App\Models\Student;
 use App\Models\Teacher;
@@ -196,9 +197,19 @@ class TeacherQuizController extends Controller
         $rows = $students->map(function ($s) use ($byStudent) {
             $list = $byStudent->get($s->id);
             if (!$list) {
-                return ['student_id' => $s->id, 'name' => $s->name, 'attempts' => 0, 'best_score' => null, 'best_percentage' => null, 'last_attempt' => null];
+                return ['student_id' => $s->id, 'name' => $s->name, 'attempts' => 0, 'best_score' => null, 'best_percentage' => null, 'last_attempt' => null, 'history' => []];
             }
             $best = $list->sortByDesc('percentage')->first();
+            $bestId = $best->id;
+            $history = $list->sortByDesc('submitted_at')->take(20)->map(fn ($a) => [
+                'id' => $a->id,
+                'score' => $a->score !== null ? (float) $a->score : null,
+                'total_points' => (int) $a->total_points,
+                'percentage' => $a->percentage !== null ? (float) $a->percentage : null,
+                'submitted_at' => $a->submitted_at?->format('d M Y H:i'),
+                'auto_submitted' => (bool) $a->auto_submitted,
+                'is_best' => $a->id === $bestId,
+            ])->values();
             return [
                 'student_id' => $s->id,
                 'name' => $s->name,
@@ -206,10 +217,51 @@ class TeacherQuizController extends Controller
                 'best_score' => $best->score,
                 'best_percentage' => $best->percentage,
                 'last_attempt' => $list->sortByDesc('submitted_at')->first()?->submitted_at?->format('d M Y H:i'),
+                'history' => $history,
             ];
         });
 
         $attemptedPct = $rows->whereNotNull('best_percentage')->pluck('best_percentage');
+
+        // Score distribution (each student counted once, based on best attempt)
+        $distribution = [
+            ['label' => '0-25%', 'min' => 0, 'max' => 25, 'count' => 0],
+            ['label' => '25-50%', 'min' => 25, 'max' => 50, 'count' => 0],
+            ['label' => '50-75%', 'min' => 50, 'max' => 75, 'count' => 0],
+            ['label' => '75-100%', 'min' => 75, 'max' => 100, 'count' => 0],
+        ];
+        foreach ($attemptedPct as $p) {
+            $p = (float) $p;
+            if ($p < 25) $distribution[0]['count']++;
+            elseif ($p < 50) $distribution[1]['count']++;
+            elseif ($p < 75) $distribution[2]['count']++;
+            else $distribution[3]['count']++;
+        }
+
+        // Per-question accuracy across each student's best attempt
+        $bestPerStudent = $attempts->groupBy('student_id')->map(fn ($list) => $list->sortByDesc('percentage')->first());
+        $bestAttemptIds = $bestPerStudent->pluck('id');
+        $questionStats = [];
+        if ($bestAttemptIds->isNotEmpty()) {
+            $quiz->load('questions');
+            $answers = QuizAnswer::whereIn('quiz_attempt_id', $bestAttemptIds)->get()->groupBy('quiz_question_id');
+            $studentsAttempted = $bestPerStudent->count();
+            foreach ($quiz->questions as $i => $q) {
+                $rowsForQ = $answers->get($q->id, collect());
+                $correct = $rowsForQ->where('is_correct', true)->count();
+                $unanswered = $rowsForQ->whereNull('selected_option_id')->count();
+                $questionStats[] = [
+                    'question_id' => $q->id,
+                    'position' => $i + 1,
+                    'text' => $q->question_text,
+                    'points' => (int) $q->points,
+                    'correct' => $correct,
+                    'unanswered' => $unanswered,
+                    'total' => $studentsAttempted,
+                    'pct_correct' => $studentsAttempted ? (int) round($correct / $studentsAttempted * 100) : 0,
+                ];
+            }
+        }
 
         return response()->json([
             'title' => $quiz->title,
@@ -217,6 +269,8 @@ class TeacherQuizController extends Controller
             'class_size' => $students->count(),
             'students_attempted' => $attemptedPct->count(),
             'average_percentage' => $attemptedPct->count() ? round($attemptedPct->avg(), 1) : null,
+            'distribution' => $distribution,
+            'question_stats' => $questionStats,
             'results' => $rows->values(),
         ]);
     }

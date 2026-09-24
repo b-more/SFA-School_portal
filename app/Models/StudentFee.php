@@ -14,6 +14,9 @@ class StudentFee extends Model
     protected $fillable = [
         'student_id',
         'fee_structure_id',
+        'fee_category_id',
+        'period_label',
+        'catalogue_item_id',
         'academic_year_id',
         'term_id',
         'grade_id',
@@ -95,6 +98,16 @@ class StudentFee extends Model
     /**
      * Get the fee structure associated with the fee.
      */
+    public function feeCategory(): BelongsTo
+    {
+        return $this->belongsTo(FeeCategory::class, 'fee_category_id');
+    }
+
+    public function catalogueItem(): BelongsTo
+    {
+        return $this->belongsTo(FeeCatalogueItem::class, 'catalogue_item_id');
+    }
+
     public function feeStructure(): BelongsTo
     {
         return $this->belongsTo(FeeStructure::class);

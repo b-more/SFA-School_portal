@@ -48,11 +48,18 @@ class Api {
 
     // Classes
     getMyClasses() { return this.get('/my-classes'); }
-    getClassStudents(classSectionId) { return this.get(`/class/${classSectionId}/students`); }
+    getClassStudents(classSectionId, subjectId = null) {
+        const qs = subjectId ? `?subject_id=${subjectId}` : '';
+        return this.get(`/class/${classSectionId}/students${qs}`);
+    }
 
     // Attendance
     markAttendance(data) { return this.post('/attendance/mark', data); }
-    getAttendance(classSectionId, date) { return this.get(`/attendance/${classSectionId}?date=${date || new Date().toISOString().split('T')[0]}`); }
+    getAttendance(classSectionId, date, subjectId = null) {
+        const d = date || new Date().toISOString().split('T')[0];
+        const sj = subjectId ? `&subject_id=${subjectId}` : '';
+        return this.get(`/attendance/${classSectionId}?date=${d}${sj}`);
+    }
 
     // Homework
     getMyHomework() { return this.get('/homework'); }

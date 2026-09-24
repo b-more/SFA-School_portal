@@ -21,6 +21,10 @@ class QrPayment extends Model
         'initiated_at',
         'completed_at',
         'expires_at',
+        'payment_kind',
+        'channel',
+        'period_label',
+        'bus_fare_structure_id',
     ];
 
     protected $casts = [

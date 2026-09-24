@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\SchoolSettings;
 use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -26,16 +27,21 @@ class CGrateService
 
     public function __construct()
     {
-        $this->soapUrl = env('CGRATE_SOAP_URL', 'https://543.cgrate.co.zm/Konik/KonikWs');
-        $this->username = env('CGRATE_USERNAME', '1751463093895');
-        $this->password = env('CGRATE_PASSWORD', 'D6cQ21d0');
-        $this->timeout = (int) env('CGRATE_TIMEOUT', 30);
+        // Credentials live in the encrypted school_settings store, managed from
+        // Admin → School Settings → Fees & Payments. No secrets in code or .env.
+        $settings = SchoolSettings::getInstance();
+
+        $this->soapUrl = $settings->cgrate_soap_url ?: 'https://543.cgrate.co.zm/Konik/KonikWs';
+        $this->username = (string) ($settings->cgrate_username ?? '');
+        $this->password = (string) ($settings->cgrate_password ?? '');
+        $this->timeout = (int) ($settings->cgrate_timeout ?: 30);
         $this->retryAttempts = (int) env('CGRATE_RETRY_ATTEMPTS', 3);
-        $this->mockMode = env('CGRATE_MOCK_MODE', false);
+        $this->mockMode = (bool) env('CGRATE_MOCK_MODE', false);
 
         Log::info('CGrate service initialized', [
             'mode' => $this->mockMode ? 'mock' : 'live',
             'url' => $this->soapUrl,
+            'configured' => $this->username !== '' && $this->password !== '',
         ]);
     }
 

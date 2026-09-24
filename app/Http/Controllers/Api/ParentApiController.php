@@ -240,11 +240,50 @@ class ParentApiController extends Controller
             ];
         });
 
+        // Categorized breakdown across all fee categories (tuition + bus + annual + ad-hoc).
+        // Grouped by category, with one item per period_label, oldest first.
+        $allFees = StudentFee::with('feeCategory')
+            ->where('student_id', $student->id)
+            ->orderBy('created_at')
+            ->get();
+
+        $byCategory = $allFees->groupBy('fee_category_id');
+        $categories = [];
+        foreach ($byCategory as $catId => $rows) {
+            $cat = $rows->first()->feeCategory;
+            if (! $cat) {
+                continue;
+            }
+            $items = $rows->map(function ($f) use ($student) {
+                $amount = (float) $f->amount_paid + (float) $f->balance;
+                return [
+                    'id'      => $f->id,
+                    'period'  => $f->period_label,
+                    'amount'  => $amount,
+                    'paid'    => (float) $f->amount_paid,
+                    'balance' => (float) $f->balance,
+                    'status'  => $f->payment_status,
+                    'receipt_url' => '/portal/student-fees/' . $f->id . '/receipt/pdf',
+                ];
+            })->values();
+            $categories[] = [
+                'code'     => $cat->code,
+                'name'     => $cat->name,
+                'subtotal_due'     => $rows->sum(fn ($f) => (float) $f->amount_paid + (float) $f->balance),
+                'subtotal_paid'    => $rows->sum('amount_paid'),
+                'subtotal_balance' => $rows->sum('balance'),
+                'items'    => $items,
+            ];
+        }
+
         return response()->json([
-            'terms' => $termData,
+            'terms' => $termData,                 // back-compat (tuition-only per-term view)
+            'categories' => $categories,          // new categorized breakdown
             'total_tuition' => $termData->sum('tuition_fee'),
-            'total_paid' => $termData->sum('amount_paid'),
-            'total_balance' => $termData->sum('balance'),
+            'total_paid' => $allFees->sum('amount_paid'),
+            'total_balance' => $allFees->sum('balance'),
+            // Single source of truth — same threshold-aware rule the PDF gate uses.
+            'is_locked' => $student->hasArrears(),
             'statement_url' => '/portal/payment-statement/student/' . $student->id,
         ]);
     }
@@ -927,6 +966,13 @@ class ParentApiController extends Controller
     // Mobile Money Payment
     public function initiatePayment(Request $request, Student $student)
     {
+        if (! (bool) SchoolSettings::get('enable_online_payments', false)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Online payments are temporarily unavailable. Please contact the school office.',
+            ], 503);
+        }
+
         $this->validateChild($student);
 
         $request->validate([
@@ -934,132 +980,179 @@ class ParentApiController extends Controller
             'mobile_number' => 'required|string|min:10|max:13',
         ]);
 
-        $activeYear = AcademicYear::where('is_active', true)->first();
-        $activeTerm = Term::where('is_active', true)->first();
+        // Delegate the initiation body to a shared service so the WhatsApp
+        // bot's /api/bot/pay endpoint goes through the same DB writes,
+        // CGrate call, and status transitions.
+        $result = app(\App\Services\PaymentInitiationService::class)->initiate(
+            student: $student,
+            amount: (float) $request->amount,
+            payerMsisdn: (string) $request->mobile_number,
+            channel: 'parent_app',
+            referencePrefix: 'PAR'
+        );
 
-        // Calculate outstanding balance
-        $fees = StudentFee::where('student_id', $student->id)
-            ->where('balance', '>', 0)
-            ->with('feeStructure')
-            ->get();
-
-        $totalBalance = $fees->sum('balance');
-        $amount = (float) $request->amount;
-
-        if ($totalBalance <= 0) {
-            return response()->json(['message' => 'No outstanding balance for this student.'], 422);
+        $payload = [
+            'success' => $result['success'],
+            'message' => $result['message'],
+        ];
+        if (isset($result['payment_reference'])) {
+            $payload['payment_reference'] = $result['payment_reference'];
+        }
+        if (isset($result['payment_id'])) {
+            $payload['payment_id'] = $result['payment_id'];
+        }
+        if (isset($result['amount'])) {
+            $payload['amount'] = $result['amount'];
+        }
+        if (! empty($result['is_delayed'])) {
+            $payload['is_delayed'] = true;
         }
 
-        if ($amount > $totalBalance) {
-            return response()->json(['message' => "Amount exceeds outstanding balance of K {$totalBalance}."], 422);
+        return response()->json($payload, $result['success'] ? 200 : 422);
+    }
+
+    /**
+     * Public-ish list of active bus routes so the parent app can show a picker.
+     */
+    public function busRoutes()
+    {
+        $rows = \App\Models\BusFareStructure::where('is_active', true)
+            ->orderBy('route_name')
+            ->get(['id', 'route_name', 'monthly_amount']);
+
+        return response()->json([
+            'routes' => $rows->map(fn ($r) => [
+                'id'             => $r->id,
+                'name'           => $r->route_name,
+                'monthly_amount' => (float) $r->monthly_amount,
+            ]),
+        ]);
+    }
+
+    /**
+     * Pay-as-you-go bus fare for a specific month + route. Does not create a debt:
+     * a Bus StudentFee row (and a legacy BusPayment row) is created (fully paid)
+     * only after CGrate confirms.
+     */
+    public function payBusFare(Request $request, Student $student)
+    {
+        if (! (bool) SchoolSettings::get('enable_online_payments', false)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Online payments are temporarily unavailable. Please contact the school office.',
+            ], 503);
         }
 
-        // Generate unique payment reference
-        $paymentReference = 'PAR-' . strtoupper(Str::random(10));
+        $this->validateChild($student);
 
-        // Find the student fee to link
-        $studentFee = StudentFee::where('student_id', $student->id)
-            ->where('balance', '>', 0)
-            ->orderBy('created_at', 'asc')
-            ->first();
-
-        // Create QR payment record
-        $qrPayment = QrPayment::create([
-            'qr_code' => QrPayment::generateQrCode($paymentReference, $amount, $request->mobile_number),
-            'payment_reference' => $paymentReference,
-            'amount' => $amount,
-            'customer_mobile' => $request->mobile_number,
-            'student_id' => $student->id,
-            'student_fee_id' => $studentFee?->id,
-            'status' => 'pending',
-            'initiated_at' => now(),
-            'expires_at' => now()->addHours(24),
+        $request->validate([
+            'mobile_number'         => 'required|string|min:10|max:13',
+            'month'                 => 'required|date_format:Y-m',
+            'bus_fare_structure_id' => 'nullable|integer|exists:bus_fare_structures,id',
         ]);
 
-        // Initiate CGrate payment — single attempt, unique reference per try
-        $cgrateService = new CGrateService();
-        $result = null;
+        $busCategory = \App\Models\FeeCategory::where('code', \App\Models\FeeCategory::BUS)->first();
+        if (! $busCategory) {
+            return response()->json(['success' => false, 'message' => 'Bus fee category is not configured.'], 500);
+        }
 
+        // Amount comes from the chosen route; falls back to category default.
+        $route  = $request->bus_fare_structure_id
+            ? \App\Models\BusFareStructure::find($request->bus_fare_structure_id)
+            : null;
+        $amount = (float) ($route?->monthly_amount ?: $busCategory->default_amount ?: 500);
+
+        $monthFull = \Carbon\Carbon::createFromFormat('Y-m', $request->month)->format('F Y');
+        $period    = $route ? "{$monthFull} — {$route->route_name}" : $monthFull;
+
+        // Idempotency — already paid for this route + month? Block early so the
+        // parent isn't double-charged for the same month's boarding on the same route.
+        $alreadyPaid = \App\Models\StudentFee::where('student_id', $student->id)
+            ->where('fee_category_id', $busCategory->id)
+            ->where('period_label', $period)
+            ->where('payment_status', 'paid')
+            ->exists();
+        if ($alreadyPaid) {
+            return response()->json([
+                'success' => false,
+                'message' => "Bus fare for {$student->name} for {$period} is already paid.",
+            ], 422);
+        }
+
+        $paymentReference = 'BUS-' . strtoupper(Str::random(10));
+
+        $qrPayment = QrPayment::create([
+            'qr_code'               => QrPayment::generateQrCode($paymentReference, $amount, $request->mobile_number),
+            'payment_reference'     => $paymentReference,
+            'amount'                => $amount,
+            'customer_mobile'       => $request->mobile_number,
+            'student_id'            => $student->id,
+            'status'                => 'pending',
+            'initiated_at'          => now(),
+            'expires_at'            => now()->addHours(24),
+            'payment_kind'          => 'bus_month',
+            'period_label'          => $period,
+            'bus_fare_structure_id' => $route?->id,
+        ]);
+
+        $cgrateService = new CGrateService();
         try {
             $result = $cgrateService->processCustomerPayment($amount, $request->mobile_number, $paymentReference);
-        } catch (\Exception $e) {
-            \Log::warning("CGrate payment failed: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            \Log::warning('Bus payment CGrate failed: ' . $e->getMessage());
             $result = ['success' => false, 'message' => 'Payment service is temporarily unavailable. Please try again in a few minutes.'];
         }
 
-        if ($result && $result['success']) {
-            $qrPayment->update([
-                'status' => 'processing',
-                'cgrate_payment_id' => $result['paymentID'] ?? $result['paymentId'] ?? null,
-                'response_message' => $result['message'] ?? 'Payment initiated',
-                'response_code' => $result['responseCode'] ?? null,
-            ]);
+        $responseCode = $result['responseCode'] ?? '';
+        $cgPaymentId  = $result['paymentID'] ?? $result['paymentId'] ?? null;
+        $errorMsg     = $result['message'] ?? 'Payment initiation failed.';
 
+        if (! empty($result['success'])) {
+            $qrPayment->update([
+                'status'             => 'processing',
+                'cgrate_payment_id'  => $cgPaymentId,
+                'response_message'   => $result['message'] ?? 'Payment initiated',
+                'response_code'      => $responseCode,
+            ]);
             return response()->json([
-                'success' => true,
-                'message' => 'Payment initiated. Please check your phone to approve the transaction.',
+                'success'           => true,
+                'message'           => "Bus fare for {$period}: K" . number_format($amount, 2) . ". Approve the prompt on your phone.",
                 'payment_reference' => $paymentReference,
-                'payment_id' => $qrPayment->id,
-                'amount' => $amount,
+                'payment_id'        => $qrPayment->id,
+                'amount'            => $amount,
+                'period'            => $period,
             ]);
         }
 
-        // Determine error type
-        $errorMsg = $result['message'] ?? 'Payment initiation failed.';
-        $responseCode = $result['responseCode'] ?? '';
-        $cgPaymentId = $result['paymentID'] ?? $result['paymentId'] ?? null;
-        $isTimeout = str_contains(strtolower($errorMsg), 'timeout') || str_contains(strtolower($errorMsg), 'timed out') || str_contains(strtolower($errorMsg), 'delay') || str_contains(strtolower($errorMsg), 'unavailable');
-        $isDuplicate = $responseCode === '104' || str_contains(strtolower($errorMsg), 'reference not unique');
+        $isTimeout = str_contains(strtolower($errorMsg), 'timeout') || str_contains(strtolower($errorMsg), 'timed out')
+            || str_contains(strtolower($errorMsg), 'delay') || str_contains(strtolower($errorMsg), 'unavailable');
+        $isDuplicate = $responseCode === '104';
 
-        // Code 104 = CGrate already has this payment (from a timed-out first attempt)
-        // This means CGrate DID receive it — treat as processing
         if ($isDuplicate && $cgPaymentId) {
-            $qrPayment->update([
-                'status' => 'processing',
-                'cgrate_payment_id' => $cgPaymentId,
-                'response_message' => 'Payment accepted by CGrate',
-                'response_code' => $responseCode,
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Payment is being processed. Please check your phone to approve.',
-                'payment_reference' => $paymentReference,
-                'payment_id' => $qrPayment->id,
-                'amount' => $amount,
-            ]);
+            $qrPayment->update(['status' => 'processing', 'cgrate_payment_id' => $cgPaymentId, 'response_message' => 'Payment accepted by CGrate', 'response_code' => $responseCode]);
+            return response()->json(['success' => true, 'message' => 'Payment is being processed. Check your phone to approve.',
+                'payment_reference' => $paymentReference, 'payment_id' => $qrPayment->id, 'amount' => $amount, 'period' => $period]);
         }
 
         if ($isTimeout) {
-            $qrPayment->update([
-                'status' => 'processing',
-                'response_message' => 'Timeout - awaiting confirmation',
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Payment request sent but confirmation is delayed. Check your phone — if you receive a payment prompt, approve it.',
-                'payment_reference' => $paymentReference,
-                'payment_id' => $qrPayment->id,
-                'amount' => $amount,
-                'is_delayed' => true,
-            ]);
+            $qrPayment->update(['status' => 'processing', 'response_message' => 'Timeout — awaiting confirmation']);
+            return response()->json(['success' => true, 'message' => 'Confirmation is delayed — check your phone for the prompt.',
+                'payment_reference' => $paymentReference, 'payment_id' => $qrPayment->id, 'amount' => $amount, 'period' => $period, 'is_delayed' => true]);
         }
 
-        $qrPayment->update([
-            'status' => 'failed',
-            'response_message' => $errorMsg,
-            'response_code' => $responseCode,
-        ]);
-
-        return response()->json([
-            'success' => false,
-            'message' => $errorMsg,
-        ], 422);
+        $qrPayment->update(['status' => 'failed', 'response_message' => $errorMsg, 'response_code' => $responseCode]);
+        return response()->json(['success' => false, 'message' => $errorMsg], 422);
     }
 
     public function checkPaymentStatus(Request $request)
     {
+        if (! (bool) SchoolSettings::get('enable_online_payments', false)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Online payments are temporarily unavailable. Please contact the school office.',
+            ], 503);
+        }
+
         $request->validate(['payment_id' => 'required|integer']);
 
         $qrPayment = QrPayment::find($request->payment_id);
@@ -1145,102 +1238,9 @@ class ParentApiController extends Controller
 
     private function applyPaymentToFees(QrPayment $payment)
     {
-        if (!$payment->student_id || $payment->status !== 'completed') return;
-
-        // Duplicate protection — check if we already created transactions for this reference
-        $existingCount = PaymentTransaction::where('external_reference', $payment->payment_reference)->count();
-        if ($existingCount > 0) {
-            \Log::info('Payment already applied, skipping duplicate: ' . $payment->payment_reference);
-            return;
-        }
-
-        $fees = StudentFee::where('student_id', $payment->student_id)
-            ->where('balance', '>', 0)
-            ->orderBy('created_at', 'asc')
-            ->get();
-
-        $remaining = $payment->amount;
-
-        foreach ($fees as $fee) {
-            if ($remaining <= 0) break;
-
-            $apply = min($remaining, $fee->balance);
-            $newPaid = $fee->amount_paid + $apply;
-            $newBalance = $fee->balance - $apply;
-
-            $fee->update([
-                'amount_paid' => $newPaid,
-                'balance' => max($newBalance, 0),
-                'payment_status' => $newBalance <= 0 ? 'paid' : 'partial',
-                'payment_date' => now(),
-                'payment_method' => 'mobile_money',
-            ]);
-
-            // Create payment transaction record
-            PaymentTransaction::create([
-                'student_fee_id' => $fee->id,
-                'academic_year_id' => $fee->academic_year_id,
-                'amount' => $apply,
-                'type' => 'payment',
-                'payment_method' => 'mobile_money',
-                'external_reference' => $payment->payment_reference,
-                'notes' => 'Mobile money payment via parent app',
-                'status' => 'completed',
-                'processed_by' => Auth::id(),
-                'transaction_date' => now(),
-            ]);
-
-            $remaining -= $apply;
-        }
-
-        // Handle overpayment
-        if ($remaining > 0) {
-            try {
-                $lastFee = $fees->last();
-                if ($lastFee) {
-                    $bfService = new BalanceForwardService();
-                    $bfService->processOverpayment($lastFee, $remaining);
-                }
-            } catch (\Exception $e) {
-                \Log::warning('Overpayment forward failed: ' . $e->getMessage());
-            }
-        }
-
-        // Send SMS confirmation to parent
-        $this->sendPaymentSms($payment);
-    }
-
-    private function sendPaymentSms(QrPayment $payment)
-    {
-        try {
-            $student = Student::with('parentGuardian')->find($payment->student_id);
-            if (!$student) return;
-
-            $parentPhone = $payment->customer_mobile
-                ?? $student->parentGuardian?->phone
-                ?? null;
-            if (!$parentPhone) return;
-
-            // Calculate new balance
-            $newBalance = StudentFee::where('student_id', $student->id)->sum('balance');
-
-            $amount = number_format($payment->amount, 2);
-            $message = "St Francis of Assisi: Payment of K{$amount} received for {$student->name}. "
-                . "Ref: {$payment->payment_reference}. "
-                . "New balance: K" . number_format($newBalance, 2) . ". "
-                . "Thank you.";
-
-            $smsService = app(SmsService::class);
-            $smsService->send($message, $parentPhone, 'payment', $payment->id);
-
-            \Log::info('Payment SMS sent', [
-                'phone' => $parentPhone,
-                'reference' => $payment->payment_reference,
-                'amount' => $payment->amount,
-            ]);
-        } catch (\Exception $e) {
-            \Log::warning('Payment SMS failed: ' . $e->getMessage());
-        }
+        // Crediting logic lives in PaymentReconciliationService so the live status
+        // poll and the scheduled reconciliation job behave identically.
+        app(\App\Services\PaymentReconciliationService::class)->creditPayment($payment);
     }
 
     private function generatePaymentReceiptUrl(QrPayment $payment): ?string

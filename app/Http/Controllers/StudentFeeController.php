@@ -43,7 +43,8 @@ class StudentFeeController extends Controller
         $pdf = Pdf::loadView('fee-receipt', [
             'studentFee' => $studentFee,
             'copy' => 'RECEIPT',
-            'lastPaymentAmount' => $studentFee->amount_paid
+            'lastPaymentAmount' => $studentFee->amount_paid,
+            'logoSrc' => $this->resolveLogoSrc(forPdf: true),
         ]);
 
         // Set PDF options for half page (A5 portrait size)
@@ -149,7 +150,8 @@ class StudentFeeController extends Controller
             $pdf = Pdf::loadView('fee-receipt', [
                 'studentFee' => $studentFee,
                 'copy' => 'RECEIPT',
-                'lastPaymentAmount' => $studentFee->amount_paid
+                'lastPaymentAmount' => $studentFee->amount_paid,
+                'logoSrc' => $this->resolveLogoSrc(forPdf: true),
             ]);
 
             // Set PDF options same as individual receipts
@@ -217,8 +219,41 @@ class StudentFeeController extends Controller
     // Return HTML view (make sure this file exists at resources/views/fee-receipt.blade.php)
     return view('fee-receipt', [
         'studentFee' => $studentFee,
-        'lastPaymentAmount' => $studentFee->amount_paid
+        'lastPaymentAmount' => $studentFee->amount_paid,
+        'logoSrc' => $this->resolveLogoSrc(forPdf: false),
     ]);
+}
+
+/**
+ * Resolve the right src/href for the school logo on the receipt template.
+ *
+ * Prefers the SchoolSettings logo (the actual current school crest) and falls
+ * back to public/images/logo.png.
+ *
+ * For PDF rendering (DomPDF has `enable_remote => false` in config/dompdf.php),
+ * return a filesystem path so DomPDF can read directly from disk.
+ *
+ * For HTML rendering (browser), return an asset URL so the <img> tag works.
+ */
+private function resolveLogoSrc(bool $forPdf): ?string
+{
+    $settings = \App\Models\SchoolSettings::first();
+    $settingsLogo = $settings?->school_logo;
+
+    if ($settingsLogo) {
+        $diskPath = storage_path('app/public/' . $settingsLogo);
+        if (file_exists($diskPath)) {
+            return $forPdf ? $diskPath : asset('storage/' . $settingsLogo);
+        }
+    }
+
+    // Fallback to the legacy logo bundled in public/images/.
+    $legacyDisk = public_path('images/logo.png');
+    if (file_exists($legacyDisk)) {
+        return $forPdf ? $legacyDisk : asset('images/logo.png');
+    }
+
+    return null;
 }
 
 /**
@@ -384,6 +419,7 @@ public function debugFeeStructure(StudentFee $studentFee)
             'totalFee' => $studentFee->feeStructure->total_fee,
             'previouslyPaid' => $previousTransactions,
             'runningBalance' => max(0, $runningBalance),
+            'logoSrc' => $this->resolveLogoSrc(forPdf: true),
         ]);
 
         $pdf->setPaper('a5', 'portrait');

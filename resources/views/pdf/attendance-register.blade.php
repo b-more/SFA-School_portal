@@ -296,9 +296,9 @@
         <div class="header-content">
             <div class="logo-section">
                 @if($schoolLogo)
-                    <img src="{{ public_path('storage/' . $schoolLogo) }}" class="school-logo" alt="Logo">
+                    <img src="{{ asset('storage/' . $schoolLogo) }}" class="school-logo" alt="Logo">
                 @else
-                    <img src="{{ public_path('images/logo.png') }}" class="school-logo" alt="Logo">
+                    <img src="{{ asset('images/logo.png') }}" class="school-logo" alt="Logo">
                 @endif
             </div>
             <div class="school-info-section">

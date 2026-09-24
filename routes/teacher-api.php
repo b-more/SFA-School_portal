@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\TeacherApiController;
 use App\Http\Controllers\Api\TeacherQuizController;
 use App\Http\Controllers\Api\TeacherQuestionBankController;
 use App\Http\Controllers\Api\TeacherAssessmentController;
+use App\Http\Controllers\Api\FcmController;
 use Illuminate\Support\Facades\Route;
 
 // Public
@@ -133,6 +134,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Account
     Route::post('/change-password', [TeacherApiController::class, 'changePassword']);
     Route::post('/profile-photo', [TeacherApiController::class, 'updateProfilePhoto']);
+
+    // FCM (native Android push)
+    Route::post('/push/fcm/register', [FcmController::class, 'registerTeacher']);
+    Route::post('/push/fcm/unregister', [FcmController::class, 'unregister']);
 
     // Messaging
     Route::get('/messages', [TeacherApiController::class, 'conversations']);

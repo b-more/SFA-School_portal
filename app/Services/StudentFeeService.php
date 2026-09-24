@@ -596,19 +596,31 @@ class StudentFeeService
      */
     private static function sendMessage(string $message, string $phoneNumber): bool
     {
+        // If SMS isn't configured (e.g. stale config cache, missing .env keys), skip
+        // gracefully instead of crashing the caller (which would 500 the request
+        // that's also doing student creation, fee assignment, etc.).
+        $smsUrl = env('SMS_API_URL');
+        if (! is_string($smsUrl) || $smsUrl === '') {
+            Log::warning('SMS not sent: SMS_API_URL is not configured', [
+                'phone' => $phoneNumber,
+                'hint'  => 'Check .env and run `php artisan config:clear` as www-data.',
+            ]);
+            return false;
+        }
+
         try {
             $urlEncodedMessage = urlencode(str_replace('@', '(at)', $message));
 
             $response = Http::withoutVerifying()
                 ->timeout(20)
-                ->post(env('SMS_API_URL'), [
-                    'username' => env('SMS_USERNAME'),
-                    'password' => env('SMS_PASSWORD'),
-                    'msg' => $urlEncodedMessage,
+                ->post($smsUrl, [
+                    'username'  => env('SMS_USERNAME'),
+                    'password'  => env('SMS_PASSWORD'),
+                    'msg'       => $urlEncodedMessage,
                     'shortcode' => env('SMS_SHORTCODE'),
                     'sender_id' => env('SMS_SENDER_ID'),
-                    'phone' => $phoneNumber,
-                    'api_key' => env('SMS_API_KEY')
+                    'phone'     => $phoneNumber,
+                    'api_key'   => env('SMS_API_KEY'),
                 ]);
 
             $isSuccessful = $response->successful() &&
@@ -616,11 +628,10 @@ class StudentFeeService
                             strpos(strtolower($response->body()), 'success') !== false);
 
             return $isSuccessful;
-
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('SMS sending failed', [
                 'error' => $e->getMessage(),
-                'phone' => $phoneNumber
+                'phone' => $phoneNumber,
             ]);
             return false;
         }

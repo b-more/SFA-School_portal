@@ -358,6 +358,38 @@ class Teacher extends Model
     }
 
     /**
+     * True if this teacher belongs to the Secondary section.
+     *
+     * Resolves the section via, in order:
+     *   1. teachers.school_section_id (direct)
+     *   2. teachers.class_section_id → grade.school_section_id
+     *   3. teachers.grade_id → grade.school_section_id
+     *
+     * Secondary teachers are subject specialists — they cannot be class teachers
+     * (that's a Primary/ECE concept where one teacher owns one class).
+     */
+    public function belongsToSecondarySection(): bool
+    {
+        $secCode = 'SEC';
+
+        if ($this->school_section_id) {
+            return optional(SchoolSection::find($this->school_section_id))->code === $secCode;
+        }
+
+        if ($this->class_section_id) {
+            $cs = ClassSection::with('grade.schoolSection:id,code')->find($this->class_section_id);
+            return optional(optional($cs?->grade)->schoolSection)->code === $secCode;
+        }
+
+        if ($this->grade_id) {
+            $grade = Grade::with('schoolSection:id,code')->find($this->grade_id);
+            return optional(optional($grade)->schoolSection)->code === $secCode;
+        }
+
+        return false;
+    }
+
+    /**
      * Check if teacher has a specific designation by code
      */
     public function hasDesignation(string $code): bool

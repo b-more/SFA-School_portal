@@ -69,7 +69,12 @@ class Api {
     login(login, password, remember) { return this.post('/login', { login, password, remember }); }
     logout() { return this.post('/logout', {}); }
     forgotPassword(email) { return this.post('/forgot-password', { email }); }
+    forgotPasswordSms(phone) { return this.post('/forgot-password-sms', { phone }); }
+    resetPasswordSms(phone, otp, newPassword) { return this.post('/reset-password-sms', { phone, otp, new_password: newPassword }); }
+    changePassword(currentPassword, newPassword) { return this.post('/change-password', { current_password: currentPassword, new_password: newPassword }); }
     getUser() { return this.get('/user'); }
+    uploadProfilePhoto(file) { const fd = new FormData(); fd.append('photo', file); return this.uploadForm('/profile-photo', fd); }
+    deleteProfilePhoto() { return this.request('/profile-photo', { method: 'DELETE' }); }
     getSchoolSettings() { return this.get('/school-settings'); }
 
     // Append token to download URLs so the Laravel web routes can authenticate
@@ -117,6 +122,8 @@ class Api {
 
     // Payments
     initiatePayment(studentId, amount, mobileNumber) { return this.post(`/children/${studentId}/pay`, { amount, mobile_number: mobileNumber }); }
+    getBusRoutes() { return this.get('/bus-routes'); }
+    payBusFare(studentId, month, mobileNumber, busFareStructureId) { return this.post(`/children/${studentId}/pay-bus`, { month, mobile_number: mobileNumber, bus_fare_structure_id: busFareStructureId }); }
     checkPaymentStatus(paymentId) { return this.post('/payment-status', { payment_id: paymentId }); }
 
     // Push notifications

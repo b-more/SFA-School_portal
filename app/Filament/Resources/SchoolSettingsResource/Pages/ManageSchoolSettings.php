@@ -38,6 +38,10 @@ class ManageSchoolSettings extends Page implements HasForms
             }
         }
 
+        // Never render the decrypted gateway password into the form/HTML.
+        // The field stays blank; an empty value won't overwrite the stored secret on save.
+        unset($settingsArray['cgrate_password']);
+
         $this->form->fill($settingsArray);
     }
 
@@ -77,6 +81,11 @@ class ManageSchoolSettings extends Page implements HasForms
         }
 
         $data = $this->form->getState();
+
+        // Keep the existing gateway password when the field was left blank.
+        if (array_key_exists('cgrate_password', $data) && blank($data['cgrate_password'])) {
+            unset($data['cgrate_password']);
+        }
 
         // Handle nested JSON data for bank_details and mobile_money_details
         if (isset($data['bank_details']) && is_array($data['bank_details'])) {

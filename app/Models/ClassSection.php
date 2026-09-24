@@ -24,6 +24,41 @@ class ClassSection extends Model
     ];
 
     /**
+     * Keep teachers.class_section_id + teachers.is_class_teacher in sync with
+     * class_sections.class_teacher_id. When the class teacher of a section changes:
+     *   - The previous teacher (if any) is unlinked from this section.
+     *   - The new teacher (if any) is linked to this section.
+     * Prevents the homeroom <-> attendance gate from breaking after a swap.
+     */
+    protected static function booted(): void
+    {
+        static::saved(function (ClassSection $section) {
+            if (! $section->wasChanged('class_teacher_id')) {
+                return;
+            }
+
+            $previousId = $section->getOriginal('class_teacher_id');
+            $newId = $section->class_teacher_id;
+
+            if ($previousId && $previousId !== $newId) {
+                Teacher::where('id', $previousId)
+                    ->where('class_section_id', $section->id)
+                    ->update([
+                        'class_section_id' => null,
+                        'is_class_teacher' => false,
+                    ]);
+            }
+
+            if ($newId) {
+                Teacher::where('id', $newId)->update([
+                    'class_section_id' => $section->id,
+                    'is_class_teacher' => true,
+                ]);
+            }
+        });
+    }
+
+    /**
      * Get the grade that this class section belongs to
      */
     public function grade(): BelongsTo

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ParentGuardianResource\Pages;
 
+use App\Constants\RoleConstants;
 use App\Filament\Resources\ParentGuardianResource;
 use App\Models\User;
 use App\Models\UserCredential;
@@ -22,21 +23,37 @@ class CreateParentGuardian extends CreateRecord
     /**
      * Handle the creation of a new parent/guardian and a corresponding user account
      */
+    /**
+     * Default password applied to every newly-created parent account.
+     * Forces a change on first login (must_change_password = true).
+     */
+    protected const DEFAULT_PASSWORD = 'School1234!';
+
     protected function handleRecordCreation(array $data): Model
     {
         // Wrap in a transaction to ensure both parent and user are created or neither
         return DB::transaction(function () use ($data) {
-            // Generate a secure random password
-            $password = Str::password(10);
+            // Default password (parent will be forced to change on first login).
+            $password = self::DEFAULT_PASSWORD;
+
+            // Phone normalised to 260XXXXXXXXX — this becomes the username so parents
+            // can log in with their phone number per the school's policy.
+            $internationalPhone = $this->formatPhoneNumber($data['phone']);
+
+            // Pick the username: international phone if it's available, else a
+            // sanitised email-style fallback so duplicates don't blow up the insert.
+            $username = $this->pickUsername($internationalPhone, $data['name']);
 
             // Create a new user for this parent/guardian
             $user = User::create([
                 'name' => $data['name'],
-                'email' => $data['email'],
+                'email' => $data['email'] ?? null,
                 'phone' => $data['phone'],
-                'username' => $this->generateUsername($data['name']),
+                'username' => $username,
                 'password' => Hash::make($password),
+                'role_id' => RoleConstants::PARENT,
                 'status' => 'active',
+                'must_change_password' => true,
             ]);
 
             // Create the parent/guardian and link it to the user
@@ -47,10 +64,11 @@ class CreateParentGuardian extends CreateRecord
 
             // Send the login credentials via SMS
             try {
-                //$message = "Hello {$data['name']}, your parent portal account has been created. Username: {$user->username}@stfrancisofassisizm.com, Password: {$password}. Please log in and change your password. You can access your child's homework and other information through this account.";
-                $message = "Hello {$data['name']}. You have been added to the St. Francis School system where you will be receiving notifications and other updates.";
+                $message = "Hello {$data['name']}, your St Francis parent portal account is ready. "
+                    . "Username: {$username} | Password: {$password} . "
+                    . "Login at " . config('app.url') . "/admin/login and change the password on first login.";
 
-                $formattedPhone = $this->formatPhoneNumber($data['phone']);
+                $formattedPhone = $internationalPhone;
                 $this->sendMessage($message, $formattedPhone);
 
                 // Record successful SMS sending
@@ -106,26 +124,32 @@ class CreateParentGuardian extends CreateRecord
     }
 
     /**
-     * Generate a username from the parent/guardian's name
+     * Pick the right username for a new parent.
+     * Preference order:
+     *   1. International phone (260…) if it's not already taken
+     *   2. Sanitised email-style fallback derived from name (kept for resilience
+     *      when two parents share a phone — same convention as the bulk reset).
      */
-    protected function generateUsername(string $name): string
+    protected function pickUsername(?string $internationalPhone, string $name): string
     {
-        // Convert the name to lowercase and remove spaces
+        if ($internationalPhone && ! User::where('username', $internationalPhone)->exists()) {
+            return $internationalPhone;
+        }
+
+        // Fallback: build something stable from the name.
         $baseUsername = strtolower(str_replace(' ', '.', $name));
+        $baseUsername = preg_replace('/[^a-z0-9\.]/', '', $baseUsername);
+        $baseUsername = $baseUsername ?: 'parent';
 
-        // Add the domain to the username
-        $domainUsername = $baseUsername . '@stfrancisofassisizm.com';
-
-        // Check if the username exists, if it does, append numbers
-        $username = $domainUsername;
+        $candidate = $baseUsername . '@stfrancisofassisizm.com';
         $counter = 1;
 
-        while (User::where('username', $username)->exists()) {
-            $username = $baseUsername . $counter . '@stfrancisofassisizm.com';
+        while (User::where('username', $candidate)->exists()) {
+            $candidate = $baseUsername . $counter . '@stfrancisofassisizm.com';
             $counter++;
         }
 
-        return $username;
+        return $candidate;
     }
 
     /**

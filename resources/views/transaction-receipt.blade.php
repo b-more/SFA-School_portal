@@ -146,14 +146,14 @@
 <body>
     <div class="container">
         <div class="watermark">
-            @if(file_exists(public_path('images/logo.png')))
-                <img src="{{ public_path('images/logo.png') }}" alt="School Logo" width="150">
+            @if(! empty($logoSrc ?? null))
+                <img src="{{ $logoSrc }}" alt="School Logo" width="150">
             @endif
         </div>
 
         <div class="header">
-            @if(file_exists(public_path('images/logo.png')))
-                <img src="{{ public_path('images/logo.png') }}" alt="School Logo" class="logo">
+            @if(! empty($logoSrc ?? null))
+                <img src="{{ $logoSrc }}" alt="School Logo" class="logo">
             @endif
             <h1 class="title">St. Francis Of Assisi Private School</h1>
             <p class="subtitle">Individual Transaction Receipt</p>
@@ -208,6 +208,42 @@
             </table>
         </div>
 
+        @php
+            // Break the amount owed into "this term's fee" vs "brought forward from a previous term",
+            // anchored on the real balance + paid so it always reconciles, then recompute the
+            // post-transaction balance from that real total (the controller's $runningBalance starts
+            // from current-term-only and misses carry-forward when a prior term wasn't fully paid).
+            $totalPaid       = $studentFee->amount_paid ?? 0;
+            $balance         = $studentFee->balance ?? 0;
+            $currentTermFee  = ($studentFee->feeStructure && $studentFee->feeStructure->total_fee)
+                ? $studentFee->feeStructure->total_fee
+                : ($totalPaid + $balance);
+            $grossDue        = round($balance + $totalPaid, 2);
+            $broughtForward  = max(0, round($grossDue - $currentTermFee, 2));
+            $balanceAfterTxn = max(0, round($grossDue - $previouslyPaid - ($transaction->amount ?? 0), 2));
+
+            $carriedFromTerm = null;
+            if ($broughtForward > 0) {
+                $src = \App\Models\StudentFee::with(['term', 'academicYear'])
+                    ->where('student_id', $studentFee->student_id)
+                    ->where('id', '!=', $studentFee->id)
+                    ->where('payment_status', 'carried_forward')
+                    ->orderByDesc('term_id')
+                    ->first();
+                $carriedFromTerm = ($src && $src->term)
+                    ? trim($src->term->name . ' ' . (optional($src->academicYear)->name ?? ''))
+                    : 'a previous term';
+            }
+
+            $feeCategoryName = optional($studentFee->feeCategory)->name ?? 'Tuition';
+            $currentTermLabel = $studentFee->period_label ?: trim(
+                (optional(optional($studentFee->feeStructure)->term)->name
+                    ?? optional($studentFee->term)->name ?? 'Current Term')
+                . ' ' . (optional(optional($studentFee->feeStructure)->academicYear)->name
+                    ?? optional($studentFee->academicYear)->name ?? '')
+            );
+        @endphp
+
         <div class="payment-info">
             <table class="payment-table">
                 <thead>
@@ -218,8 +254,18 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Total Term Fee</td>
-                        <td>{{ number_format($totalFee, 2) }}</td>
+                        <td>{{ $feeCategoryName }} ({{ $currentTermLabel }})</td>
+                        <td>{{ number_format($currentTermFee, 2) }}</td>
+                    </tr>
+                    @if($broughtForward > 0)
+                    <tr style="background-color: #fdf0e3;">
+                        <td>Brought Forward &mdash; unpaid balance from {{ $carriedFromTerm }}</td>
+                        <td>{{ number_format($broughtForward, 2) }}</td>
+                    </tr>
+                    @endif
+                    <tr>
+                        <td><strong>Total Amount Due</strong></td>
+                        <td><strong>{{ number_format($grossDue, 2) }}</strong></td>
                     </tr>
                     <tr>
                         <td>Previously Paid (Before This Transaction)</td>
@@ -231,7 +277,7 @@
                     </tr>
                     <tr>
                         <td>Balance After This Transaction</td>
-                        <td>{{ number_format($runningBalance, 2) }}</td>
+                        <td>{{ number_format($balanceAfterTxn, 2) }}</td>
                     </tr>
                     @if($transaction->payment_method)
                     <tr>

@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\StudentFeeResource\Widgets;
 
 use App\Models\AcademicYear;
-use App\Models\FeeStructure;
 use App\Models\Student;
 use App\Models\StudentFee;
 use App\Models\Term;
@@ -17,137 +16,110 @@ class StudentFeeStatsWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        // Get current academic year
-        $currentAcademicYear = AcademicYear::where('is_active', true)->first();
+        $year = AcademicYear::where('is_active', true)->first();
 
-        if (! $currentAcademicYear) {
+        if (! $year) {
             return [
                 Stat::make('No Active Academic Year', 'Please set an active academic year')
                     ->color('danger'),
             ];
         }
 
-        // Get current term
-        $currentTerm = Term::where('academic_year_id', $currentAcademicYear->id)
+        $term = Term::where('academic_year_id', $year->id)
             ->where('is_current', true)
             ->first();
 
-        $termName = $currentTerm ? $currentTerm->name : 'No active term';
+        if (! $term) {
+            return [
+                Stat::make('No Current Term', 'Mark one term as current in /admin/terms')
+                    ->color('danger'),
+            ];
+        }
 
-        // Calculate total expected fees based on active students and fee structures
-        // This calculates what SHOULD be collected from all active students
-        $totalExpectedFees = $this->calculateExpectedFees($currentAcademicYear->id, $currentTerm?->id);
+        // ---- Term-scoped query base ----
+        // Exclude `carried_forward` rows: those are closed (balance=0, amount_paid
+        // is historical), they don't represent current-term activity.
+        // Columns are qualified because later we JOIN fee_structures which also has
+        // term_id / payment_status-adjacent columns.
+        $base = StudentFee::query()
+            ->where('student_fees.term_id', $term->id)
+            ->where('student_fees.payment_status', '!=', 'carried_forward');
 
-        // Get statistics from actual StudentFee records for current academic year
-        $totalFeeRecords = StudentFee::where('student_fees.academic_year_id', $currentAcademicYear->id)
+        // ---- Money totals (term-scoped) ----
+        // Expected = current-term tuition (basic_fee) + arrears carried forward (previous_balance) - discounts
+        $expectedRow = (clone $base)
             ->join('fee_structures', 'student_fees.fee_structure_id', '=', 'fee_structures.id')
-            ->sum('fee_structures.basic_fee');
+            ->selectRaw('
+                COALESCE(SUM(fee_structures.basic_fee), 0)     AS tuition,
+                COALESCE(SUM(student_fees.previous_balance), 0) AS arrears,
+                COALESCE(SUM(student_fees.discount_amount), 0) AS discounts
+            ')
+            ->first();
 
-        $totalPaid = StudentFee::where('student_fees.academic_year_id', $currentAcademicYear->id)
-            ->sum('amount_paid');
+        $expected = max(0, (float) $expectedRow->tuition + (float) $expectedRow->arrears - (float) $expectedRow->discounts);
 
-        $totalBalance = StudentFee::where('student_fees.academic_year_id', $currentAcademicYear->id)
-            ->sum('balance');
+        $collected   = (float) (clone $base)->sum('amount_paid');
+        $outstanding = (float) (clone $base)->sum('balance'); // canonical from DB
 
-        $paidCount = StudentFee::where('student_fees.academic_year_id', $currentAcademicYear->id)
+        $collectionRate = $expected > 0 ? round(($collected / $expected) * 100, 1) : 0;
+
+        // ---- Student counts (distinct, term-scoped) ----
+        $paidStudents = (int) (clone $base)
             ->where('payment_status', 'paid')
-            ->count();
-
-        $partialCount = StudentFee::where('student_fees.academic_year_id', $currentAcademicYear->id)
-            ->where('payment_status', 'partial')
-            ->count();
-
-        $unpaidCount = StudentFee::where('student_fees.academic_year_id', $currentAcademicYear->id)
-            ->where('payment_status', 'unpaid')
-            ->count();
-
-        // Count active students
-        $totalActiveStudents = Student::where('enrollment_status', 'active')->count();
-
-        // Students with fee records
-        $studentsWithFees = StudentFee::where('student_fees.academic_year_id', $currentAcademicYear->id)
             ->distinct('student_id')
             ->count('student_id');
 
-        // Calculate collection rate based on expected fees
-        $collectionRate = $totalExpectedFees > 0 ? round(($totalPaid / $totalExpectedFees) * 100, 1) : 0;
+        $partialStudents = (int) (clone $base)
+            ->where('payment_status', 'partial')
+            ->distinct('student_id')
+            ->count('student_id');
 
-        // Outstanding = Expected - Paid
-        $totalOutstanding = $totalExpectedFees - $totalPaid;
+        $unpaidStudents = (int) (clone $base)
+            ->where('payment_status', 'unpaid')
+            ->distinct('student_id')
+            ->count('student_id');
+
+        $studentsWithFees = (int) (clone $base)
+            ->distinct('student_id')
+            ->count('student_id');
+
+        $activeStudents = (int) Student::where('enrollment_status', 'active')->count();
 
         return [
-            Stat::make('Total Expected Fees', 'ZMW '.number_format($totalExpectedFees, 2))
-                ->description("{$currentAcademicYear->name} - {$termName} ({$totalActiveStudents} active students)")
+            Stat::make('Total Expected Fees', 'ZMW '.number_format($expected, 2))
+                ->description("{$year->name} – {$term->name} ({$activeStudents} active students)")
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('primary'),
 
-            Stat::make('Total Collected', 'ZMW '.number_format($totalPaid, 2))
-                ->description("Collection Rate: {$collectionRate}%")
+            Stat::make('Total Collected', 'ZMW '.number_format($collected, 2))
+                ->description("Collection rate: {$collectionRate}% (this term)")
                 ->descriptionIcon('heroicon-m-currency-dollar')
                 ->color('success'),
 
-            Stat::make('Outstanding Balance', 'ZMW '.number_format(max(0, $totalOutstanding), 2))
-                ->description('Amount pending collection')
+            Stat::make('Outstanding Balance', 'ZMW '.number_format($outstanding, 2))
+                ->description('Owed across all '.$studentsWithFees.' invoices this term')
                 ->descriptionIcon('heroicon-m-exclamation-triangle')
-                ->color($totalOutstanding > 0 ? 'warning' : 'success'),
+                ->color($outstanding > 0 ? 'warning' : 'success'),
 
-            Stat::make('Fully Paid Students', $paidCount)
-                ->description("Out of {$studentsWithFees} with fee records")
+            Stat::make('Fully Paid Students', $paidStudents)
+                ->description("Out of {$studentsWithFees} students with a {$term->name} invoice")
                 ->descriptionIcon('heroicon-m-check-circle')
                 ->color('success'),
 
-            Stat::make('Partially Paid', $partialCount)
-                ->description('Students with partial payments')
+            Stat::make('Partially Paid', $partialStudents)
+                ->description('Started paying, still owe a balance')
                 ->descriptionIcon('heroicon-m-clock')
                 ->color('warning'),
 
-            Stat::make('Unpaid Students', $unpaidCount)
-                ->description('Students with no payments')
+            Stat::make('Unpaid Students', $unpaidStudents)
+                ->description('Have an invoice but have not paid yet')
                 ->descriptionIcon('heroicon-m-x-circle')
                 ->color('danger'),
         ];
     }
 
-    /**
-     * Calculate total expected fees based on active students and their section/grade fee structures
-     */
-    protected function calculateExpectedFees(int $academicYearId, ?int $termId): float
-    {
-        if (!$termId) {
-            return 0;
-        }
-
-        // Section-based fees: join through grades.school_section_id = fee_structures.school_section_id
-        // Uses basic_fee (tuition only) for expected fees calculation
-        $sectionBasedFees = DB::table('students')
-            ->join('grades', 'students.grade_id', '=', 'grades.id')
-            ->join('fee_structures', function ($join) use ($academicYearId, $termId) {
-                $join->on('grades.school_section_id', '=', 'fee_structures.school_section_id')
-                    ->where('fee_structures.academic_year_id', '=', $academicYearId)
-                    ->where('fee_structures.term_id', '=', $termId)
-                    ->where('fee_structures.is_active', '=', true)
-                    ->whereNotNull('fee_structures.school_section_id');
-            })
-            ->where('students.enrollment_status', '=', 'active')
-            ->sum('fee_structures.basic_fee');
-
-        // Grade-based fees (legacy): for old records where school_section_id is null
-        $gradeBasedFees = DB::table('students')
-            ->join('fee_structures', function ($join) use ($academicYearId, $termId) {
-                $join->on('students.grade_id', '=', 'fee_structures.grade_id')
-                    ->where('fee_structures.academic_year_id', '=', $academicYearId)
-                    ->where('fee_structures.term_id', '=', $termId)
-                    ->where('fee_structures.is_active', '=', true)
-                    ->whereNull('fee_structures.school_section_id');
-            })
-            ->where('students.enrollment_status', '=', 'active')
-            ->sum('fee_structures.basic_fee');
-
-        return (float) $sectionBasedFees + (float) $gradeBasedFees;
-    }
-
     protected function getPollingInterval(): ?string
     {
-        return '30s'; // Refresh every 30 seconds
+        return '30s';
     }
 }

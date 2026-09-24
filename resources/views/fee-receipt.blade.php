@@ -152,14 +152,14 @@
 <body>
     <div class="container">
         <div class="watermark">
-            @if(file_exists(public_path('images/logo.png')))
-                <img src="{{ public_path('images/logo.png') }}" alt="School Logo" width="150">
+            @if(! empty($logoSrc ?? null))
+                <img src="{{ $logoSrc }}" alt="School Logo" width="150">
             @endif
         </div>
 
         <div class="header">
-            @if(file_exists(public_path('images/logo.png')))
-                <img src="{{ public_path('images/logo.png') }}" alt="School Logo" class="logo">
+            @if(! empty($logoSrc ?? null))
+                <img src="{{ $logoSrc }}" alt="School Logo" class="logo">
             @endif
             <h1 class="title">St. Francis Of Assisi Private School</h1>
             <p class="subtitle">Official Payment Receipt</p>
@@ -168,7 +168,7 @@
         </div>
 
         <div class="receipt-info">
-            <div class="receipt-no">Receipt No: {{ $studentFee->receipt_number ?? 'N/A' }}</div>
+            <div class="receipt-no">Receipt No: {{ $studentFee->receipt_number ?? optional($studentFee->paymentTransactions->last())->reference_number ?? 'RCP-FEE-' . $studentFee->id }}</div>
             <div class="date">Date: {{ $studentFee->payment_date ? $studentFee->payment_date->format('F j, Y') : now()->format('F j, Y') }}</div>
         </div>
 
@@ -232,6 +232,37 @@
                     $totalFee = $totalPaid + $balance;
                 }
 
+                // Split what is owed into "this term's fee" vs "brought forward from a previous term".
+                // Anchor on the real amount owed (balance + paid) so the breakdown always reconciles,
+                // even if stored carry-forward figures were hand-adjusted.
+                $currentTermFee = $totalFee;
+                $grossDue       = round($balance + $totalPaid, 2);
+                $broughtForward = max(0, round($grossDue - $currentTermFee, 2));
+
+                $carriedFromTerm = null;
+                if ($broughtForward > 0) {
+                    $src = \App\Models\StudentFee::with(['term', 'academicYear'])
+                        ->where('student_id', $studentFee->student_id)
+                        ->where('id', '!=', $studentFee->id)
+                        ->where('payment_status', 'carried_forward')
+                        ->orderByDesc('term_id')
+                        ->first();
+                    $carriedFromTerm = ($src && $src->term)
+                        ? trim($src->term->name . ' ' . (optional($src->academicYear)->name ?? ''))
+                        : 'a previous term';
+                }
+
+                // Category-aware label: prefer the explicit period_label set when the fee was generated
+                // (e.g. "May 2026", "Lusaka Tour 2026"), otherwise fall back to term + year.
+                $feeCategoryName = optional($studentFee->feeCategory)->name ?? 'Tuition';
+                $periodLabel = $studentFee->period_label ?: trim(
+                    (optional(optional($studentFee->feeStructure)->term)->name
+                        ?? optional($studentFee->term)->name ?? 'Current Term')
+                    . ' ' . (optional(optional($studentFee->feeStructure)->academicYear)->name
+                        ?? optional($studentFee->academicYear)->name ?? '')
+                );
+                $currentTermLabel = $periodLabel;
+
                 // Get all payment transactions
                 $transactions = $studentFee->paymentTransactions()
                     ->orderBy('transaction_date', 'asc')
@@ -254,7 +285,7 @@
                 </thead>
                 <tbody>
                     @php
-                        $runningBalance = $totalFee;
+                        $runningBalance = $grossDue;
                     @endphp
                     @foreach($transactions as $index => $transaction)
                         @php
@@ -291,8 +322,18 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Total Term Fee</td>
-                        <td>{{ number_format($totalFee, 2) }}</td>
+                        <td>{{ $feeCategoryName }} ({{ $currentTermLabel }})</td>
+                        <td>{{ number_format($currentTermFee, 2) }}</td>
+                    </tr>
+                    @if($broughtForward > 0)
+                    <tr style="background-color: #fdf0e3;">
+                        <td>Brought Forward &mdash; unpaid balance from {{ $carriedFromTerm }}</td>
+                        <td>{{ number_format($broughtForward, 2) }}</td>
+                    </tr>
+                    @endif
+                    <tr class="amount-row">
+                        <td><strong>Total Amount Due</strong></td>
+                        <td><strong>{{ number_format($grossDue, 2) }}</strong></td>
                     </tr>
                     <tr class="amount-row" style="background-color: #d4edda;">
                         <td><strong>Total Paid</strong></td>

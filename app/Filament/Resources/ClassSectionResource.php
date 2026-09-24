@@ -25,7 +25,22 @@ class ClassSectionResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return ! in_array(auth()->user()?->role_id, [RoleConstants::LIBRARIAN, RoleConstants::TEACHER, RoleConstants::PARENT, RoleConstants::STUDENT, RoleConstants::DRIVER]) ?? false;
+        return ! in_array(auth()->user()?->role_id, [RoleConstants::LIBRARIAN, RoleConstants::TEACHER, RoleConstants::PARENT, RoleConstants::STUDENT, RoleConstants::DRIVER, RoleConstants::CLINICIAN, RoleConstants::NURSE]) ?? false;
+    }
+
+    /**
+     * Does this grade belong to the Secondary school section?
+     */
+    public static function gradeIsSecondary($gradeId): bool
+    {
+        if (! $gradeId) {
+            return false;
+        }
+
+        return Grade::query()
+            ->where('id', $gradeId)
+            ->whereHas('schoolSection', fn ($q) => $q->where('code', 'SEC'))
+            ->exists();
     }
 
     public static function form(Form $form): Form
@@ -39,27 +54,24 @@ class ClassSectionResource extends Resource
             Forms\Components\Select::make('grade_id')
                 ->label('Grade')
                 ->options(Grade::pluck('name', 'id'))
-                ->required(),
+                ->required()
+                ->live(),
 
             Forms\Components\TextInput::make('name')
                 ->required()
                 ->maxLength(255),
 
-            // Direct selection of Teacher without using Employee
+            // Every class section MUST have exactly one class teacher (homeroom / attendance
+            // teacher) — both Primary and Secondary. In Primary/ECE they teach all subjects;
+            // in Secondary they teach only their own subject and other subjects are taught
+            // by visiting subject teachers.
             Forms\Components\Select::make('class_teacher_id')
-                ->label('Class Teacher')
-                ->options(function () {
-                    // This directly uses the Teacher model
-                    return Teacher::when(
-                            method_exists(Teacher::class, 'active'),
-                            fn($query) => $query->active(),
-                            fn($query) => $query
-                        )
-                        ->get()
-                        ->pluck('name', 'id');
-                })
+                ->label('Class Teacher (Homeroom)')
+                ->helperText('One teacher per class: marks attendance, manages this class, writes report-card comments. Secondary classes still get one — they teach only their specialty subject; other subjects are taught by subject teachers.')
+                ->options(fn () => Teacher::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'))
                 ->searchable()
-                ->nullable(),
+                ->required(fn (Forms\Get $get) => self::gradeIsSecondary($get('grade_id')))
+                ->nullable(fn (Forms\Get $get) => ! self::gradeIsSecondary($get('grade_id'))),
 
             Forms\Components\TextInput::make('capacity')
                 ->numeric()

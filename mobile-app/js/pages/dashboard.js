@@ -39,13 +39,19 @@ export async function renderDashboard(container, api, settings) {
     const user = JSON.parse(localStorage.getItem('user_data') || '{}');
     const children = JSON.parse(localStorage.getItem('children_data') || '[]');
 
+    // Bulk-provisioned accounts are flagged so we force a password change
+    // on first login. Show a blocking modal that can't be dismissed.
+    if (user && user.must_change_password) {
+        showForcedPasswordChangeModal(api, user);
+    }
+
     // Shell first, load data async
     container.innerHTML = `
         <div class="app-shell">
             <div class="app-header">
                 <div class="app-header-left">
                     <button class="app-header-btn" id="menu-btn" aria-label="Menu">${SVG.menu}</button>
-                    <div class="app-header-avatar">${initial(user.name)}</div>
+                    <div class="app-header-avatar">${user.profile_photo ? `<img src="${user.profile_photo}" alt="${user.name || 'Parent'}">` : initial(user.name)}</div>
                     <div>
                         <div class="app-header-name">${user.name || 'Parent'}</div>
                         <div class="app-header-role">${user.relationship ? user.relationship.charAt(0).toUpperCase() + user.relationship.slice(1) : 'Parent'} &middot; ${children.length} child${children.length !== 1 ? 'ren' : ''}</div>
@@ -58,7 +64,7 @@ export async function renderDashboard(container, api, settings) {
             <div class="drawer-overlay" id="drawer-overlay"></div>
             <aside class="drawer" id="drawer">
                 <div class="drawer-header">
-                    <div class="drawer-avatar">${initial(user.name)}</div>
+                    <div class="drawer-avatar">${user.profile_photo ? `<img src="${user.profile_photo}" alt="${user.name || 'Parent'}">` : initial(user.name)}</div>
                     <div>
                         <div class="drawer-name">${user.name || 'Parent'}</div>
                         <div class="drawer-role">${user.email || ''}</div>
@@ -288,7 +294,7 @@ async function renderHome(el, api, children) {
         // Pay Now buttons
         el.querySelectorAll('.btn-pay-now').forEach(btn => {
             btn.addEventListener('click', () => {
-                alert('Coming Soon!\n\nMobile money payments will be available shortly. Please pay via the school office for now.');
+                showPaymentModal(api, btn.dataset.child, btn.dataset.name, parseFloat(btn.dataset.balance));
             });
         });
 
@@ -418,8 +424,9 @@ function renderChildCard({ child, att, fees, results, hw, bookLoans, busPayments
     }
     html += '</div>';
 
-    // Results - full view (locked if fees not fully paid)
-    const resultsLocked = fees.total_balance > 0;
+    // Results - full view (locked per the backend's threshold-aware rule).
+    // Fall back to total_balance>0 for older API responses lacking the flag.
+    const resultsLocked = (typeof fees.is_locked === 'boolean') ? fees.is_locked : (fees.total_balance > 0);
     if (results.total_subjects > 0) {
         html += `<div class="section" style="${resultsLocked ? 'position:relative;overflow:hidden' : ''}">
             <div class="section-title"><span class="section-dot" style="background:var(--purple)"></span>Academic Results ${resultsLocked ? '<span class="badge badge-red" style="margin-left:6px">🔒 Locked</span>' : ''}</div>
@@ -814,6 +821,10 @@ async function renderPayments(el, api) {
                         ${c.balance > 0 ? `<button class="btn-primary btn-pay-child" data-child="${c.id}" data-name="${c.name}" data-balance="${c.balance}" style="flex:1;padding:10px;border:none;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--navy);color:#fff"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"/></svg> Pay K ${fmt(c.balance)}</button>` : ''}
                         <a href="${api.downloadUrl(c.statement_url)}" target="_blank" class="btn-outline" style="flex:${c.balance > 0 ? '0' : '1'};padding:10px;border-radius:6px;font-size:0.78rem;font-weight:600;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--border);color:var(--text2);background:var(--card)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg> Statement</a>
                     </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+                        <button class="btn-outline btn-pay-bus" data-child="${c.id}" data-name="${c.name}" style="flex:1;padding:10px;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--amber);color:var(--amber);background:var(--card)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg> Pay Bus Fare (K500)</button>
+                    </div>
+                    <div class="cat-tree" id="cat-tree-${c.id}" style="margin-top:10px"></div>
                 </div>`;
             }
             html += '</div></div>';
@@ -856,11 +867,73 @@ async function renderPayments(el, api) {
         // Bind pay buttons
         el.querySelectorAll('.btn-pay-child').forEach(btn => {
             btn.addEventListener('click', () => {
-                alert('Coming Soon!\n\nMobile money payments will be available shortly. Please pay via the school office for now.');
+                showPaymentModal(api, btn.dataset.child, btn.dataset.name, parseFloat(btn.dataset.balance));
+            });
+        });
+        el.querySelectorAll('.btn-pay-bus').forEach(btn => {
+            btn.addEventListener('click', () => {
+                showBusPaymentModal(api, btn.dataset.child, btn.dataset.name);
             });
         });
 
+        // Per-child categorized fee breakdown — load in parallel and inject.
+        for (const c of children) {
+            const target = document.getElementById(`cat-tree-${c.id}`);
+            if (!target) continue;
+            target.innerHTML = '<div class="text-xs text-gray" style="padding:6px 0">Loading fee breakdown…</div>';
+            api.getFees(c.id).then(data => {
+                target.innerHTML = renderCategoryTree(data, c, api);
+            }).catch(err => {
+                target.innerHTML = `<div class="text-xs text-gray" style="padding:6px 0">Breakdown unavailable.</div>`;
+            });
+        }
+
     } catch (err) { el.innerHTML = `<div class="dash-scroll card-empty">${err.message}</div>`; }
+}
+
+// Render the categorized fee breakdown returned by /api/children/{id}/fees.
+// Compact mobile-friendly layout: one panel per category, listing each period
+// row underneath with paid / balance and a receipt link.
+function renderCategoryTree(data, child, api) {
+    const cats = (data && data.categories) || [];
+    if (!cats.length) {
+        return '<div class="text-xs text-gray" style="padding:6px 0">No fees on record.</div>';
+    }
+    let html = '<div style="margin-top:6px;border-top:1px dashed var(--border);padding-top:8px">'
+        + '<div class="text-xs bold text-gray" style="text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Fee Breakdown</div>';
+    for (const cat of cats) {
+        const balColor = cat.subtotal_balance > 0 ? 'text-red' : 'text-green';
+        html += `<details style="margin-bottom:6px;border:1px solid var(--border);border-radius:8px;background:var(--card)">
+            <summary style="padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:0.78rem">
+                <span class="bold text-navy">${escapeHtml(cat.name)}</span>
+                <span class="mono ${balColor}" style="font-size:0.78rem">${fmtK(cat.subtotal_balance)}</span>
+            </summary>
+            <div style="padding:0 10px 8px 10px">`;
+        for (const it of (cat.items || [])) {
+            const itemBalColor = it.balance > 0 ? 'text-red' : 'text-green';
+            const status = it.status || (it.balance <= 0 ? 'paid' : (it.paid > 0 ? 'partial' : 'unpaid'));
+            const statusBadge = status === 'paid' ? '<span class="badge badge-green" style="font-size:0.6rem">Paid</span>'
+                : status === 'partial' ? '<span class="badge badge-amber" style="font-size:0.6rem">Partial</span>'
+                : '<span class="badge badge-red" style="font-size:0.6rem">Unpaid</span>';
+            html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border-light, var(--border));font-size:0.74rem">
+                <div style="flex:1;min-width:0">
+                    <div class="text-navy">${escapeHtml(it.period || '—')} ${statusBadge}</div>
+                    <div class="text-xs text-gray">Total K${fmt(it.amount)} &middot; Paid K${fmt(it.paid)}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0">
+                    <div class="mono ${itemBalColor}">${fmtK(it.balance)}</div>
+                    ${it.receipt_url ? `<a href="${api.downloadUrl(it.receipt_url)}" target="_blank" class="share-btn share-copy" style="padding:1px 5px;font-size:0.58rem;margin-top:2px">Receipt</a>` : ''}
+                </div>
+            </div>`;
+        }
+        html += '</div></details>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function escapeHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 async function renderHomeworkPage(el, api, children) {
@@ -1930,12 +2003,26 @@ function renderTimetableHtml(timetable) {
 
 async function renderProfile(el, user, children, api) {
     const isDark = document.documentElement.classList.contains('dark-mode');
+    const photoUrl = user.profile_photo || '';
     let html = '<div class="dash-scroll">';
     html += `<div class="card">
-        <div style="background:linear-gradient(135deg,var(--navy),var(--navy-light));padding:24px;text-align:center;color:#fff">
-            <div class="child-avatar" style="width:64px;height:64px;font-size:1.6rem;margin:0 auto 12px;border-radius:16px">${initial(user.name)}</div>
-            <div style="font-size:1.1rem;font-weight:700">${user.name || ''}</div>
+        <div style="background:linear-gradient(135deg,var(--navy),var(--navy-light));padding:24px 16px 20px;text-align:center;color:#fff">
+            <div class="profile-photo-wrap">
+                <div class="profile-photo-frame" id="profile-photo-frame">
+                    ${photoUrl
+                        ? `<img src="${photoUrl}" alt="${user.name || 'Parent'}" class="profile-photo-img">`
+                        : `<div class="profile-photo-fallback">${initial(user.name)}</div>`}
+                </div>
+                <button class="profile-photo-edit" id="profile-photo-edit" aria-label="Change photo">${SVG.camera || '📷'}</button>
+                <input type="file" id="profile-photo-input" accept="image/jpeg,image/png,image/webp" style="display:none">
+            </div>
+            <div style="font-size:1.1rem;font-weight:700;margin-top:12px">${user.name || ''}</div>
             <div style="font-size:0.82rem;opacity:0.65;margin-top:4px">${user.relationship ? user.relationship.charAt(0).toUpperCase() + user.relationship.slice(1) : 'Parent'}</div>
+            <div class="profile-photo-actions">
+                <button class="profile-photo-btn" id="profile-photo-pick">${photoUrl ? 'Change photo' : 'Add photo'}</button>
+                ${photoUrl ? `<button class="profile-photo-btn ghost" id="profile-photo-remove">Remove</button>` : ''}
+            </div>
+            <div id="profile-photo-msg" class="profile-photo-msg" style="display:none"></div>
         </div>
         <div style="padding:16px">
             <div class="list-item" style="border-bottom:1px solid var(--border)"><div class="text-xs text-gray bold" style="width:80px">Email</div><div class="text-sm">${user.email || '-'}</div></div>
@@ -2005,6 +2092,61 @@ async function renderProfile(el, user, children, api) {
         localStorage.removeItem('user_data');
         localStorage.removeItem('children_data');
         window.location.hash = '#/login';
+    });
+
+    // Profile photo upload / remove
+    const fileInput = document.getElementById('profile-photo-input');
+    const pickBtn = document.getElementById('profile-photo-pick');
+    const editBtn = document.getElementById('profile-photo-edit');
+    const removeBtn = document.getElementById('profile-photo-remove');
+    const msgEl = document.getElementById('profile-photo-msg');
+    const showMsg = (text, ok) => {
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        msgEl.className = 'profile-photo-msg ' + (ok ? 'ok' : 'err');
+        msgEl.style.display = '';
+        setTimeout(() => { if (msgEl) msgEl.style.display = 'none'; }, 3000);
+    };
+    const persistAndRerender = (newPhotoUrl) => {
+        user.profile_photo = newPhotoUrl;
+        try {
+            const cached = JSON.parse(localStorage.getItem('user_data') || '{}');
+            cached.profile_photo = newPhotoUrl;
+            localStorage.setItem('user_data', JSON.stringify(cached));
+        } catch {}
+        // Re-render the whole dashboard so header & drawer pick up the new photo
+        renderDashboard(document.getElementById('app'), api, null);
+    };
+    pickBtn?.addEventListener('click', () => fileInput?.click());
+    editBtn?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', async () => {
+        const file = fileInput.files?.[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) { showMsg('Photo must be 5 MB or smaller.', false); fileInput.value = ''; return; }
+        if (!/^image\/(jpe?g|png|webp)$/i.test(file.type)) { showMsg('Choose a JPG, PNG, or WebP image.', false); fileInput.value = ''; return; }
+        pickBtn.disabled = true; pickBtn.textContent = 'Uploading…';
+        try {
+            const res = await api.uploadProfilePhoto(file);
+            showMsg('Profile photo updated.', true);
+            persistAndRerender(res.profile_photo);
+        } catch (err) {
+            pickBtn.disabled = false; pickBtn.textContent = user.profile_photo ? 'Change photo' : 'Add photo';
+            showMsg(err.message || 'Upload failed.', false);
+        } finally {
+            fileInput.value = '';
+        }
+    });
+    removeBtn?.addEventListener('click', async () => {
+        if (!confirm('Remove your profile photo?')) return;
+        removeBtn.disabled = true; removeBtn.textContent = 'Removing…';
+        try {
+            await api.deleteProfilePhoto();
+            showMsg('Profile photo removed.', true);
+            persistAndRerender(null);
+        } catch (err) {
+            removeBtn.disabled = false; removeBtn.textContent = 'Remove';
+            showMsg(err.message || 'Failed to remove.', false);
+        }
     });
 }
 
@@ -2088,6 +2230,262 @@ function showComplaintForm(el, api, childId, childName) {
             submitBtn.disabled = false;
             submitBtn.innerHTML = 'Submit Report';
         }
+    });
+}
+
+// Forced first-login password change — blocking, can't be dismissed.
+function showForcedPasswordChangeModal(api, user) {
+    if (document.getElementById('force-pw-modal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'force-pw-modal';
+    modal.className = 'complaint-modal-overlay';
+    modal.style.zIndex = '9999';
+    modal.innerHTML = `
+        <div class="complaint-modal">
+            <div class="list-title" style="font-size:1rem;margin-bottom:4px">Set a New Password</div>
+            <div class="text-xs text-gray" style="margin-bottom:16px">You're using a temporary password. Please choose a new one to continue.</div>
+            <div class="form-group">
+                <label class="form-label">Current (Temporary) Password</label>
+                <input type="password" id="fp-current" class="form-input" autocomplete="current-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">New Password</label>
+                <input type="password" id="fp-new" class="form-input" autocomplete="new-password" placeholder="At least 8 characters">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Confirm New Password</label>
+                <input type="password" id="fp-confirm" class="form-input" autocomplete="new-password">
+            </div>
+            <div id="fp-error" class="form-error" style="display:none;margin-bottom:12px"></div>
+            <button id="fp-submit" class="btn btn-primary" style="padding:14px;font-size:0.95rem">Update Password</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('fp-submit').addEventListener('click', async () => {
+        const current = document.getElementById('fp-current').value;
+        const next = document.getElementById('fp-new').value;
+        const confirm = document.getElementById('fp-confirm').value;
+        const err = document.getElementById('fp-error');
+        err.style.display = 'none';
+
+        if (!current || !next || next.length < 8) { err.textContent = 'New password must be at least 8 characters.'; err.style.display = ''; return; }
+        if (next !== confirm) { err.textContent = 'New passwords do not match.'; err.style.display = ''; return; }
+        if (next === current) { err.textContent = 'Choose a different password from the temporary one.'; err.style.display = ''; return; }
+
+        const btn = document.getElementById('fp-submit');
+        btn.disabled = true; btn.innerHTML = '<div class="btn-spinner"></div> Updating...';
+
+        try {
+            await api.changePassword(current, next);
+            // Clear the flag locally; clear saved auto-login (old pw is stale).
+            user.must_change_password = false;
+            localStorage.setItem('user_data', JSON.stringify(user));
+            localStorage.removeItem('saved_pass');
+            modal.remove();
+        } catch (e) {
+            err.textContent = e.message || 'Could not update password.';
+            err.style.display = '';
+            btn.disabled = false;
+            btn.innerHTML = 'Update Password';
+        }
+    });
+}
+
+// Pay-as-you-go Bus Fare modal — fixed K500, month picker, no carried debt.
+function showBusPaymentModal(api, childId, childName) {
+    if (document.getElementById('bus-pay-modal')) return;
+    const user = JSON.parse(localStorage.getItem('user_data') || '{}');
+    const now = new Date();
+    const currentMonthValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const monthLabel = (v) => {
+        const [y, m] = v.split('-');
+        const d = new Date(parseInt(y), parseInt(m) - 1, 1);
+        return d.toLocaleString('en', { month: 'long', year: 'numeric' });
+    };
+
+    // Build month options: current + next 3 months
+    let monthOpts = '';
+    for (let i = 0; i < 4; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        const v = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        monthOpts += `<option value="${v}" ${v === currentMonthValue ? 'selected' : ''}>${monthLabel(v)}</option>`;
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'bus-pay-modal';
+    modal.className = 'complaint-modal-overlay';
+    modal.innerHTML = `
+        <div class="complaint-modal">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <div class="list-title" style="font-size:1rem">Pay Bus Fare</div>
+                <button id="close-bus-pay" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text3)">&times;</button>
+            </div>
+            <div class="text-xs text-gray" style="margin-bottom:16px">${childName} &middot; K500 per month</div>
+
+            <div style="background:linear-gradient(135deg,var(--amber),#b45309);border-radius:var(--radius-sm);padding:16px;color:#fff;margin-bottom:16px;text-align:center">
+                <div style="font-size:0.7rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.05em">This Payment</div>
+                <div class="mono" id="bus-amount-display" style="font-size:1.8rem;font-weight:700;margin-top:4px">K 500</div>
+                <div class="text-xs" style="opacity:0.85;margin-top:6px">Pay-as-you-go — no debt is created if you don't pay.</div>
+            </div>
+
+            <div id="bus-form">
+                <div class="form-group">
+                    <label class="form-label">Bus Route</label>
+                    <select id="bus-route" class="form-input" style="padding:12px"><option value="">Loading routes…</option></select>
+                    <div class="text-xs text-gray" style="margin-top:4px">Pick the route your child rides.</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Month</label>
+                    <select id="bus-month" class="form-input" style="padding:12px">${monthOpts}</select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mobile Money Number</label>
+                    <input type="tel" id="bus-mobile" class="form-input" placeholder="e.g. 0971234567" value="${user.phone || ''}" style="padding:12px" inputmode="tel">
+                    <div class="text-xs text-gray" style="margin-top:4px">Airtel Money, MTN MoMo, or Zamtel Kwacha</div>
+                </div>
+                <div id="bus-error" class="form-error" style="display:none;margin-bottom:12px"></div>
+                <button id="bus-submit" class="btn btn-primary" style="padding:14px;font-size:0.95rem;background:var(--amber)">Pay K500</button>
+            </div>
+
+            <div id="bus-processing" style="display:none;text-align:center;padding:24px 0">
+                <div class="btn-spinner" style="width:40px;height:40px;margin:0 auto 16px;border-color:var(--border);border-top-color:var(--amber)"></div>
+                <div class="list-title">Processing Payment</div>
+                <div class="text-sm text-gray" style="margin-top:6px">Check your phone to approve the transaction</div>
+                <div class="text-xs text-gray" style="margin-top:12px">Reference: <span id="bus-ref" class="mono bold">—</span></div>
+            </div>
+
+            <div id="bus-success" style="display:none;text-align:center;padding:24px 0">
+                <div style="width:56px;height:56px;border-radius:50%;background:rgba(5,150,105,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:var(--green)">${SVG.check}</div>
+                <div class="list-title" style="color:var(--green)">Bus Fare Paid</div>
+                <div class="text-sm text-gray" style="margin-top:6px">K500 received for <span id="bus-success-month">—</span></div>
+                <div class="text-xs text-gray" style="margin-top:4px">Ref: <span id="bus-success-ref" class="mono">—</span></div>
+                <button id="bus-done" class="btn btn-primary mt-3" style="background:var(--amber)">Done</button>
+            </div>
+
+            <div id="bus-failed" style="display:none;text-align:center;padding:24px 0">
+                <div style="width:56px;height:56px;border-radius:50%;background:rgba(220,38,38,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:var(--red);font-size:1.5rem;font-weight:700">&times;</div>
+                <div class="list-title" style="color:var(--red)">Payment Failed</div>
+                <div class="text-sm text-gray" style="margin-top:6px" id="bus-fail-msg">Please try again.</div>
+                <button id="bus-retry" class="btn btn-outline mt-3">Try Again</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const formEl = document.getElementById('bus-form');
+    const procEl = document.getElementById('bus-processing');
+    const okEl   = document.getElementById('bus-success');
+    const failEl = document.getElementById('bus-failed');
+    let inFlight = false;
+
+    const close = () => {
+        if (inFlight && !confirm('Payment is being processed. Close anyway? It will still complete if you approve on your phone.')) return;
+        inFlight = false; modal.remove();
+    };
+    document.getElementById('close-bus-pay').onclick = close;
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+    // Load active routes; update displayed amount when route changes.
+    const routeEl = document.getElementById('bus-route');
+    const amountEl = document.getElementById('bus-amount-display');
+    const submitBtnEl = document.getElementById('bus-submit');
+    let routes = [];
+    const refreshAmount = () => {
+        const id = routeEl.value;
+        const r = routes.find(x => String(x.id) === String(id));
+        const amt = r ? r.monthly_amount : 500;
+        amountEl.textContent = 'K ' + new Intl.NumberFormat().format(amt);
+        submitBtnEl.textContent = 'Pay K' + new Intl.NumberFormat().format(amt);
+    };
+    api.getBusRoutes().then(data => {
+        routes = (data && data.routes) || [];
+        if (!routes.length) {
+            routeEl.innerHTML = '<option value="">(No routes configured — using default K500)</option>';
+        } else {
+            routeEl.innerHTML = routes.map(r => `<option value="${r.id}">${escapeHtml(r.name)} — K${new Intl.NumberFormat().format(r.monthly_amount)}</option>`).join('');
+        }
+        refreshAmount();
+    }).catch(() => {
+        routeEl.innerHTML = '<option value="">(Could not load routes — paying default K500)</option>';
+        refreshAmount();
+    });
+    routeEl.addEventListener('change', refreshAmount);
+
+    document.getElementById('bus-submit').addEventListener('click', async () => {
+        const month = document.getElementById('bus-month').value;
+        const mobile = document.getElementById('bus-mobile').value.trim();
+        const routeId = routeEl.value ? parseInt(routeEl.value, 10) : null;
+        const err = document.getElementById('bus-error');
+        if (!month) { err.textContent = 'Pick the month you are paying for.'; err.style.display = ''; return; }
+        if (routes.length && !routeId) { err.textContent = 'Pick the bus route.'; err.style.display = ''; return; }
+        if (!mobile || mobile.length < 10) { err.textContent = 'Please enter a valid mobile number.'; err.style.display = ''; return; }
+        err.style.display = 'none';
+
+        const btn = document.getElementById('bus-submit');
+        btn.disabled = true; btn.innerHTML = '<div class="btn-spinner"></div> Processing...';
+        formEl.style.display = 'none';
+        procEl.style.display = '';
+        inFlight = true;
+
+        try {
+            const result = await api.payBusFare(childId, month, mobile, routeId);
+            document.getElementById('bus-ref').textContent = result.payment_reference;
+            if (result.is_delayed) {
+                document.querySelector('#bus-processing .list-title').textContent = 'Payment Request Sent';
+                document.querySelector('#bus-processing .text-sm').textContent = 'Confirmation delayed — approve on your phone if prompted; we\'ll detect it automatically.';
+            }
+            // Poll using the same checkPaymentStatus the regular flow uses
+            const paymentId = result.payment_id;
+            let attempts = 0, networkErrors = 0;
+            const maxAttempts = 60; // 5 minutes
+            const poll = async () => {
+                if (!document.getElementById('bus-pay-modal')) return;
+                attempts++;
+                try {
+                    const status = await api.checkPaymentStatus(paymentId);
+                    networkErrors = 0;
+                    if (status.status === 'completed') {
+                        inFlight = false;
+                        procEl.style.display = 'none';
+                        okEl.style.display = '';
+                        document.getElementById('bus-success-month').textContent = monthLabel(month);
+                        document.getElementById('bus-success-ref').textContent = status.payment_reference || result.payment_reference;
+                        return;
+                    }
+                    if (status.status === 'failed' || status.status === 'expired') {
+                        inFlight = false;
+                        procEl.style.display = 'none';
+                        failEl.style.display = '';
+                        document.getElementById('bus-fail-msg').textContent = status.message || 'Payment was not successful.';
+                        return;
+                    }
+                    if (attempts < maxAttempts) setTimeout(poll, 5000);
+                    else {
+                        procEl.style.display = 'none'; failEl.style.display = '';
+                        document.getElementById('bus-fail-msg').innerHTML = `Confirmation is taking longer than expected.<br><br><strong>Ref: ${result.payment_reference}</strong><br><br>If you approved on your phone, we\'ll detect it and update your balance automatically. Check back later.`;
+                        document.getElementById('bus-retry').textContent = 'Close';
+                    }
+                } catch (e) {
+                    networkErrors++;
+                    if (networkErrors >= 5) {
+                        inFlight = false; procEl.style.display = 'none'; failEl.style.display = '';
+                        document.getElementById('bus-fail-msg').textContent = 'Connection lost. If you approved on your phone, the payment will still complete.';
+                    } else if (attempts < maxAttempts) setTimeout(poll, 5000);
+                }
+            };
+            setTimeout(poll, 5000);
+        } catch (e) {
+            inFlight = false; procEl.style.display = 'none'; failEl.style.display = '';
+            document.getElementById('bus-fail-msg').textContent = e.message || 'Could not start payment.';
+        }
+    });
+
+    document.getElementById('bus-done')?.addEventListener('click', () => { modal.remove(); window.location.reload(); });
+    document.getElementById('bus-retry')?.addEventListener('click', () => {
+        failEl.style.display = 'none'; formEl.style.display = '';
+        document.getElementById('bus-error').style.display = 'none';
+        const btn = document.getElementById('bus-submit'); btn.disabled = false; btn.innerHTML = 'Pay K500';
     });
 }
 
@@ -2306,33 +2704,141 @@ let _quizTimer = null;
 function clearQuizTimer() { if (_quizTimer) { clearInterval(_quizTimer); _quizTimer = null; } }
 function pquizEsc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
+function quizSubjectStyle(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('math')) return { cls: 'sc-math', emoji: '🧮' };
+    if (n.includes('english') || n.includes('language') || n.includes('literacy')) return { cls: 'sc-eng', emoji: '📖' };
+    if (n.includes('biolog')) return { cls: 'sc-bio', emoji: '🧬' };
+    if (n.includes('chem')) return { cls: 'sc-chem', emoji: '⚗️' };
+    if (n.includes('phys')) return { cls: 'sc-phys', emoji: '⚛️' };
+    if (n.includes('science')) return { cls: 'sc-sci', emoji: '🔬' };
+    if (n.includes('social') || n.includes('history') || n.includes('geog') || n.includes('civic')) return { cls: 'sc-soc', emoji: '🌍' };
+    if (n.includes('art') || n.includes('music') || n.includes('creative')) return { cls: 'sc-art', emoji: '🎨' };
+    if (n.includes('religi')) return { cls: 'sc-soc', emoji: '🕊️' };
+    if (n.includes('comput') || n.includes('ict')) return { cls: 'sc-phys', emoji: '💻' };
+    return { cls: 'sc-other', emoji: '📝' };
+}
+
+function quizInitials(name) {
+    const parts = (name || '').trim().split(/\s+/).slice(0, 2);
+    return parts.map(p => p[0] || '').join('').toUpperCase() || '?';
+}
+
+function quizPraise(pct) {
+    if (pct >= 90) return { emoji: '🏆', msg: 'Outstanding work!' };
+    if (pct >= 75) return { emoji: '🌟', msg: 'Great job!' };
+    if (pct >= 50) return { emoji: '👍', msg: 'Well done — you passed.' };
+    if (pct >= 30) return { emoji: '💪', msg: 'Keep practising — you can do better.' };
+    return { emoji: '📚', msg: "Don't give up — review and try again." };
+}
+
 async function renderQuizzesPage(el, api, children) {
     clearQuizTimer();
     el.innerHTML = '<div class="dash-scroll"><div class="skeleton skeleton-card"></div></div>';
     try {
         const perChild = await Promise.all(children.map(c =>
             api.getQuizzes(c.id).then(q => ({ child: c, quizzes: q })).catch(() => ({ child: c, quizzes: [] }))));
+
+        // Aggregate stats for the hero
+        let totalQ = 0, doneQ = 0, pctSum = 0, pctCount = 0;
+        for (const { quizzes } of perChild) {
+            for (const q of quizzes) {
+                totalQ++;
+                if (q.best_percentage !== null && q.best_percentage !== undefined) {
+                    doneQ++;
+                    pctSum += Number(q.best_percentage);
+                    pctCount++;
+                }
+            }
+        }
+        const avgPct = pctCount ? Math.round(pctSum / pctCount) : null;
+
         let html = '<div class="dash-scroll">';
-        html += `<div style="font-size:1.05rem;font-weight:700;margin-bottom:10px">Quizzes</div>`;
+        html += `<div class="q-hero">
+            <div class="q-hero-eyebrow">Learning</div>
+            <div class="q-hero-title">Quizzes</div>
+            <div class="q-hero-sub">${totalQ ? 'Practise, test yourself, and track your progress.' : 'No quizzes assigned yet — check back soon.'}</div>
+            ${totalQ ? `<div class="q-hero-stats">
+                <div class="q-hero-stat"><div class="q-hero-stat-val">${totalQ}</div><div class="q-hero-stat-lbl">Available</div></div>
+                <div class="q-hero-stat"><div class="q-hero-stat-val">${doneQ}</div><div class="q-hero-stat-lbl">Completed</div></div>
+                <div class="q-hero-stat"><div class="q-hero-stat-val">${avgPct !== null ? avgPct + '%' : '—'}</div><div class="q-hero-stat-lbl">Average</div></div>
+            </div>` : ''}
+        </div>`;
+
         for (const { child, quizzes } of perChild) {
-            html += `<div class="text-xs bold text-gray" style="margin:12px 0 6px;text-transform:uppercase;letter-spacing:0.04em">${pquizEsc(child.name)}${child.class ? ' · ' + child.class : ''}</div>`;
+            html += `<div class="q-child">
+                <div class="q-child-avatar">${quizInitials(child.name)}</div>
+                <div>
+                    <div class="q-child-name">${pquizEsc(child.name)}</div>
+                    ${child.class ? `<div class="q-child-class">${pquizEsc(child.class)}</div>` : ''}
+                </div>
+            </div>`;
+
             if (!quizzes.length) {
-                html += `<div class="card"><div style="padding:14px;text-align:center;color:#9ca3af;font-size:0.85rem">No quizzes assigned.</div></div>`;
+                html += `<div class="q-empty">
+                    <div class="q-empty-emoji">📭</div>
+                    <div>No quizzes assigned yet.</div>
+                </div>`;
                 continue;
             }
+
             for (const q of quizzes) {
                 const done = q.best_percentage !== null && q.best_percentage !== undefined;
-                const timed = q.time_limit_minutes ? `${q.time_limit_minutes} min` : 'No time limit';
-                let badge;
-                if (q.closed) badge = `<span class="badge" style="background:#9ca3af;color:#fff">Closed</span>`;
-                else if (done) badge = `<span class="badge ${q.best_percentage >= 50 ? 'badge-green' : 'badge-red'}">Best ${q.best_percentage}%</span>`;
-                else badge = `<span class="badge badge-amber">Not done</span>`;
-                html += `<div class="card"><div style="padding:12px 14px">
-                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-weight:700;font-size:0.9rem">${pquizEsc(q.title)}</div>${badge}</div>
-                    <div class="text-xs text-gray" style="margin-top:4px">${q.subject || ''} · ${q.num_questions} questions · ${timed}</div>
-                    ${q.attempts ? `<div class="text-xs text-gray" style="margin-top:2px">${q.attempts} attempt${q.attempts > 1 ? 's' : ''}</div>` : ''}
-                    ${!q.closed ? `<button class="btn btn-primary btn-take-quiz" data-child="${child.id}" data-quiz="${q.id}" style="width:auto;padding:8px 16px;font-size:0.75rem;margin-top:8px">${done ? 'Retake' : 'Start'}</button>` : ''}
-                </div></div>`;
+                const sub = quizSubjectStyle(q.subject);
+                const timed = q.time_limit_minutes ? `${q.time_limit_minutes} min` : 'Untimed';
+                let statusEl = '';
+                if (q.closed) {
+                    statusEl = `<span class="q-score-pill" style="background:rgba(107,114,128,0.12);color:#6b7280">Closed</span>`;
+                } else if (done) {
+                    const pass = q.best_percentage >= 50;
+                    statusEl = `<span class="q-score-pill" style="background:${pass ? 'rgba(5,150,105,0.12)' : 'rgba(220,38,38,0.12)'};color:${pass ? 'var(--green)' : 'var(--red)'}">${pass ? '★' : '•'} ${q.best_percentage}%</span>`;
+                } else {
+                    statusEl = `<span class="q-score-pill" style="background:rgba(217,119,6,0.12);color:var(--amber)">New</span>`;
+                }
+
+                const actionLabel = q.closed ? null : (q.in_progress ? 'Resume' : (done ? 'Retake' : 'Start'));
+                const hist = Array.isArray(q.history) ? q.history : [];
+                const histPanelId = `hist-${child.id}-${q.id}`;
+                const histRowsHtml = hist.map((a, i) => {
+                    const pctCls = a.percentage === null ? '' : (a.percentage >= 50 ? 'good' : 'warn');
+                    const num = hist.length - i;
+                    return `<div class="q-hist-row">
+                        <div class="q-hist-num">${num}</div>
+                        <div class="q-hist-main">
+                            <div class="q-hist-date">${a.submitted_at || ''}</div>
+                            <div class="q-hist-meta">
+                                <span>${a.score ?? 0} / ${a.total_points} pts</span>
+                                ${a.is_best ? '<span class="q-hist-best">★ Best</span>' : ''}
+                                ${a.auto_submitted ? '<span class="q-hist-auto">⏱ Auto</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="q-hist-pct ${pctCls}">${a.percentage !== null ? a.percentage + '%' : '—'}</div>
+                    </div>`;
+                }).join('');
+
+                html += `<div class="q-card ${sub.cls}">
+                    <div class="q-card-accent" style="background:var(--sc)"></div>
+                    <div class="q-card-body">
+                        <div class="q-card-top">
+                            <div class="q-icon" style="background:var(--sc-bg);color:var(--sc)">${sub.emoji}</div>
+                            <div class="q-card-info">
+                                <div class="q-card-title">${pquizEsc(q.title)}</div>
+                                <div class="q-card-meta">
+                                    ${q.subject ? `<span style="color:var(--sc);font-weight:700">${pquizEsc(q.subject)}</span><span class="q-meta-dot"></span>` : ''}
+                                    <span>${q.num_questions} question${q.num_questions > 1 ? 's' : ''}</span>
+                                    <span class="q-meta-dot"></span>
+                                    <span>${timed}</span>
+                                </div>
+                            </div>
+                            <div class="q-card-status">${statusEl}</div>
+                        </div>
+                        <div class="q-card-actions">
+                            ${hist.length ? `<button class="q-hist-toggle" data-target="${histPanelId}">↻ ${q.attempts} attempt${q.attempts > 1 ? 's' : ''} · View <span class="chev">▾</span></button>` : `<span class="q-attempts">No attempts yet</span>`}
+                            ${actionLabel ? `<button class="q-btn q-btn-primary btn-take-quiz" data-child="${child.id}" data-quiz="${q.id}">${actionLabel} →</button>` : ''}
+                        </div>
+                    </div>
+                    ${hist.length ? `<div class="q-hist" id="${histPanelId}" style="display:none">${histRowsHtml}</div>` : ''}
+                </div>`;
             }
         }
         html += '</div>';
@@ -2341,8 +2847,15 @@ async function renderQuizzesPage(el, api, children) {
             const child = children.find(c => String(c.id) === b.dataset.child);
             showQuizTake(el, api, children, child, b.dataset.quiz);
         }));
+        el.querySelectorAll('.q-hist-toggle').forEach(b => b.addEventListener('click', () => {
+            const panel = document.getElementById(b.dataset.target);
+            if (!panel) return;
+            const open = panel.style.display !== 'none';
+            panel.style.display = open ? 'none' : 'block';
+            b.classList.toggle('open', !open);
+        }));
     } catch (err) {
-        el.innerHTML = `<div class="dash-scroll"><div class="card"><div style="padding:14px;text-align:center;color:#9ca3af">${err.message}</div></div></div>`;
+        el.innerHTML = `<div class="dash-scroll"><div class="q-empty"><div class="q-empty-emoji">⚠️</div><div>${pquizEsc(err.message)}</div></div></div>`;
     }
 }
 
@@ -2351,24 +2864,29 @@ async function showQuizTake(el, api, children, child, quizId) {
     el.innerHTML = '<div class="dash-scroll"><div class="skeleton skeleton-card"></div></div>';
     let quiz;
     try { quiz = await api.getQuiz(child.id, quizId); }
-    catch (err) { el.innerHTML = `<div class="dash-scroll"><div class="card"><div style="padding:14px;text-align:center;color:#9ca3af">${err.message}</div></div></div>`; return; }
+    catch (err) { el.innerHTML = `<div class="dash-scroll"><div class="q-empty"><div class="q-empty-emoji">⚠️</div><div>${pquizEsc(err.message)}</div></div></div>`; return; }
 
     let attemptId = null, deadlineMs = null, submitting = false, submitted = false;
+    const subStyle = quizSubjectStyle(quiz.subject);
 
     function renderIntro() {
         clearQuizTimer();
-        const timed = quiz.time_limit_minutes ? `${quiz.time_limit_minutes} minute${quiz.time_limit_minutes > 1 ? 's' : ''}` : 'No time limit';
+        const timed = quiz.time_limit_minutes ? `${quiz.time_limit_minutes} min` : 'Untimed';
         let h = '<div class="dash-scroll">';
-        h += `<button id="q-back" class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:0.72rem;margin-bottom:10px">← Back</button>`;
-        h += `<div class="card"><div style="padding:16px">
-            <div style="font-size:1.1rem;font-weight:700">${pquizEsc(quiz.title)}</div>
-            ${quiz.subject ? `<div class="text-xs text-gray" style="margin-top:4px">${quiz.subject}</div>` : ''}
-            ${quiz.description ? `<div class="text-sm" style="margin-top:8px;color:#4b5563">${pquizEsc(quiz.description)}</div>` : ''}
-            <div class="text-sm" style="margin-top:8px">${quiz.questions.length} question${quiz.questions.length > 1 ? 's' : ''} · ${quiz.total_points} point${quiz.total_points > 1 ? 's' : ''}</div>
-            <div class="text-sm">Time: ${timed}</div>
-            ${quiz.time_limit_minutes ? `<div class="text-xs text-gray" style="margin-top:8px">The timer starts when you tap Start. The quiz auto-submits when time runs out.</div>` : ''}
-            <button id="q-start" class="btn btn-primary" style="margin-top:12px">${quiz.in_progress_attempt ? 'Resume' : 'Start Quiz'}</button>
-        </div></div></div>`;
+        h += `<button id="q-back" class="q-btn q-btn-ghost" style="margin-bottom:12px">← Back</button>`;
+        h += `<div class="q-intro ${subStyle.cls}">
+            <div class="q-intro-icon" style="background:var(--sc-bg);color:var(--sc)">${subStyle.emoji}</div>
+            ${quiz.subject ? `<div class="q-intro-subject" style="color:var(--sc)">${pquizEsc(quiz.subject)}</div>` : ''}
+            <div class="q-intro-title">${pquizEsc(quiz.title)}</div>
+            ${quiz.description ? `<div class="q-intro-desc">${pquizEsc(quiz.description)}</div>` : ''}
+            <div class="q-intro-facts">
+                <div class="q-fact"><div class="q-fact-val">${quiz.questions.length}</div><div class="q-fact-lbl">Questions</div></div>
+                <div class="q-fact"><div class="q-fact-val">${quiz.total_points}</div><div class="q-fact-lbl">Points</div></div>
+                <div class="q-fact"><div class="q-fact-val">${timed}</div><div class="q-fact-lbl">${quiz.time_limit_minutes ? 'Time' : ''}</div></div>
+            </div>
+            ${quiz.time_limit_minutes ? `<div class="q-intro-hint">The timer starts when you tap Start. The quiz auto-submits when time runs out.</div>` : ''}
+            <button id="q-start" class="q-btn q-btn-primary" style="margin-top:16px;padding:13px 28px;font-size:0.9rem">${quiz.in_progress_attempt ? 'Resume Quiz' : 'Start Quiz'} →</button>
+        </div></div>`;
         el.innerHTML = h;
         document.getElementById('q-back').addEventListener('click', () => renderQuizzesPage(el, api, children));
         document.getElementById('q-start').addEventListener('click', startAndRender);
@@ -2383,23 +2901,63 @@ async function showQuizTake(el, api, children, child, quizId) {
         } catch (err) { alert(err.message); }
     }
 
+    function updateProgress() {
+        const total = quiz.questions.length;
+        let answered = 0;
+        quiz.questions.forEach(q => { if (el.querySelector(`input[name="q-${q.id}"]:checked`)) answered++; });
+        const fill = document.getElementById('q-progress-fill');
+        const count = document.getElementById('q-progress-count');
+        if (fill) fill.style.width = `${(answered / total) * 100}%`;
+        if (count) count.textContent = `${answered} of ${total} answered`;
+    }
+
     function renderQuestions(serverNow) {
         let h = '<div class="dash-scroll">';
-        if (deadlineMs) {
-            h += `<div style="position:sticky;top:0;z-index:5;background:#1e3a5f;color:#fff;text-align:center;padding:8px;border-radius:8px;font-weight:700;margin-bottom:10px">Time left: <span id="q-timer-val">--:--</span></div>`;
-        }
-        h += `<div style="font-size:1rem;font-weight:700;margin-bottom:10px">${pquizEsc(quiz.title)}</div>`;
+        h += `<div class="q-progress-bar">
+            <div class="q-progress-row">
+                <div class="q-progress-label">${pquizEsc(quiz.title)}</div>
+                ${deadlineMs ? `<div class="q-timer-pill" id="q-timer-pill">⏱ <span id="q-timer-val">--:--</span></div>` : ''}
+            </div>
+            <div class="q-progress-row" style="margin-bottom:6px">
+                <div class="q-progress-count" id="q-progress-count">0 of ${quiz.questions.length} answered</div>
+                <div class="q-progress-count">${quiz.total_points} pts</div>
+            </div>
+            <div class="q-progress-track"><div class="q-progress-fill" id="q-progress-fill" style="width:0%"></div></div>
+        </div>`;
         quiz.questions.forEach((q, qi) => {
-            h += `<div class="card" style="margin-bottom:8px"><div style="padding:12px 14px">
-                <div style="font-weight:600;font-size:0.88rem">${qi + 1}. ${pquizEsc(q.question_text)} <span class="text-xs text-gray">(${q.points} pt${q.points > 1 ? 's' : ''})</span></div>
-                <div style="margin-top:8px">
-                ${q.options.map(o => `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer">
-                    <input type="radio" name="q-${q.id}" value="${o.id}"><span class="text-sm">${pquizEsc(o.option_text)}</span></label>`).join('')}
-                </div></div></div>`;
+            h += `<div class="q-question">
+                <div class="q-q-header">
+                    <div class="q-num">${qi + 1}</div>
+                    <div>
+                        <div class="q-q-text">${pquizEsc(q.question_text)}</div>
+                        <div class="q-q-points">${q.points} point${q.points > 1 ? 's' : ''}</div>
+                    </div>
+                </div>
+                <div class="q-options">
+                    ${q.options.map(o => `<label class="q-opt" data-qid="${q.id}">
+                        <input type="radio" name="q-${q.id}" value="${o.id}">
+                        <div class="q-opt-marker"></div>
+                        <div class="q-opt-text">${pquizEsc(o.option_text)}</div>
+                    </label>`).join('')}
+                </div>
+            </div>`;
         });
-        h += `<button id="q-submit" class="btn btn-primary" style="margin:10px 0 4px">Submit Quiz</button>`;
+        h += `<button id="q-submit" class="q-btn q-btn-primary" style="width:100%;padding:14px;font-size:0.95rem;margin-top:6px;margin-bottom:8px">Submit Quiz</button>`;
         h += '</div>';
         el.innerHTML = h;
+
+        // Wire option selection + visual state + progress
+        el.querySelectorAll('.q-opt').forEach(label => {
+            label.addEventListener('click', () => {
+                const input = label.querySelector('input');
+                input.checked = true;
+                el.querySelectorAll(`.q-opt`).forEach(l => {
+                    if (l.querySelector('input').name === input.name) l.classList.remove('selected');
+                });
+                label.classList.add('selected');
+                updateProgress();
+            });
+        });
         document.getElementById('q-submit').addEventListener('click', () => doSubmit(false));
         if (deadlineMs) startCountdown(serverNow);
     }
@@ -2409,11 +2967,16 @@ async function showQuizTake(el, api, children, child, quizId) {
         const skew = Date.now() - serverNow;
         const tick = () => {
             const v = document.getElementById('q-timer-val');
+            const pill = document.getElementById('q-timer-pill');
             if (!v) { clearQuizTimer(); return; }
             const remaining = deadlineMs - (Date.now() - skew);
             if (remaining <= 0) { v.textContent = '0:00'; clearQuizTimer(); doSubmit(true); return; }
             const s = Math.floor(remaining / 1000);
             v.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+            if (pill) {
+                if (remaining < 60_000) pill.classList.add('warn');
+                else pill.classList.remove('warn');
+            }
         };
         tick();
         _quizTimer = setInterval(tick, 1000);
@@ -2444,26 +3007,50 @@ async function showQuizTake(el, api, children, child, quizId) {
         clearQuizTimer();
         const pct = res.percentage;
         const pass = pct >= 50;
+        const praise = quizPraise(pct);
         let h = '<div class="dash-scroll">';
-        h += `<div class="card"><div style="padding:18px;text-align:center">
-            <div style="font-size:2rem;font-weight:800;color:${pass ? '#059669' : '#dc2626'}">${pct}%</div>
-            <div class="text-sm bold" style="margin-top:4px">You scored ${res.score} / ${res.total_points}</div>
-            ${res.auto_submitted ? `<div class="text-xs text-gray" style="margin-top:6px">Time ran out — your answers were auto-submitted.</div>` : ''}
-            ${(res.best_percentage !== null && res.best_percentage !== res.percentage) ? `<div class="text-xs text-gray" style="margin-top:6px">Your best so far: ${res.best_percentage}%</div>` : ''}
-        </div></div>`;
+        h += `<div class="q-result-hero ${pass ? 'pass' : 'fail'}">
+            <div class="q-result-emoji">${praise.emoji}</div>
+            <div class="q-result-pct">${pct}<small>%</small></div>
+            <div class="q-result-score">${res.score} / ${res.total_points} points · ${praise.msg}</div>
+            ${res.auto_submitted ? `<div class="q-result-note">⏱ Time ran out — your answers were auto-submitted.</div>` : ''}
+            ${(res.best_percentage !== null && res.best_percentage !== res.percentage) ? `<div class="q-result-best">Personal best: ${res.best_percentage}%</div>` : ''}
+        </div>`;
+
+        const correctCount = (res.review || []).filter(r => r.is_correct).length;
+        const totalCount = (res.review || []).length;
+        h += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+            <div class="q-fact" style="background:rgba(5,150,105,0.08);border-color:rgba(5,150,105,0.2)">
+                <div class="q-fact-val" style="color:var(--green)">${correctCount}</div>
+                <div class="q-fact-lbl">Correct</div>
+            </div>
+            <div class="q-fact" style="background:rgba(220,38,38,0.08);border-color:rgba(220,38,38,0.2)">
+                <div class="q-fact-val" style="color:var(--red)">${totalCount - correctCount}</div>
+                <div class="q-fact-lbl">Incorrect</div>
+            </div>
+        </div>`;
+
+        h += `<div style="font-size:0.78rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin:6px 0 8px">Review your answers</div>`;
+
         const byQ = {}; (res.review || []).forEach(r => { byQ[r.question_id] = r; });
         quiz.questions.forEach((q, qi) => {
             const r = byQ[q.id] || {};
             const correct = !!r.is_correct;
             const yourOpt = q.options.find(o => o.id === r.selected_option_id);
             const correctOpt = q.options.find(o => o.id === r.correct_option_id);
-            h += `<div class="card" style="margin-bottom:8px"><div style="padding:12px 14px;border-left:4px solid ${correct ? '#059669' : '#dc2626'}">
-                <div style="font-weight:600;font-size:0.86rem">${correct ? '✓' : '✗'} ${qi + 1}. ${pquizEsc(q.question_text)}</div>
-                <div class="text-xs" style="margin-top:4px">Your answer: ${yourOpt ? pquizEsc(yourOpt.option_text) : '<span class="text-gray">No answer</span>'}</div>
-                ${!correct ? `<div class="text-xs" style="color:#059669;margin-top:2px">Correct: ${correctOpt ? pquizEsc(correctOpt.option_text) : '-'}</div>` : ''}
-            </div></div>`;
+            h += `<div class="q-review-q ${correct ? 'correct' : 'wrong'}">
+                <div class="q-review-head">
+                    <div class="q-review-icon ${correct ? 'correct' : 'wrong'}">${correct ? '✓' : '✗'}</div>
+                    <div class="q-review-text">${qi + 1}. ${pquizEsc(q.question_text)}</div>
+                </div>
+                <div class="q-review-ans">
+                    <div class="lbl">Your answer</div>
+                    <div class="ans-you">${yourOpt ? pquizEsc(yourOpt.option_text) : '<span class="text-gray">No answer</span>'}</div>
+                    ${!correct ? `<div class="lbl" style="margin-top:6px">Correct answer</div><div class="ans-correct">${correctOpt ? pquizEsc(correctOpt.option_text) : '—'}</div>` : ''}
+                </div>
+            </div>`;
         });
-        h += `<button id="q-done" class="btn btn-primary" style="margin:10px 0 4px">Back to Quizzes</button>`;
+        h += `<button id="q-done" class="q-btn q-btn-primary" style="width:100%;padding:14px;font-size:0.95rem;margin-top:12px">Back to Quizzes</button>`;
         h += '</div>';
         el.innerHTML = h;
         document.getElementById('q-done').addEventListener('click', () => renderQuizzesPage(el, api, children));

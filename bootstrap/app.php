@@ -27,6 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \App\Http\Middleware\CorsMiddleware::class,
         ]);
+        $middleware->alias([
+            'bot.auth' => \App\Http\Middleware\BotApiAuth::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

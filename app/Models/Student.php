@@ -116,7 +116,10 @@ class Student extends Model
      */
     public function hasArrears(): bool
     {
-        return $this->arrearsAmount() > 0;
+        // Admin-configurable forgiveness threshold (default K100). 0 = strict.
+        $threshold = (float) \App\Models\SchoolSettings::get('report_card_lock_threshold', 100);
+
+        return $this->arrearsAmount() > $threshold;
     }
 
     /**
@@ -135,6 +138,11 @@ class Student extends Model
     public function fees(): HasMany
     {
         return $this->hasMany(StudentFee::class);
+    }
+
+    public function busAssignments(): HasMany
+    {
+        return $this->hasMany(StudentBusAssignment::class);
     }
 
     public function homeworkSubmissions(): HasMany

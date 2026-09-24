@@ -55,8 +55,19 @@ class ParentQuizController extends Controller
             $attempts = QuizAttempt::where('quiz_id', $q->id)
                 ->where('student_id', $student->id)
                 ->get();
-            $bestSubmitted = $attempts->where('status', 'submitted')->sortByDesc('percentage')->first();
+            $submitted = $attempts->where('status', 'submitted')->sortByDesc('submitted_at')->values();
+            $bestSubmitted = $submitted->sortByDesc('percentage')->first();
             $inProgress = $attempts->firstWhere('status', 'in_progress');
+            $bestId = $bestSubmitted?->id;
+            $history = $submitted->take(20)->map(fn ($a) => [
+                'id' => $a->id,
+                'score' => $a->score !== null ? (float) $a->score : null,
+                'total_points' => (int) $a->total_points,
+                'percentage' => $a->percentage !== null ? (float) $a->percentage : null,
+                'submitted_at' => $a->submitted_at?->format('d M Y H:i'),
+                'auto_submitted' => (bool) $a->auto_submitted,
+                'is_best' => $a->id === $bestId,
+            ])->values();
             return [
                 'id' => $q->id,
                 'title' => $q->title,
@@ -66,10 +77,11 @@ class ParentQuizController extends Controller
                 'time_limit_minutes' => $q->time_limit_minutes,
                 'due_at' => $q->due_at?->toIso8601String(),
                 'closed' => $q->due_at ? $q->due_at->isPast() : false,
-                'attempts' => $attempts->where('status', 'submitted')->count(),
+                'attempts' => $submitted->count(),
                 'best_score' => $bestSubmitted?->score,
                 'best_percentage' => $bestSubmitted?->percentage,
                 'in_progress' => (bool) $inProgress,
+                'history' => $history,
             ];
         });
 
