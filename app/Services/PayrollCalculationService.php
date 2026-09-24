@@ -22,11 +22,16 @@ class PayrollCalculationService
     ];
 
     /**
-     * Calculate NAPSA deduction (5% of basic salary, capped at ZMW 2,301.60)
+     * Calculate NAPSA deduction (5% of pensionable earnings, capped).
+     *
+     * Pensionable earnings = gross earnings (basic + regular allowances),
+     * per NAPSA regulations. The parameter kept the old name for a while
+     * to soften the transition — it is the gross figure that must be
+     * passed in from calculateStatutoryDeductions().
      */
-    public function calculateNAPSA(float $basicSalary): float
+    public function calculateNAPSA(float $pensionableEarnings): float
     {
-        $napsa = $basicSalary * self::NAPSA_RATE;
+        $napsa = $pensionableEarnings * self::NAPSA_RATE;
 
         // Cap at maximum NAPSA ceiling (5% of ZMW 46,032)
         $maxNapsa = 2301.60;
@@ -78,8 +83,10 @@ class PayrollCalculationService
         $totalAllowances = collect($allowances)->sum('amount');
         $grossSalary = $basicSalary + $totalAllowances;
 
-        // Calculate statutory deductions
-        $napsa = $this->calculateNAPSA($basicSalary);
+        // Calculate statutory deductions. NAPSA is on gross pensionable
+        // earnings (basic + allowances) up to the NAPSA ceiling — matches the
+        // statutory rule, and NHIMA/PAYE are already on gross-derived figures.
+        $napsa = $this->calculateNAPSA($grossSalary);
         $nhima = $this->calculateNHIMA($grossSalary);
         $paye = $this->calculatePAYE($grossSalary, $napsa);
 
@@ -87,7 +94,7 @@ class PayrollCalculationService
             [
                 'type' => 'NAPSA',
                 'amount' => round($napsa, 2),
-                'description' => '5% of basic salary (Employee contribution)',
+                'description' => '5% of gross earnings (Employee contribution)',
             ],
             [
                 'type' => 'NHIMA',
