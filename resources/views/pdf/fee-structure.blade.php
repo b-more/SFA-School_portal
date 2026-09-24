@@ -18,18 +18,45 @@
     $additionalCharges = $feeStructure->additional_charges ?? [];
     $schoolFees   = [];
     $uniformItems = [];
+    $__isUniformDesc = fn ($desc) => str_starts_with($desc, 'Girls -')
+        || str_starts_with($desc, 'Boys -')
+        || str_starts_with($desc, 'Sports -')
+        || $desc === 'Blazer';
+
     if (is_array($additionalCharges)) {
         foreach ($additionalCharges as $charge) {
             if (! isset($charge['description'], $charge['amount'])) continue;
             $desc = $charge['description'];
-            if (str_starts_with($desc, 'Girls -')
-                || str_starts_with($desc, 'Boys -')
-                || str_starts_with($desc, 'Sports -')
-                || $desc === 'Blazer') {
+            if ($__isUniformDesc($desc)) {
                 $uniformItems[] = $charge;
             } else {
                 $schoolFees[] = $charge;
             }
+        }
+    }
+
+    // Uniform prices are typically only stored on the Term 1 fee structure
+    // per section — Term 2 and Term 3 carry no uniform items because
+    // parents bought uniforms once at the start of the year. Fall back to
+    // a sibling fee structure in the same section so the second page always
+    // shows current uniform prices.
+    if (empty($uniformItems) && $feeStructure->school_section_id) {
+        $sibling = \App\Models\FeeStructure::query()
+            ->where('school_section_id', $feeStructure->school_section_id)
+            ->when($feeStructure->academic_year_id, fn ($q) => $q->where('academic_year_id', $feeStructure->academic_year_id))
+            ->where('id', '!=', $feeStructure->id)
+            ->orderBy('term_id')
+            ->get();
+        foreach ($sibling as $sib) {
+            $ac = $sib->additional_charges ?? [];
+            if (! is_array($ac)) continue;
+            foreach ($ac as $charge) {
+                if (! isset($charge['description'], $charge['amount'])) continue;
+                if ($__isUniformDesc($charge['description'])) {
+                    $uniformItems[] = $charge;
+                }
+            }
+            if (! empty($uniformItems)) break;
         }
     }
 
@@ -365,7 +392,7 @@
                 </td>
                 <td>
                     <div class="school-title">St. Francis of Assisi Private School</div>
-                    <div class="motto">Educating the Mind and Heart</div>
+                    <div class="motto">For God and Country</div>
                 </td>
                 <td class="contact-strip">
                     Plot No 1310/4 East Kamenza, Chililabombwe<br>
@@ -445,6 +472,11 @@
     <div style="font-size: 8pt; letter-spacing: 0.18em; text-transform: uppercase; color: #8b1a1a; font-weight: 700; margin-top: 6px;">
         How to Pay
     </div>
+
+    <div style="background: #8b1a1a; color: #ffffff; padding: 8px 12px; margin: 4px 0 8px 0; text-align: center; letter-spacing: 0.06em;">
+        <strong style="font-size: 10pt;">NO CASH PAYMENTS</strong>
+        <span style="font-size: 9pt; opacity: 0.95;"> · The school does not accept cash for fees or uniforms — regardless of the amount. Pay only via Mobile Money or Bank Deposit.</span>
+    </div>
     <table class="pay">
         <tr>
             <td>
@@ -474,7 +506,7 @@
             <li>All termly fees are due by the first day of the term.</li>
             <li><strong>PTA, Maintenance</strong> and <strong>Computer Fee</strong> are paid <strong>once per academic year</strong>, not every term.</li>
             <li><strong>Bus Fee</strong> is <strong>optional</strong> — payable only if the pupil uses the school bus.</li>
-            <li>No cash payments are accepted at the school. Please use Mobile Money or Bank Deposit.</li>
+            <li><strong>No cash payments are accepted at the school under any circumstances</strong>, regardless of the amount. Use Mobile Money or Bank Deposit only.</li>
             <li>Late payments may attract a 5% penalty.</li>
             <li>All queries should be directed to the Accounts Office.</li>
         </ul>
@@ -522,7 +554,7 @@
                 </td>
                 <td>
                     <div class="school-title">St. Francis of Assisi Private School</div>
-                    <div class="motto">Educating the Mind and Heart</div>
+                    <div class="motto">For God and Country</div>
                 </td>
                 <td class="contact-strip">
                     Plot No 1310/4 East Kamenza, Chililabombwe<br>
