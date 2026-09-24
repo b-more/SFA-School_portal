@@ -1,249 +1,402 @@
+@php
+    // Embed images inline as data-URIs so DomPDF renders them reliably
+    // regardless of the working directory / DOMPDF_ENABLE_REMOTE flag.
+    $__logoPath = public_path('images/logo.png');
+    $__logoData = file_exists($__logoPath)
+        ? 'data:image/png;base64,' . base64_encode(file_get_contents($__logoPath))
+        : null;
+
+    $__sigPath = public_path('images/ed_signature.png');
+    $__sigData = file_exists($__sigPath)
+        ? 'data:image/png;base64,' . base64_encode(file_get_contents($__sigPath))
+        : null;
+
+    $__annualLabels     = ['pta', 'maintenance', 'computer'];  // case-insensitive substring match
+    $__optionalLabels   = ['bus'];
+
+    // Split the JSON additional_charges into school fees vs. uniform items.
+    $additionalCharges = $feeStructure->additional_charges ?? [];
+    $schoolFees   = [];
+    $uniformItems = [];
+    if (is_array($additionalCharges)) {
+        foreach ($additionalCharges as $charge) {
+            if (! isset($charge['description'], $charge['amount'])) continue;
+            $desc = $charge['description'];
+            if (str_starts_with($desc, 'Girls -')
+                || str_starts_with($desc, 'Boys -')
+                || str_starts_with($desc, 'Sports -')
+                || $desc === 'Blazer') {
+                $uniformItems[] = $charge;
+            } else {
+                $schoolFees[] = $charge;
+            }
+        }
+    }
+
+    $tagFor = function ($desc) use ($__annualLabels, $__optionalLabels) {
+        $needle = strtolower($desc);
+        foreach ($__annualLabels as $k)   if (str_contains($needle, $k)) return 'annual';
+        foreach ($__optionalLabels as $k) if (str_contains($needle, $k)) return 'optional';
+        return null;
+    };
+
+    // Termly total excludes items marked "annual" (they aren't billed every term)
+    // and items marked "optional" (bus). Basic tuition is always included.
+    $termlyTotal = (float) $feeStructure->basic_fee;
+    foreach ($schoolFees as $fee) {
+        $tag = $tagFor($fee['description']);
+        if ($tag === null) $termlyTotal += (float) $fee['amount'];
+    }
+
+    $annualExtras = 0.0;
+    $optionalExtras = 0.0;
+    foreach ($schoolFees as $fee) {
+        $tag = $tagFor($fee['description']);
+        if ($tag === 'annual')   $annualExtras   += (float) $fee['amount'];
+        if ($tag === 'optional') $optionalExtras += (float) $fee['amount'];
+    }
+@endphp
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Fee Structure</title>
+    <meta charset="utf-8">
+    <title>Fee Structure — {{ $grade }} · {{ $term }} · {{ $academicYear }}</title>
     <style>
-        /* Base styling for clean, professional look */
+        @page { margin: 22mm 18mm 20mm 18mm; }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 15px;
-            padding: 0;
-            color: #333;
-            font-size: 11pt;
-            line-height: 1.3;
+            font-family: 'Helvetica', Arial, sans-serif;
+            color: #1f2937;
+            font-size: 10.5pt;
+            line-height: 1.4;
+            margin: 0;
         }
 
-        /* Header section with logo and title */
-        .header {
-            text-align: center;
-            margin-bottom: 15px;
+        /* -------- Letterhead -------- */
+        .letterhead {
+            border-bottom: 2px solid #0e2746;
+            padding-bottom: 10px;
+            margin-bottom: 6px;
         }
-        .logo {
-            max-width: 70px;
-            margin-bottom: 5px;
-        }
+        .letterhead-inner { width: 100%; }
+        .letterhead-inner td { vertical-align: middle; padding: 0; }
+        .crest { width: 62px; height: auto; }
         .school-title {
-            font-size: 16pt;
-            font-weight: bold;
-            color: #003366;
-            margin: 5px 0 2px 0;
-        }
-        .document-title {
-            font-size: 14pt;
-            color: #4b86c4;
-            margin: 2px 0;
-        }
-
-        /* School contact info */
-        .school-info {
-            text-align: center;
-            color: #555;
-            margin-bottom: 15px;
-            font-size: 9pt;
-        }
-        .school-info p {
+            font-family: 'Times New Roman', Georgia, serif;
+            font-size: 18pt;
+            font-weight: 700;
+            color: #0e2746;
+            letter-spacing: 0.5px;
             margin: 0;
-            padding: 0;
+            line-height: 1.1;
+        }
+        .motto {
+            font-family: 'Times New Roman', Georgia, serif;
+            font-style: italic;
+            color: #8b1a1a;
+            font-size: 9.5pt;
+            margin-top: 2px;
+        }
+        .contact-strip {
+            text-align: right;
+            font-size: 8.5pt;
+            color: #4b5563;
+            line-height: 1.4;
+        }
+        .contact-strip strong { color: #0e2746; }
+
+        /* -------- Document title bar -------- */
+        .doc-title-bar {
+            background: #0e2746;
+            color: #ffffff;
+            padding: 8px 14px;
+            margin: 12px 0 4px 0;
+        }
+        .doc-title-bar .kicker {
+            font-size: 8.5pt;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: #b08a3e;
+            font-weight: 700;
+        }
+        .doc-title-bar .doc-title {
+            font-family: 'Times New Roman', Georgia, serif;
+            font-size: 15pt;
+            font-weight: 700;
+            margin-top: 1px;
+            letter-spacing: 0.3px;
         }
 
-        /* Line separator */
-        .divider {
-            border-bottom: 1px solid #4b86c4;
-            margin: 10px 0;
-        }
-
-        /* Student info section */
-        .info-section {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-gap: 10px;
-            margin-bottom: 15px;
-            font-size: 10pt;
-        }
-        .info-item {
-            margin: 0;
-        }
-        .info-label {
-            font-weight: bold;
-            display: inline-block;
-            min-width: 120px;
-        }
-
-        /* Fee table styling */
-        table {
+        /* -------- Meta strip (section, term, year, date) -------- */
+        .meta {
             width: 100%;
             border-collapse: collapse;
-            margin: 15px 0;
+            margin: 6px 0 14px 0;
+            font-size: 9.5pt;
+        }
+        .meta td {
+            padding: 6px 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .meta .label {
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            font-size: 8pt;
+            width: 22%;
+        }
+        .meta .value { color: #0e2746; font-weight: 600; }
+
+        /* -------- Fee table -------- */
+        table.fees {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 6px 0 10px 0;
             font-size: 10pt;
         }
-        th {
-            background-color: #4b86c4;
-            color: white;
-            font-weight: bold;
+        table.fees thead th {
+            background: #0e2746;
+            color: #ffffff;
+            font-weight: 700;
             text-align: left;
-            padding: 7px 10px;
-            border: 1px solid #ddd;
-        }
-        td {
-            padding: 5px 10px;
-            border: 1px solid #ddd;
-        }
-        tr:nth-child(even) {
-            background-color: #f8f8f8;
-        }
-        .amount-column {
-            text-align: right;
-        }
-        .total-row {
-            background-color: #e6f2ff !important;
-            font-weight: bold;
-        }
-        .subtotal-row {
-            background-color: #f0f0f0 !important;
-            font-weight: bold;
+            padding: 8px 12px;
             font-size: 9pt;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            border: none;
         }
-        .category-row {
-            background-color: #4b86c4 !important;
-            color: white;
-            font-weight: bold;
-            font-size: 9pt;
+        table.fees tbody td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e5e7eb;
         }
-        .category-row td {
-            border-color: #3a75b3;
+        table.fees tbody tr:nth-child(even) td { background: #fafaf7; }
+        .amount { text-align: right; font-variant-numeric: tabular-nums; }
+        .tag {
+            display: inline-block;
+            font-size: 7.5pt;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            padding: 1px 6px;
+            margin-left: 6px;
+            border-radius: 2px;
+            vertical-align: middle;
+            text-transform: uppercase;
+        }
+        .tag.annual   { background: #fdf2e0; color: #8b6a1a; border: 1px solid #e6c98a; }
+        .tag.optional { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; }
+
+        .total-row td {
+            background: #f5efe0 !important;
+            color: #0e2746;
+            font-weight: 700;
+            font-size: 10.5pt;
+            border-top: 1.5px solid #b08a3e;
+            border-bottom: 1.5px solid #b08a3e !important;
         }
 
-        /* Additional information section */
-        .additional-info {
-            margin-top: 15px;
-            font-size: 10pt;
+        /* -------- Payment options blocks -------- */
+        .pay {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 4px 0 8px 0;
         }
-        .section-title {
-            font-weight: bold;
+        .pay td {
+            vertical-align: top;
+            width: 50%;
+            padding: 0 6px;
+        }
+        .pay .box {
+            border: 1px solid #d1d5db;
+            border-left: 3px solid #0e2746;
+            background: #ffffff;
+            padding: 10px 12px;
+        }
+        .pay .box.mobile { border-left-color: #b08a3e; }
+        .pay .kicker {
+            font-size: 8pt;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: #8b1a1a;
+            font-weight: 700;
+        }
+        .pay .box-title {
+            font-family: 'Times New Roman', Georgia, serif;
+            font-size: 12pt;
+            color: #0e2746;
+            font-weight: 700;
+            margin: 2px 0 6px 0;
+        }
+        .pay .ussd {
+            font-family: 'Courier New', monospace;
+            background: #0e2746;
+            color: #b08a3e;
+            padding: 6px 10px;
+            font-weight: 700;
+            font-size: 12pt;
+            letter-spacing: 0.5px;
+            display: inline-block;
+            margin: 4px 0;
+        }
+        .pay .row { margin: 2px 0; font-size: 9.5pt; color: #374151; }
+        .pay .row strong { color: #0e2746; }
+        .pay .row .acct { font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
+
+        /* -------- Notes / signatures -------- */
+        .notes {
+            margin-top: 10px;
+            font-size: 9pt;
+            color: #374151;
+        }
+        .notes .kicker {
+            font-size: 8pt;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: #8b1a1a;
+            font-weight: 700;
             margin-bottom: 2px;
         }
-        .additional-info p {
-            margin: 0;
-        }
+        .notes ul { margin: 4px 0 0 0; padding-left: 16px; }
+        .notes li { margin-bottom: 2px; }
 
-        /* Footer sections */
-        .footer-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-gap: 20px;
-            margin-top: 15px;
-            font-size: 9pt;
-        }
-
-        /* Notes section */
-        .notes-section {
-            margin-top: 0;
-        }
-        .notes-section p {
-            margin: 0 0 3px 0;
-            font-weight: bold;
-        }
-        .notes-section ul {
-            margin: 0;
-            padding-left: 15px;
-        }
-        .notes-section li {
-            margin-bottom: 2px;
-        }
-
-        /* Signatures section */
         .signatures {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-gap: 40px;
-            margin-top: 20px;
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 22px;
         }
-        .signature-block {
+        .signatures td {
             text-align: center;
+            padding: 0 20px;
+            width: 50%;
+            vertical-align: bottom;
+        }
+        .signature-wrap {
+            height: 55px;
+            display: block;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+        .signature-wrap img {
+            max-height: 55px;
+            max-width: 130px;
+            width: auto;
+            height: auto;
         }
         .signature-line {
-            border-top: 1px solid #000;
-            width: 80%;
-            margin: 0 auto 2px auto;
+            border-top: 1px solid #0e2746;
+            width: 78%;
+            margin: 0 auto 3px auto;
         }
-        .signature-img {
-            height: 60px;
-            margin-bottom: 5px;
-            max-width: 150px;
+        .signature-name {
+            font-family: 'Times New Roman', Georgia, serif;
+            font-weight: 700;
+            color: #0e2746;
+            font-size: 10pt;
+        }
+        .signature-title {
+            font-size: 8.5pt;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-top: 1px;
         }
 
-        /* Fine print section */
         .fine-print {
             text-align: center;
-            margin-top: 15px;
-            font-size: 8pt;
-            color: #666;
+            margin-top: 14px;
+            padding-top: 8px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 7.5pt;
+            color: #6b7280;
         }
-        .disclaimer {
-            font-style: italic;
-            margin-bottom: 2px;
-        }
+        .fine-print .disclaimer { font-style: italic; }
 
-        /* Page break */
-        .page-break {
-            page-break-before: always;
+        /* -------- Uniform page --------- */
+        .page-break { page-break-before: always; }
+        table.uniforms {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 4px 0 8px 0;
+            font-size: 10pt;
+        }
+        table.uniforms thead th {
+            background: #0e2746;
+            color: #fff;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 9pt;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        table.uniforms tbody td {
+            padding: 6px 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        table.uniforms tbody tr:nth-child(even) td { background: #fafaf7; }
+        .category-row td {
+            background: #f5efe0 !important;
+            color: #0e2746;
+            font-weight: 700;
+            font-size: 9pt;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            border-top: 1.5px solid #b08a3e;
+        }
+        .subtotal-row td {
+            background: #fafaf7 !important;
+            font-weight: 700;
+            font-size: 9.5pt;
+            border-top: 1px solid #d1d5db;
         }
     </style>
 </head>
 <body>
-    {{-- ============================================ --}}
-    {{-- PAGE 1: SCHOOL FEES --}}
-    {{-- ============================================ --}}
-    <div class="header">
-        <img src="{{ public_path('images/logo.png') }}" alt="School Logo" class="logo">
-        <div class="school-title">St. Francis Of Assisi Private School</div>
-        <div class="document-title">Fee Structure</div>
+
+    {{-- ============================================
+         PAGE 1 — SCHOOL FEES
+         ============================================ --}}
+
+    <div class="letterhead">
+        <table class="letterhead-inner">
+            <tr>
+                <td style="width: 74px;">
+                    @if($__logoData)
+                        <img class="crest" src="{{ $__logoData }}" alt="Crest">
+                    @endif
+                </td>
+                <td>
+                    <div class="school-title">St. Francis of Assisi Private School</div>
+                    <div class="motto">Educating the Mind and Heart</div>
+                </td>
+                <td class="contact-strip">
+                    Plot No 1310/4 East Kamenza, Chililabombwe<br>
+                    <strong>+260 972 266 217</strong><br>
+                    stfrancisofassisi.sfa@gmail.com
+                </td>
+            </tr>
+        </table>
     </div>
 
-    <div class="school-info">
-        <p>Plot No 1310/4 East Kamenza, Chililabombwe, Zambia</p>
-        <p>Phone: +260 972 266 217, Email: info@stfrancisofassisizm.com</p>
+    <div class="doc-title-bar">
+        <div class="kicker">Official Fee Schedule</div>
+        <div class="doc-title">{{ $grade }} · {{ $term }} · {{ $academicYear }}</div>
     </div>
 
-    <div class="divider"></div>
+    <table class="meta">
+        <tr>
+            <td class="label">Section</td>
+            <td class="value">{{ $grade }}</td>
+            <td class="label">Academic Year</td>
+            <td class="value">{{ $academicYear }}</td>
+        </tr>
+        <tr>
+            <td class="label">Term</td>
+            <td class="value">{{ $term }}</td>
+            <td class="label">Issued</td>
+            <td class="value">{{ date('j F Y') }}</td>
+        </tr>
+    </table>
 
-    <div class="info-section">
-        <p class="info-item"><span class="info-label">Section:</span> {{ $grade }}</p>
-        <p class="info-item"><span class="info-label">Term:</span> {{ $term }}</p>
-        <p class="info-item"><span class="info-label">Academic Year:</span> {{ $academicYear }}</p>
-        <p class="info-item"><span class="info-label">Date Generated:</span> {{ date('F j, Y') }}</p>
-    </div>
-
-    @php
-        $additionalCharges = $feeStructure->additional_charges;
-        $schoolFees = [];
-        $uniformItems = [];
-
-        if (is_array($additionalCharges)) {
-            foreach ($additionalCharges as $charge) {
-                if (!isset($charge['description']) || !isset($charge['amount'])) continue;
-
-                $desc = $charge['description'];
-                // Uniform/sports items go to page 2
-                if (str_starts_with($desc, 'Girls -') ||
-                    str_starts_with($desc, 'Boys -') ||
-                    str_starts_with($desc, 'Sports -') ||
-                    $desc === 'Blazer') {
-                    $uniformItems[] = $charge;
-                } else {
-                    $schoolFees[] = $charge;
-                }
-            }
-        }
-
-        // Calculate school fees total (page 1)
-        $schoolFeesTotal = (float) $feeStructure->basic_fee;
-        foreach ($schoolFees as $fee) {
-            $schoolFeesTotal += (float) $fee['amount'];
-        }
-    @endphp
-
-    <table>
+    <table class="fees">
         <thead>
             <tr>
                 <th>Description</th>
@@ -253,99 +406,144 @@
         <tbody>
             <tr>
                 <td>Basic Tuition Fee</td>
-                <td class="amount-column">{{ number_format($feeStructure->basic_fee, 2) }}</td>
+                <td class="amount">{{ number_format($feeStructure->basic_fee, 2) }}</td>
             </tr>
 
             @foreach($schoolFees as $fee)
+                @php $tag = $tagFor($fee['description']); @endphp
                 <tr>
-                    <td>{{ $fee['description'] }}</td>
-                    <td class="amount-column">{{ number_format($fee['amount'], 2) }}</td>
+                    <td>
+                        {{ $fee['description'] }}
+                        @if($tag === 'annual')   <span class="tag annual">Annual</span> @endif
+                        @if($tag === 'optional') <span class="tag optional">Optional</span> @endif
+                    </td>
+                    <td class="amount">{{ number_format($fee['amount'], 2) }}</td>
                 </tr>
             @endforeach
 
             <tr class="total-row">
-                <td>Total School Fees</td>
-                <td class="amount-column">{{ number_format($schoolFeesTotal, 2) }}</td>
+                <td>Payable this Term (Basic Tuition + Termly Charges)</td>
+                <td class="amount">{{ number_format($termlyTotal, 2) }}</td>
             </tr>
         </tbody>
     </table>
 
-    <div class="additional-info">
-        <div class="section-title">Additional Information:</div>
-        <p>{{ $feeStructure->description ?? $grade . ' ' . $term . ' ' . $academicYear . ' Fee Structure' }}</p>
+    @if($annualExtras > 0 || $optionalExtras > 0)
+        <div style="font-size: 8.5pt; color: #6b7280; margin: -4px 0 10px 0; line-height: 1.5;">
+            @if($annualExtras > 0)
+                <strong style="color:#8b6a1a;">Annual charges</strong> (PTA, Maintenance, Computer Fee):
+                billed once per academic year — <strong>ZMW {{ number_format($annualExtras, 2) }}</strong> total.
+            @endif
+            @if($optionalExtras > 0)
+                <br><strong style="color:#3730a3;">Optional charges</strong> (Bus): only payable if the pupil uses the school bus —
+                <strong>ZMW {{ number_format($optionalExtras, 2) }}</strong>.
+            @endif
+        </div>
+    @endif
+
+    {{-- Payment options — MOBILE MONEY first, banks second --}}
+    <div style="font-size: 8pt; letter-spacing: 0.18em; text-transform: uppercase; color: #8b1a1a; font-weight: 700; margin-top: 6px;">
+        How to Pay
+    </div>
+    <table class="pay">
+        <tr>
+            <td>
+                <div class="box mobile">
+                    <div class="kicker">Option 1 · Mobile Money</div>
+                    <div class="box-title">Pay by USSD</div>
+                    <div class="ussd">*388*719693*amount#</div>
+                    <div class="row">Dial the code above from any Zambian line, replacing <em>amount</em> with the ZMW amount you are paying. Follow the prompts to confirm.</div>
+                    <div class="row" style="margin-top: 4px; color: #6b7280; font-size: 8.5pt;">Example: <strong>*388*719693*3800#</strong> pays K3,800.</div>
+                </div>
+            </td>
+            <td>
+                <div class="box">
+                    <div class="kicker">Option 2 · Bank Deposit</div>
+                    <div class="box-title">Indo Zambia Bank</div>
+                    <div class="row"><strong>School Fees Account</strong><br>Acct No. <span class="acct">0172040000103</span></div>
+                    <div class="row" style="margin-top: 4px;"><strong>Bus / Uniform Account</strong><br>Acct No. <span class="acct">0172040000104</span></div>
+                    <div class="row" style="margin-top: 6px; color: #6b7280; font-size: 8.5pt;">Deposit slip must show the pupil's full name and grade.</div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="notes">
+        <div class="kicker">Please Note</div>
+        <ul>
+            <li>All termly fees are due by the first day of the term.</li>
+            <li><strong>PTA, Maintenance</strong> and <strong>Computer Fee</strong> are paid <strong>once per academic year</strong>, not every term.</li>
+            <li><strong>Bus Fee</strong> is <strong>optional</strong> — payable only if the pupil uses the school bus.</li>
+            <li>No cash payments are accepted at the school. Please use Mobile Money or Bank Deposit.</li>
+            <li>Late payments may attract a 5% penalty.</li>
+            <li>All queries should be directed to the Accounts Office.</li>
+        </ul>
     </div>
 
-    <div class="footer-content">
-        <div class="notes-section">
-            <p><strong>Bank Payment Details (No Cash Payments):</strong></p>
-            <ul>
-                <li><strong>School Fees:</strong> Indo Zambia Bank - Account No: 0172040000103</li>
-                <li><strong>Bus/Uniform:</strong> Indo Zambia Bank - Account No: 0172040000104</li>
-            </ul>
-            <p>Please note:</p>
-            <ul>
-                <li>All fees must be paid by the first day of the term</li>
-                <li>Late payments may incur a 5% penalty fee</li>
-                <li>Payment can be made via bank transfer or mobile money only. No cash payments accepted.</li>
-                <li>For any fee-related inquiries, please contact the accounts department</li>
-            </ul>
-        </div>
-    </div>
-
-    <div class="signatures">
-        <div class="signature-block">
-            <img src="{{ public_path('images/ed_signature.png') }}" alt="Executive Director Signature" class="signature-img">
-            <div class="signature-line"></div>
-            <p>Executive Director's Signature</p>
-        </div>
-        <div class="signature-block">
-            <div style="height: 60px;"></div>
-            <div class="signature-line"></div>
-            <p>Accounts Officer's Signature</p>
-        </div>
-    </div>
+    <table class="signatures">
+        <tr>
+            <td>
+                <div class="signature-wrap">
+                    @if($__sigData)
+                        <img src="{{ $__sigData }}" alt="Executive Director's Signature">
+                    @endif
+                </div>
+                <div class="signature-line"></div>
+                <div class="signature-name">Executive Director</div>
+                <div class="signature-title">St. Francis of Assisi Private School</div>
+            </td>
+            <td>
+                <div class="signature-wrap"></div>
+                <div class="signature-line"></div>
+                <div class="signature-name">Accounts Officer</div>
+                <div class="signature-title">Bursar's Department</div>
+            </td>
+        </tr>
+    </table>
 
     <div class="fine-print">
-        <p class="disclaimer">This is an official document of {{ $schoolName }}. Any alterations render it invalid.</p>
-        <p>&copy; {{ date('Y') }} {{ $schoolName }}. All Rights Reserved.</p>
+        <div class="disclaimer">This is an official document of {{ $schoolName }}. Any alterations render it invalid.</div>
+        &copy; {{ date('Y') }} {{ $schoolName }}. All rights reserved.
     </div>
 
-    {{-- ============================================ --}}
-    {{-- PAGE 2: UNIFORM & SPORTS PRICE LIST --}}
-    {{-- ============================================ --}}
+    {{-- ============================================
+         PAGE 2 — UNIFORM & SPORTS PRICE LIST
+         ============================================ --}}
     @if(count($uniformItems) > 0)
     <div class="page-break"></div>
 
-    <div class="header">
-        <img src="{{ public_path('images/logo.png') }}" alt="School Logo" class="logo">
-        <div class="school-title">St. Francis Of Assisi Private School</div>
-        <div class="document-title">Uniform & Sports Attire Price List</div>
+    <div class="letterhead">
+        <table class="letterhead-inner">
+            <tr>
+                <td style="width: 74px;">
+                    @if($__logoData)
+                        <img class="crest" src="{{ $__logoData }}" alt="Crest">
+                    @endif
+                </td>
+                <td>
+                    <div class="school-title">St. Francis of Assisi Private School</div>
+                    <div class="motto">Educating the Mind and Heart</div>
+                </td>
+                <td class="contact-strip">
+                    Plot No 1310/4 East Kamenza, Chililabombwe<br>
+                    <strong>+260 972 266 217</strong><br>
+                    stfrancisofassisi.sfa@gmail.com
+                </td>
+            </tr>
+        </table>
     </div>
 
-    <div class="school-info">
-        <p>Plot No 1310/4 East Kamenza, Chililabombwe, Zambia</p>
-        <p>Phone: +260 972 266 217, Email: info@stfrancisofassisizm.com</p>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="info-section">
-        <p class="info-item"><span class="info-label">Section:</span> {{ $grade }}</p>
-        <p class="info-item"><span class="info-label">Academic Year:</span> {{ $academicYear }}</p>
+    <div class="doc-title-bar">
+        <div class="kicker">Price List</div>
+        <div class="doc-title">Uniform & Sports Attire — {{ $grade }} · {{ $academicYear }}</div>
     </div>
 
     @php
-        $girlsItems = [];
-        $boysItems = [];
-        $sportsItems = [];
-        $girlsTotal = 0;
-        $boysTotal = 0;
-        $sportsTotal = 0;
-
+        $girlsItems = []; $boysItems = []; $sportsItems = [];
+        $girlsTotal = 0; $boysTotal = 0; $sportsTotal = 0;
         foreach ($uniformItems as $item) {
             $desc = $item['description'];
             $amount = (float) $item['amount'];
-
             if (str_starts_with($desc, 'Girls -')) {
                 $girlsItems[] = ['name' => str_replace('Girls - ', '', $desc), 'amount' => $amount];
                 $girlsTotal += $amount;
@@ -353,102 +551,86 @@
                 $boysItems[] = ['name' => str_replace('Boys - ', '', $desc), 'amount' => $amount];
                 $boysTotal += $amount;
             } else {
-                // Sports items and Blazer
-                $name = str_replace('Sports - ', '', $desc);
-                $sportsItems[] = ['name' => $name, 'amount' => $amount];
+                $sportsItems[] = ['name' => str_replace('Sports - ', '', $desc), 'amount' => $amount];
                 $sportsTotal += $amount;
             }
         }
     @endphp
 
-    <table>
+    <table class="uniforms">
         <thead>
             <tr>
-                <th style="width: 10%;">S/N</th>
+                <th style="width: 8%;">S/N</th>
                 <th>Item Description</th>
-                <th style="width: 25%; text-align: right;">Price (ZMW)</th>
+                <th style="width: 22%; text-align: right;">Price (ZMW)</th>
             </tr>
         </thead>
         <tbody>
-            {{-- Girls Section --}}
             @if(count($girlsItems) > 0)
-            <tr class="category-row">
-                <td colspan="3">GIRLS UNIFORM</td>
-            </tr>
-            @foreach($girlsItems as $index => $item)
-                <tr>
-                    <td style="text-align: center;">{{ $index + 1 }}</td>
-                    <td>{{ $item['name'] }}</td>
-                    <td class="amount-column">{{ number_format($item['amount'], 2) }}</td>
+                <tr class="category-row"><td colspan="3">Girls Uniform</td></tr>
+                @foreach($girlsItems as $i => $it)
+                    <tr>
+                        <td style="text-align: center;">{{ $i + 1 }}</td>
+                        <td>{{ $it['name'] }}</td>
+                        <td class="amount">{{ number_format($it['amount'], 2) }}</td>
+                    </tr>
+                @endforeach
+                <tr class="subtotal-row">
+                    <td></td>
+                    <td style="text-align: right;">Girls Uniform Total</td>
+                    <td class="amount">{{ number_format($girlsTotal, 2) }}</td>
                 </tr>
-            @endforeach
-            <tr class="subtotal-row">
-                <td></td>
-                <td style="text-align: right;">Girls Uniform Total</td>
-                <td class="amount-column">{{ number_format($girlsTotal, 2) }}</td>
-            </tr>
             @endif
 
-            {{-- Boys Section --}}
             @if(count($boysItems) > 0)
-            <tr class="category-row">
-                <td colspan="3">BOYS UNIFORM</td>
-            </tr>
-            @foreach($boysItems as $index => $item)
-                <tr>
-                    <td style="text-align: center;">{{ $index + 1 }}</td>
-                    <td>{{ $item['name'] }}</td>
-                    <td class="amount-column">{{ number_format($item['amount'], 2) }}</td>
+                <tr class="category-row"><td colspan="3">Boys Uniform</td></tr>
+                @foreach($boysItems as $i => $it)
+                    <tr>
+                        <td style="text-align: center;">{{ $i + 1 }}</td>
+                        <td>{{ $it['name'] }}</td>
+                        <td class="amount">{{ number_format($it['amount'], 2) }}</td>
+                    </tr>
+                @endforeach
+                <tr class="subtotal-row">
+                    <td></td>
+                    <td style="text-align: right;">Boys Uniform Total</td>
+                    <td class="amount">{{ number_format($boysTotal, 2) }}</td>
                 </tr>
-            @endforeach
-            <tr class="subtotal-row">
-                <td></td>
-                <td style="text-align: right;">Boys Uniform Total</td>
-                <td class="amount-column">{{ number_format($boysTotal, 2) }}</td>
-            </tr>
             @endif
 
-            {{-- Sports Section --}}
             @if(count($sportsItems) > 0)
-            <tr class="category-row">
-                <td colspan="3">SPORTS ATTIRE</td>
-            </tr>
-            @foreach($sportsItems as $index => $item)
-                <tr>
-                    <td style="text-align: center;">{{ $index + 1 }}</td>
-                    <td>{{ $item['name'] }}</td>
-                    <td class="amount-column">{{ number_format($item['amount'], 2) }}</td>
+                <tr class="category-row"><td colspan="3">Sports Attire</td></tr>
+                @foreach($sportsItems as $i => $it)
+                    <tr>
+                        <td style="text-align: center;">{{ $i + 1 }}</td>
+                        <td>{{ $it['name'] }}</td>
+                        <td class="amount">{{ number_format($it['amount'], 2) }}</td>
+                    </tr>
+                @endforeach
+                <tr class="subtotal-row">
+                    <td></td>
+                    <td style="text-align: right;">Sports Attire Total</td>
+                    <td class="amount">{{ number_format($sportsTotal, 2) }}</td>
                 </tr>
-            @endforeach
-            <tr class="subtotal-row">
-                <td></td>
-                <td style="text-align: right;">Sports Attire Total</td>
-                <td class="amount-column">{{ number_format($sportsTotal, 2) }}</td>
-            </tr>
             @endif
         </tbody>
     </table>
 
-    <div class="footer-content">
-        <div class="notes-section">
-            <p><strong>Bank Payment Details for Uniform/Bus (No Cash Payments):</strong></p>
-            <ul>
-                <li><strong>Bus/Uniform:</strong> Indo Zambia Bank - Account No: 0172040000104</li>
-            </ul>
-            <p>Please note:</p>
-            <ul>
-                <li>Uniform and sports attire are purchased separately from school fees</li>
-                <li>Payments for uniforms must be deposited into the Bus/Uniform account listed above</li>
-                <li>Prices are subject to change without prior notice</li>
-                <li>For inquiries, please contact the school office</li>
-            </ul>
-        </div>
+    <div class="notes">
+        <div class="kicker">Please Note</div>
+        <ul>
+            <li>Uniforms and sports attire are purchased separately from school fees.</li>
+            <li>Payment for uniforms goes to the <strong>Bus / Uniform</strong> account (see Page 1) or Mobile Money.</li>
+            <li>Prices are subject to change without prior notice.</li>
+            <li>For enquiries, please contact the school office.</li>
+        </ul>
     </div>
 
     <div class="fine-print">
-        <p class="disclaimer">This is an official document of {{ $schoolName }}. Any alterations render it invalid.</p>
-        <p>&copy; {{ date('Y') }} {{ $schoolName }}. All Rights Reserved.</p>
+        <div class="disclaimer">This is an official document of {{ $schoolName }}. Any alterations render it invalid.</div>
+        &copy; {{ date('Y') }} {{ $schoolName }}. All rights reserved.
     </div>
     @endif
+
 </body>
 </html>
