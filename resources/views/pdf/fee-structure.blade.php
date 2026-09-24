@@ -507,7 +507,6 @@
             <li><strong>PTA, Maintenance</strong> and <strong>Computer Fee</strong> are paid <strong>once per academic year</strong>, not every term.</li>
             <li><strong>Bus Fee</strong> is <strong>optional</strong> — payable only if the pupil uses the school bus.</li>
             <li><strong>No cash payments are accepted at the school under any circumstances</strong>, regardless of the amount. Use Mobile Money or Bank Deposit only.</li>
-            <li>Late payments may attract a 5% penalty.</li>
             <li>All queries should be directed to the Accounts Office.</li>
         </ul>
     </div>
