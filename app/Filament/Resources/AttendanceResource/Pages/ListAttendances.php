@@ -22,6 +22,14 @@ class ListAttendances extends ListRecords
 
     protected static string $resource = AttendanceResource::class;
 
+    /**
+     * Custom view — renders only the header widgets (Daily Register, Flagged Students).
+     * The big data table is intentionally omitted. Row-level edits still work via direct
+     * URL (/admin/attendances/{record}/edit); routine attendance entry uses
+     * /admin/mark-attendance.
+     */
+    protected static string $view = 'filament.resources.attendance-resource.pages.list-attendances';
+
     protected function getHeaderWidgets(): array
     {
         $user = Auth::user();
@@ -104,8 +112,56 @@ class ListAttendances extends ListRecords
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('success')
                 ->outlined()
-                ->url(fn () => route('attendance.export'))
-                ->openUrlInNewTab(),
+                ->form(function () use ($user) {
+                    $classQuery = ClassSection::with('grade')->where('is_active', true);
+                    if ($user->role_id === RoleConstants::TEACHER) {
+                        $teacher = Teacher::where('user_id', $user->id)->first();
+                        $allowed = $teacher?->classSections()->pluck('class_sections.id')->toArray() ?? [];
+                        $classQuery->whereIn('id', $allowed);
+                    }
+                    $classes = $classQuery->get()->mapWithKeys(fn ($c) => [
+                        $c->id => trim(($c->grade?->name ?? '') . ' ' . $c->name),
+                    ])->toArray();
+
+                    $months = collect(range(1, 12))->mapWithKeys(fn ($m) => [
+                        $m => \Carbon\Carbon::create(null, $m, 1)->format('F'),
+                    ])->toArray();
+
+                    $thisYear = (int) now()->year;
+                    $years = collect(range($thisYear - 2, $thisYear + 1))->mapWithKeys(fn ($y) => [$y => (string) $y])->toArray();
+
+                    return [
+                        Forms\Components\Select::make('class_section_id')
+                            ->label('Class')
+                            ->options($classes)
+                            ->required()
+                            ->searchable()
+                            ->placeholder('Choose a class…'),
+                        Forms\Components\Grid::make(2)->schema([
+                            Forms\Components\Select::make('month')
+                                ->label('Month')
+                                ->options($months)
+                                ->default((int) now()->month)
+                                ->required(),
+                            Forms\Components\Select::make('year')
+                                ->label('Year')
+                                ->options($years)
+                                ->default($thisYear)
+                                ->required(),
+                        ]),
+                        Forms\Components\Select::make('format')
+                            ->label('Format')
+                            ->options(['pdf' => 'PDF register', 'csv' => 'CSV (spreadsheet)'])
+                            ->default('pdf')
+                            ->required(),
+                    ];
+                })
+                ->modalHeading('Export Attendance Report')
+                ->modalSubmitActionLabel('Download')
+                ->action(function (array $data) {
+                    $url = route('attendance.export') . '?' . http_build_query($data);
+                    return redirect()->away($url);
+                }),
 
             Actions\CreateAction::make()
                 ->outlined()

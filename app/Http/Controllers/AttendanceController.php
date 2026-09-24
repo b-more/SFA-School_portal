@@ -8,6 +8,7 @@ use App\Models\ClassSection;
 use App\Models\SchoolSettings;
 use App\Models\Student;
 use App\Models\Teacher;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -128,8 +129,25 @@ class AttendanceController extends Controller
             return $this->exportMonthlyCSV($data);
         }
 
-        // Return PDF/HTML view
-        return view('pdf.attendance-register', $data);
+        if ($format === 'html') {
+            // Preview in-browser (kept as an escape hatch — not exposed by
+            // the UI form anymore).
+            return view('pdf.attendance-register', $data);
+        }
+
+        // Render a real PDF through DomPDF and stream as a download.
+        // A monthly register is 20-something day columns wide, so landscape
+        // A4 is the only orientation that stays legible.
+        $filename = sprintf(
+            'attendance-%s-%s-%s.pdf',
+            \Illuminate\Support\Str::slug(trim(($classSection->grade?->name ?? '') . '-' . $classSection->name)) ?: 'class',
+            strtolower($startDate->format('M')),
+            $year
+        );
+
+        return Pdf::loadView('pdf.attendance-register', $data)
+            ->setPaper('a4', 'landscape')
+            ->download($filename);
     }
 
     /**
