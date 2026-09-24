@@ -479,6 +479,15 @@ Route::middleware(['auth'])->prefix('guides')->group(function () {
 Route::middleware(['auth'])->get('/guides/page/{page}', [PageGuideController::class, 'download'])
     ->name('guides.page');
 
+// Public Fee Schedule download — parents / prospective parents can grab the
+// current fee structure by section + term without logging in.
+Route::prefix('fee-schedule')->group(function () {
+    Route::get('/', [\App\Http\Controllers\PublicFeeScheduleController::class, 'index'])
+        ->name('public.fee-schedule');
+    Route::get('/download', [\App\Http\Controllers\PublicFeeScheduleController::class, 'download'])
+        ->name('public.fee-schedule.download');
+});
+
 // Teacher Training Materials (public — training content is not sensitive)
 Route::prefix('training')->group(function () {
     Route::get('/downloads', [\App\Http\Controllers\TrainingMaterialController::class, 'downloadPage'])
