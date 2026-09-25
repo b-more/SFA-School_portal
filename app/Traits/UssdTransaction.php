@@ -76,7 +76,7 @@ trait UssdTransactionHandler
     {
         $formatted_amount = number_format($data['amount'], 2);
         return "DIGITAL RECEIPT\n"
-            . "His Kingdom Church\n"
+            . "St. Francis of Assisi\n"
             . "-------------\n"
             . "Name: {$data['full_name']}\n"
             . "Type: {$data['giving_type']}\n"
