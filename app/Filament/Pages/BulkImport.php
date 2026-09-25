@@ -10,17 +10,22 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use App\Mail\StaffCredentialsCreated;
 use App\Models\ParentGuardian;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\User;
+use App\Models\UserCredential;
 use App\Models\Grade;
 use App\Models\ClassSection;
 use App\Models\Role;
 use App\Models\AcademicYear;
+use App\Services\SmsService;
 use App\Constants\RoleConstants;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -439,12 +444,21 @@ class BulkImport extends Page implements HasForms
                     throw new \Exception("Teacher with email {$row[2]} already exists");
                 }
 
+                // Generate a strong random password. The imported teacher
+                // never types this password — it's emailed and SMSed to them
+                // by dispatchStaffCredentials() below, and they change it on
+                // first login. Bulk import used to hardcode 'password123' for
+                // every row, which is why this replacement matters.
+                $password = Str::password(12);
+
                 // Create user account
                 $user = User::create([
                     'name' => $row[1],
                     'email' => $row[2],
-                    'password' => Hash::make('password123'),
+                    'password' => Hash::make($password),
                     'role_id' => RoleConstants::TEACHER,
+                    'status' => 'active',
+                    'must_change_password' => 1,
                 ]);
 
                 // Find grade and class section if specified
@@ -491,12 +505,78 @@ class BulkImport extends Page implements HasForms
                     'role_id' => RoleConstants::TEACHER,
                 ]);
 
+                // Dispatch credentials — best-effort. If email/SMS fail the
+                // credentials row still exists with is_sent=false so admin
+                // can retry from the users listing without touching this
+                // importer.
+                $this->dispatchStaffCredentials($user, $row[1], $row[2], $row[3], $password, 'Teacher');
+
                 $this->successCount++;
 
             } catch (\Exception $e) {
                 $this->errors[] = "Row {$rowNumber}: " . $e->getMessage();
                 $this->errorCount++;
             }
+        }
+    }
+
+    /**
+     * Deliver a freshly-generated staff password by email + SMS, and log the
+     * attempt in user_credentials. Mirrors CreateTeacher.php so both surfaces
+     * behave the same way.
+     *
+     * Any thrown exception here is swallowed — a failed send should not
+     * roll back the whole import batch. user_credentials.is_sent tells
+     * admin whether follow-up is needed.
+     */
+    protected function dispatchStaffCredentials(User $user, string $name, string $email, ?string $phone, string $password, string $role): void
+    {
+        try {
+            UserCredential::create([
+                'user_id' => $user->id,
+                'username' => $email,
+                'password' => $password,
+                'is_sent' => false,
+                'delivery_method' => 'email_and_sms',
+            ]);
+
+            $emailSent = false;
+            try {
+                Mail::to($email)->send(new StaffCredentialsCreated($name, $email, $password, $role));
+                $emailSent = true;
+            } catch (\Throwable $e) {
+                Log::warning('Bulk import: credentials email failed', [
+                    'user_id' => $user->id, 'email' => $email, 'error' => $e->getMessage(),
+                ]);
+            }
+
+            $smsSent = false;
+            if (!empty($phone)) {
+                try {
+                    $message = "Welcome {$name}! Your St Francis Portal account is ready.\n".
+                               "Email: {$email}\n".
+                               "Pass: {$password}\n".
+                               "Login: ".config('app.url').'/admin';
+                    $smsSent = (bool) app(SmsService::class)->send($message, $phone, 'staff_credentials', $user->id);
+                } catch (\Throwable $e) {
+                    Log::warning('Bulk import: credentials SMS failed', [
+                        'user_id' => $user->id, 'phone' => $phone, 'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            if ($emailSent || $smsSent) {
+                UserCredential::where('username', $email)->update([
+                    'is_sent'         => true,
+                    'sent_at'         => now(),
+                    'delivery_method' => $emailSent && $smsSent ? 'email_and_sms' : ($emailSent ? 'email' : 'sms'),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // Never let credential delivery kill the import row.
+            Log::error('Bulk import: dispatchStaffCredentials failed hard', [
+                'user_id' => $user->id, 'error' => $e->getMessage(),
+            ]);
         }
     }
 
