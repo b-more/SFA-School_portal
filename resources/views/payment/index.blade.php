@@ -103,6 +103,21 @@
 
         /* Layout */
         .pay-shell { padding-block:2rem 4rem; }
+        /* USSD alternative strip — sits under the hero, above the payment form */
+        .ussd-alt-strip { background:linear-gradient(120deg, #f8f5eb 0%, #fdf9ec 100%); border-block:1px solid var(--line); padding-block:1.25rem; }
+        .ussd-alt { display:grid; grid-template-columns:auto 1fr auto; gap:1rem 1.25rem; align-items:center; }
+        .ussd-alt-badge { width:52px; height:52px; border-radius:14px; background:var(--navy-900); color:var(--gold); display:flex; align-items:center; justify-content:center; }
+        .ussd-alt-kicker { font-size:.72rem; letter-spacing:.22em; text-transform:uppercase; color:var(--crimson); font-weight:700; }
+        .ussd-alt-body h3 { margin:.15rem 0 .35rem; color:var(--navy-900); font-size:1.1rem; font-weight:700; }
+        .ussd-alt-code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--navy-900); background:#fff; border:1px solid var(--gold); padding:.05rem .5rem; border-radius:6px; font-size:1.05rem; text-decoration:none; }
+        .ussd-alt-code:hover { background:var(--gold); color:var(--navy-900); }
+        .ussd-alt-body p { margin:0; color:var(--slate); font-size:.92rem; line-height:1.5; }
+        .ussd-alt-cta { flex-shrink:0; background:var(--navy-900); color:#fff !important; padding:.75rem 1.25rem; border-radius:999px; font-weight:700; font-size:.9rem; letter-spacing:.05em; text-transform:uppercase; text-decoration:none; white-space:nowrap; }
+        .ussd-alt-cta:hover { background:var(--crimson); }
+        @media (max-width:720px) {
+            .ussd-alt { grid-template-columns:auto 1fr; }
+            .ussd-alt-cta { grid-column:1/-1; text-align:center; }
+        }
         .pay-grid { max-width:560px; margin-inline:auto; display:grid; gap:1.25rem; }
 
         /* Cards */
@@ -227,11 +242,28 @@
         <div class="container">
             <div class="crumbs"><a href="{{ url('/') }}">Home</a> · Pay Fees</div>
             <h1>Secure School Fee Payment</h1>
-            <p>Pay {{ $shortName }} school fees instantly via mobile money. No login required — receipts emailed automatically.</p>
+            <p>Pay {{ $shortName }} school fees instantly via mobile money. Every payment lands with an <strong>instant SMS receipt</strong> on your phone and an emailed copy — no login required.</p>
             <span class="pill">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 Encrypted · CGrate-powered
             </span>
+        </div>
+    </section>
+
+    {{-- USSD alternative — parents who prefer to dial from a basic phone --}}
+    <section class="ussd-alt-strip">
+        <div class="container">
+            <div class="ussd-alt">
+                <div class="ussd-alt-badge" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18H6zM10 20h4"/></svg>
+                </div>
+                <div class="ussd-alt-body">
+                    <div class="ussd-alt-kicker">Prefer to dial?</div>
+                    <h3>Use <a class="ussd-alt-code" href="tel:*388*100%23">*388*100#</a> from any mobile phone</h3>
+                    <p>Check your child's fee balance in seconds, view results and attendance, or pay — and every payment sends an <strong>instant SMS receipt</strong>. Works on any handset, no internet needed.</p>
+                </div>
+                <a class="ussd-alt-cta" href="tel:*388*100%23">Dial now →</a>
+            </div>
         </div>
     </section>
 
