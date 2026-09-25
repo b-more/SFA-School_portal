@@ -3,7 +3,7 @@
     $shortName  = 'St. Francis of Assisi';
     $motto      = $settings->school_motto ?? 'Faith · Family · Future';
     $phone      = $settings->phone        ?? '+260 977 000 000';
-    $email      = $settings->email        ?? 'info@stfrancisofassisizm.com';
+    $email      = $settings->email        ?? 'stfrancisofassisi.sfa@gmail.com';
     $logoPath   = $settings && $settings->school_logo
                     ? asset('storage/' . ltrim($settings->school_logo, '/'))
                     : asset('images/logo.png');
@@ -134,9 +134,27 @@
         footer.site a:hover { color:#fff; }
         footer.site .row { display:flex; flex-wrap:wrap; gap:1rem 1.5rem; justify-content:space-between; align-items:center; }
         footer.site .links { display:flex; flex-wrap:wrap; gap:1rem 1.25rem; }
+        /* Now-enrolling strip — matches every other marketing surface */
+        .site-announce { background: #0F2440; color: #E3EAF4; font-size: 14px; font-family: var(--sans); }
+        .site-announce .row { max-width: var(--max); margin: 0 auto; padding: 8px 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+        .site-announce strong { color: #FFC83D; letter-spacing: .02em; }
+        .site-announce a { color: #FFC83D; font-weight: 700; text-decoration: none; }
+        .site-announce a:hover { color: #fff; }
+        .site-announce .contact { display: none; }
+        @media (min-width: 720px) { .site-announce .contact { display: inline-flex; gap: 22px; align-items: center; white-space: nowrap; color: rgba(255,255,255,.82); } .site-announce .contact a { color: rgba(255,255,255,.82); font-weight: 400; } }
+        @media (prefers-reduced-motion: no-preference) {
+            @keyframes site-glow { 0%,100% { text-shadow: 0 0 0 rgba(255,200,61,0); } 50% { text-shadow: 0 0 14px rgba(255,200,61,.55); } }
+            .site-announce strong { animation: site-glow 3.2s ease-in-out infinite; }
+        }
     </style>
 </head>
 <body>
+    <div class="site-announce">
+        <div class="row">
+            <span><strong>Now enrolling</strong> · Baby Class through Grade 12 · Applications welcome year-round. <a href="{{ url('/admissions') }}">Begin an application →</a></span>
+            <span class="contact"><a href="tel:{{ preg_replace('/\s+/','',$phone) }}">{{ $phone }}</a><span>Plot 1310/4 East Kamenza, Chililabombwe</span></span>
+        </div>
+    </div>
     <div class="topbar">
         <div class="container topbar-inner">
             <div><a href="tel:{{ preg_replace('/\s+/','',$phone) }}">{{ $phone }}</a> &nbsp; · &nbsp; <a href="mailto:{{ $email }}">{{ $email }}</a></div>

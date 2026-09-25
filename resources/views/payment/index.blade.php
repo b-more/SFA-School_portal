@@ -205,9 +205,27 @@
             #receiptSection .card { box-shadow:none; border:0; padding:0; }
             .pay-shell { padding:0; }
         }
+        /* Now-enrolling strip — matches every other public surface */
+        .site-announce { background: #0F2440; color: #E3EAF4; font-size: 14px; font-family: 'Inter', system-ui, sans-serif; }
+        .site-announce .row { max-width: var(--max); margin: 0 auto; padding: 8px 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+        .site-announce strong { color: #FFC83D; letter-spacing: .02em; }
+        .site-announce a { color: #FFC83D; font-weight: 700; text-decoration: none; }
+        .site-announce a:hover { color: #fff; }
+        .site-announce .contact { display: none; }
+        @media (min-width: 720px) { .site-announce .contact { display: inline-flex; gap: 22px; align-items: center; white-space: nowrap; color: rgba(255,255,255,.82); } .site-announce .contact a { color: rgba(255,255,255,.82); font-weight: 400; } }
+        @media (prefers-reduced-motion: no-preference) {
+            @keyframes site-glow { 0%,100% { text-shadow: 0 0 0 rgba(255,200,61,0); } 50% { text-shadow: 0 0 14px rgba(255,200,61,.55); } }
+            .site-announce strong { animation: site-glow 3.2s ease-in-out infinite; }
+        }
     </style>
 </head>
 <body>
+    <div class="site-announce">
+        <div class="row">
+            <span><strong>Now enrolling</strong> · Baby Class through Grade 12 · Applications welcome year-round. <a href="/admissions">Begin an application →</a></span>
+            <span class="contact"><a href="tel:+260972266217">+260 972 266 217</a><span>Plot 1310/4 East Kamenza, Chililabombwe</span></span>
+        </div>
+    </div>
     <div class="topbar">
         <div class="container topbar-inner">
             <div class="meta">
