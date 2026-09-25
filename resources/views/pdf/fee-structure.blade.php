@@ -483,9 +483,9 @@
                 <div class="box mobile">
                     <div class="kicker">Option 1 · Mobile Money</div>
                     <div class="box-title">Pay by USSD</div>
-                    <div class="ussd">*388*719693*amount#</div>
+                    <div class="ussd">*543*719693*amount#</div>
                     <div class="row">Dial the code above from any Zambian line, replacing <em>amount</em> with the ZMW amount you are paying. Follow the prompts to confirm.</div>
-                    <div class="row" style="margin-top: 4px; color: #6b7280; font-size: 8.5pt;">Example: <strong>*388*719693*3800#</strong> pays K3,800.</div>
+                    <div class="row" style="margin-top: 4px; color: #6b7280; font-size: 8.5pt;">Example: <strong>*543*719693*3800#</strong> pays K3,800.</div>
                 </div>
             </td>
             <td>
